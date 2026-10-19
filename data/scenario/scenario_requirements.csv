@@ -1,0 +1,115 @@
+req_id,project_id,project_name,title,description,type,group_id,granularity,initial_status,final_status,split
+RET-R01,SYS-RET,Online Retail Platform,Product search with filters,"Customers can search the catalogue and narrow results by price, brand, rating and delivery options.",FR,Catalogue,Sprint Commitment,Confirmed,Confirmed,val
+RET-R02,SYS-RET,Online Retail Platform,Home page recommendations,The home page shows products recommended from the customer's recent browsing.,FR,Catalogue,Weekly Workload,Confirmed,Dropped,train
+RET-R03,SYS-RET,Online Retail Platform,Cart persistence across devices,"A signed-in customer sees the same cart on phone, tablet and laptop.",FR,Cart and Payments,Sprint Commitment,Confirmed,Confirmed,train
+RET-R04,SYS-RET,Online Retail Platform,Card and wallet payments,Checkout accepts debit and credit cards and local digital wallets.,FR,Cart and Payments,Sprint Commitment,Confirmed,Confirmed,train
+RET-R05,SYS-RET,Online Retail Platform,Order tracking page,Customers follow delivery progress of an order on a tracking page.,FR,Fulfilment,Weekly Workload,Confirmed,Confirmed,train
+RET-R06,SYS-RET,Online Retail Platform,Social account sign-in,Customers can register and sign in using Google or Facebook accounts.,FR,Customer Accounts,Sprint Commitment,Confirmed,At Risk,test
+RET-R07,SYS-RET,Online Retail Platform,PCI-DSS compliant payments,Payment handling follows PCI-DSS so card data never reaches platform servers.,NFR,Cart and Payments,Sprint Commitment,Confirmed,Confirmed,train
+RET-R08,SYS-RET,Online Retail Platform,Search response under two seconds,"Search results return within two seconds at the 95th percentile, including sale periods.",NFR,Catalogue,Weekly Workload,Confirmed,At Risk,val
+RET-R09,SYS-RET,Online Retail Platform,Seller stock dashboard,Sellers update and review stock levels in bulk from a dashboard.,FR,Seller Tools,Sprint Commitment,Confirmed,Modified,val
+RET-R10,SYS-RET,Online Retail Platform,Returns and refunds,Customers request returns from their order page and follow the refund status.,FR,Customer Accounts,Sprint Commitment,Confirmed,At Risk,test
+RET-R11,SYS-RET,Online Retail Platform,Product reviews and ratings,Customers who bought a product can rate it and write a review.,FR,Catalogue,Weekly Workload,Confirmed,Confirmed,train
+RET-R12,SYS-RET,Online Retail Platform,Wishlist,Signed-in customers save products to a wishlist and share it.,FR,Customer Accounts,Sprint Commitment,Confirmed,Modified,train
+RET-R13,SYS-RET,Online Retail Platform,Discount codes and promotions,Marketing creates discount codes and campaign prices applied at checkout.,FR,Pricing and Promotions,Sprint Commitment,Confirmed,Confirmed,train
+RET-R14,SYS-RET,Online Retail Platform,Gift cards,"Customers buy, send and redeem digital gift cards.",FR,Pricing and Promotions,Weekly Workload,Confirmed,At Risk,train
+RET-R15,SYS-RET,Online Retail Platform,Delivery slot selection,Customers choose a delivery date and time window at checkout.,FR,Fulfilment,Sprint Commitment,Confirmed,At Risk,val
+RET-R16,SYS-RET,Online Retail Platform,Multi-currency pricing,Prices can be displayed and charged in several currencies.,FR,Pricing and Promotions,Sprint Commitment,Confirmed,Confirmed,train
+RET-R17,SYS-RET,Online Retail Platform,Stock reservation at checkout,Stock is held for a customer while they complete payment.,FR,Fulfilment,Weekly Workload,Confirmed,At Risk,train
+RET-R18,SYS-RET,Online Retail Platform,Regional tax calculation,Taxes are calculated by delivery region and shown at checkout.,FR,Pricing and Promotions,Sprint Commitment,Confirmed,At Risk,train
+RET-R19,SYS-RET,Online Retail Platform,Seller onboarding and verification,New sellers register and are verified before listing products.,FR,Seller Tools,Sprint Commitment,Confirmed,At Risk,train
+RET-R20,SYS-RET,Online Retail Platform,Seller commission reports,"Sellers see sales, commission and payout reports.",FR,Seller Tools,Weekly Workload,Confirmed,Confirmed,test
+RET-R21,SYS-RET,Online Retail Platform,Product image upload and moderation,Sellers upload product images that are checked before publishing.,FR,Seller Tools,Sprint Commitment,Confirmed,Dropped,train
+RET-R22,SYS-RET,Online Retail Platform,Address book,Customers save several delivery addresses.,FR,Customer Accounts,Sprint Commitment,Confirmed,Modified,train
+RET-R23,SYS-RET,Online Retail Platform,Order history and reorder,Customers view past orders and reorder with one tap.,FR,Customer Accounts,Weekly Workload,Confirmed,Confirmed,val
+RET-R24,SYS-RET,Online Retail Platform,Order notifications,Customers get email and push notifications about order status.,FR,Fulfilment,Sprint Commitment,Confirmed,At Risk,train
+RET-R25,SYS-RET,Online Retail Platform,Order fraud screening,Suspicious orders are flagged for review before shipping.,FR,Cart and Payments,Sprint Commitment,Confirmed,Confirmed,train
+RET-R26,SYS-RET,Online Retail Platform,Price change audit trail,All price and promotion changes are logged with user and time.,NFR,Platform,Weekly Workload,Confirmed,Confirmed,train
+RET-R27,SYS-RET,Online Retail Platform,Sale-event uptime,The storefront stays available during high-traffic sale events.,NFR,Platform,Sprint Commitment,Confirmed,At Risk,train
+RET-R28,SYS-RET,Online Retail Platform,Mobile page load under three seconds,Key pages load within three seconds on a mid-range phone on 4G.,NFR,Platform,Sprint Commitment,Confirmed,Confirmed,train
+RET-R29,SYS-RET,Online Retail Platform,Privacy and consent management,Customer consent and data requests are handled according to privacy law.,NFR,Platform,Weekly Workload,Confirmed,Confirmed,test
+RET-R30,SYS-RET,Online Retail Platform,Multi-language storefront,"The storefront is available in English, Sinhala and Tamil.",FR,Catalogue,Sprint Commitment,Confirmed,Confirmed,test
+RET-R31,SYS-RET,Online Retail Platform,Storefront accessibility,The storefront meets WCAG 2.1 AA.,NFR,Platform,Sprint Commitment,Confirmed,At Risk,test
+HMS-R01,SYS-HMS,Hospital Management System,Online appointment booking,"Patients book, change and cancel appointments online.",FR,Appointments,Sprint Commitment,Confirmed,Confirmed,val
+HMS-R02,SYS-HMS,Hospital Management System,Doctor schedule management,Doctors set weekly availability and block time for surgery and leave.,FR,Appointments,Weekly Workload,Confirmed,Modified,train
+HMS-R03,SYS-HMS,Hospital Management System,Electronic patient record view,"One screen shows a patient's history, allergies and current medication.",FR,Clinical,Sprint Commitment,Confirmed,At Risk,train
+HMS-R04,SYS-HMS,Hospital Management System,Lab results in patient portal,Reviewed lab results become visible to patients in their portal.,FR,Clinical,Sprint Commitment,Confirmed,Dropped,train
+HMS-R05,SYS-HMS,Hospital Management System,Prescription issuing,Doctors issue prescriptions from the consultation screen and send them to the pharmacy.,FR,Clinical,Weekly Workload,Confirmed,Modified,train
+HMS-R06,SYS-HMS,Hospital Management System,Billing and insurance claims,Claims are generated from recorded treatments and submitted to insurers.,FR,Billing,Sprint Commitment,Confirmed,Confirmed,val
+HMS-R07,SYS-HMS,Hospital Management System,Role-based record access,Staff open only the patient information their role allows.,NFR,Security and Platform,Sprint Commitment,Confirmed,Confirmed,test
+HMS-R08,SYS-HMS,Hospital Management System,Record access audit log,"Every access to a patient record is logged with who, when and why.",NFR,Security and Platform,Weekly Workload,Confirmed,At Risk,train
+HMS-R09,SYS-HMS,Hospital Management System,Appointment SMS reminders,Patients receive an SMS reminder the day before an appointment.,FR,Appointments,Sprint Commitment,Confirmed,At Risk,train
+HMS-R10,SYS-HMS,Hospital Management System,System availability target,The system is available at least 99.5 percent of the time.,NFR,Security and Platform,Sprint Commitment,Confirmed,At Risk,train
+HMS-R11,SYS-HMS,Hospital Management System,Patient registration,Front desk registers patients and keeps demographic details.,FR,Appointments,Weekly Workload,Confirmed,Modified,train
+HMS-R12,SYS-HMS,Hospital Management System,Walk-in queue management,Walk-in patients are queued and called to consultation rooms.,FR,Appointments,Sprint Commitment,Confirmed,At Risk,test
+HMS-R13,SYS-HMS,Hospital Management System,Video consultation,Patients consult doctors by secure video call.,FR,Appointments,Sprint Commitment,Confirmed,Dropped,test
+HMS-R14,SYS-HMS,Hospital Management System,Bed management,Ward staff see bed availability and assign patients to beds.,FR,Wards and Theatre,Weekly Workload,Confirmed,Confirmed,train
+HMS-R15,SYS-HMS,Hospital Management System,Shift handover notes,Nurses record and read handover notes between shifts.,FR,Wards and Theatre,Sprint Commitment,Confirmed,Confirmed,test
+HMS-R16,SYS-HMS,Hospital Management System,Pharmacy stock and dispensing,Pharmacy tracks stock and dispenses against prescriptions.,FR,Clinical,Sprint Commitment,Confirmed,Confirmed,train
+HMS-R17,SYS-HMS,Hospital Management System,Radiology image viewing,Doctors view radiology images from the patient record.,FR,Clinical,Weekly Workload,Confirmed,Confirmed,val
+HMS-R18,SYS-HMS,Hospital Management System,Discharge summary generation,A discharge summary is created from the patient's stay.,FR,Wards and Theatre,Sprint Commitment,Confirmed,Confirmed,train
+HMS-R19,SYS-HMS,Hospital Management System,Insurance eligibility check,Staff check insurance cover at admission.,FR,Billing,Sprint Commitment,Confirmed,Confirmed,val
+HMS-R20,SYS-HMS,Hospital Management System,Patient invoicing and payment,Patients receive itemised invoices and pay by card or cash.,FR,Billing,Weekly Workload,Confirmed,At Risk,train
+HMS-R21,SYS-HMS,Hospital Management System,Theatre scheduling,"Theatre sessions are booked with surgeon, team and equipment.",FR,Wards and Theatre,Sprint Commitment,Confirmed,Confirmed,train
+HMS-R22,SYS-HMS,Hospital Management System,Staff roster and leave,Managers build duty rosters and approve leave.,FR,Administration,Sprint Commitment,Confirmed,Modified,train
+HMS-R23,SYS-HMS,Hospital Management System,Management dashboard,"Management sees admissions, waiting times and revenue.",FR,Administration,Weekly Workload,Confirmed,Confirmed,train
+HMS-R24,SYS-HMS,Hospital Management System,Backup and disaster recovery,Patient data is backed up and can be recovered quickly after a failure.,NFR,Security and Platform,Sprint Commitment,Confirmed,Confirmed,train
+HMS-R25,SYS-HMS,Hospital Management System,Patient data privacy compliance,The system meets national health data privacy requirements.,NFR,Security and Platform,Sprint Commitment,Confirmed,Confirmed,test
+HMS-R26,SYS-HMS,Hospital Management System,HL7 and FHIR integration,"Lab, radiology and device systems exchange data through standard interfaces.",NFR,Security and Platform,Weekly Workload,Confirmed,Confirmed,train
+MBA-R01,SYS-MBA,Mobile Banking App,Fund transfers,Customers move money between own accounts and to other banks.,FR,Payments,Sprint Commitment,Confirmed,Confirmed,test
+MBA-R02,SYS-MBA,Mobile Banking App,Bill and scheduled payments,Users pay utility bills and set up recurring scheduled payments.,FR,Payments,Weekly Workload,Confirmed,Confirmed,train
+MBA-R03,SYS-MBA,Mobile Banking App,Transaction history and statements,Customers browse transaction history and download statements.,FR,Accounts and Savings,Sprint Commitment,Confirmed,Modified,train
+MBA-R04,SYS-MBA,Mobile Banking App,Biometric login,Customers log in with fingerprint or face recognition.,FR,Security,Sprint Commitment,Confirmed,At Risk,test
+MBA-R05,SYS-MBA,Mobile Banking App,Two-factor authentication for transfers,Transfers above a set amount need a one-time code.,FR,Security,Weekly Workload,Confirmed,Confirmed,train
+MBA-R06,SYS-MBA,Mobile Banking App,Card block and unblock,Customers block a lost card and temporarily unblock it from the app.,FR,Cards,Sprint Commitment,Confirmed,Confirmed,train
+MBA-R07,SYS-MBA,Mobile Banking App,Transaction push notifications,Customers receive a push notification for each debit and credit.,FR,Customer Service,Sprint Commitment,Confirmed,Modified,val
+MBA-R08,SYS-MBA,Mobile Banking App,In-app support chat,Customers chat with a support agent inside the app.,FR,Customer Service,Weekly Workload,Confirmed,Dropped,train
+MBA-R09,SYS-MBA,Mobile Banking App,Transfer completion under five seconds,Own account transfers complete within five seconds of confirmation.,NFR,Payments,Sprint Commitment,Confirmed,Confirmed,val
+MBA-R10,SYS-MBA,Mobile Banking App,Data encryption,Customer data is encrypted in transit and at rest.,NFR,Security,Sprint Commitment,Confirmed,Confirmed,train
+MBA-R11,SYS-MBA,Mobile Banking App,eKYC onboarding,New customers verify identity with an ID photo and selfie.,FR,Onboarding,Weekly Workload,Confirmed,Confirmed,train
+MBA-R12,SYS-MBA,Mobile Banking App,In-app account opening,Customers open a savings account without visiting a branch.,FR,Onboarding,Sprint Commitment,Confirmed,At Risk,train
+MBA-R13,SYS-MBA,Mobile Banking App,Savings goals,Customers set savings goals and move money into them automatically.,FR,Accounts and Savings,Sprint Commitment,Confirmed,Confirmed,val
+MBA-R14,SYS-MBA,Mobile Banking App,Fixed deposits,Customers create and renew fixed deposits.,FR,Accounts and Savings,Weekly Workload,Confirmed,Confirmed,test
+MBA-R15,SYS-MBA,Mobile Banking App,Loan application,Customers apply for personal loans and track the application.,FR,Lending,Sprint Commitment,Confirmed,Confirmed,train
+MBA-R16,SYS-MBA,Mobile Banking App,Loan repayment schedule,"Customers see instalments, due dates and the payoff balance.",FR,Lending,Sprint Commitment,Confirmed,Confirmed,train
+MBA-R17,SYS-MBA,Mobile Banking App,Credit card statements and payment,Customers view card statements and pay the bill.,FR,Cards,Weekly Workload,Confirmed,At Risk,train
+MBA-R18,SYS-MBA,Mobile Banking App,Virtual card,Customers generate a temporary card number for online purchases.,FR,Cards,Sprint Commitment,Confirmed,Confirmed,test
+MBA-R19,SYS-MBA,Mobile Banking App,Card spending limits,Customers set daily and online spending limits.,FR,Cards,Sprint Commitment,Confirmed,Modified,train
+MBA-R20,SYS-MBA,Mobile Banking App,QR code payments,Customers pay merchants by scanning a QR code.,FR,Payments,Weekly Workload,Confirmed,At Risk,train
+MBA-R21,SYS-MBA,Mobile Banking App,International transfers,Customers send money abroad with fees and rates shown upfront.,FR,Payments,Sprint Commitment,Confirmed,Confirmed,train
+MBA-R22,SYS-MBA,Mobile Banking App,Exchange rates and conversion,Customers see current exchange rates and convert between currencies.,FR,Payments,Sprint Commitment,Confirmed,At Risk,val
+MBA-R23,SYS-MBA,Mobile Banking App,Fraud alerts,Suspicious transactions are flagged and customers confirm or block them.,FR,Security,Weekly Workload,Confirmed,Confirmed,train
+MBA-R24,SYS-MBA,Mobile Banking App,Session timeout and device binding,Sessions expire after inactivity and the app is linked to registered devices.,FR,Security,Sprint Commitment,Confirmed,Confirmed,test
+MBA-R25,SYS-MBA,Mobile Banking App,Customer data privacy and consent,"Customer data is handled according to privacy law, including marketing consent.",NFR,Compliance,Sprint Commitment,Confirmed,Confirmed,val
+MBA-R26,SYS-MBA,Mobile Banking App,Customer action audit log,Every customer action that changes data is logged for audit.,NFR,Compliance,Weekly Workload,Confirmed,At Risk,train
+MBA-R27,SYS-MBA,Mobile Banking App,App availability target,The mobile banking app is available 99.9 percent of the time.,NFR,Platform,Sprint Commitment,Confirmed,At Risk,train
+MBA-R28,SYS-MBA,Mobile Banking App,Supported OS versions,The app runs on current Android and iOS versions.,NFR,Platform,Sprint Commitment,Confirmed,At Risk,train
+MBA-R29,SYS-MBA,Mobile Banking App,Low-bandwidth mode,Core screens work on weak mobile connections and the app stays small.,NFR,Platform,Weekly Workload,Confirmed,Confirmed,train
+MBA-R30,SYS-MBA,Mobile Banking App,Multi-language support,"The app supports English, Sinhala and Tamil.",FR,Platform,Sprint Commitment,Confirmed,Confirmed,train
+MBA-R31,SYS-MBA,Mobile Banking App,Branch and ATM locator,Customers find nearby branches and ATMs on a map.,FR,Customer Service,Sprint Commitment,Confirmed,Modified,train
+MBA-R32,SYS-MBA,Mobile Banking App,Spending insights and budgets,Customers see spending by category and set monthly budgets.,FR,Accounts and Savings,Weekly Workload,Confirmed,Confirmed,train
+MBA-R33,SYS-MBA,Mobile Banking App,Rewards and loyalty points,Customers earn and redeem points for card spending.,FR,Customer Service,Sprint Commitment,Confirmed,Dropped,test
+MBA-R34,SYS-MBA,Mobile Banking App,Regulatory reporting export,Reports for the central bank are generated from app and transaction data.,NFR,Compliance,Sprint Commitment,Confirmed,Confirmed,test
+ULP-R01,SYS-ULP,University Learning Portal,Course enrolment,Students enrol in courses online during the registration window.,FR,Courses,Sprint Commitment,Confirmed,Confirmed,train
+ULP-R02,SYS-ULP,University Learning Portal,Assignment submission,Students upload assignments before a per-assignment deadline.,FR,Assessment,Weekly Workload,Confirmed,Confirmed,train
+ULP-R03,SYS-ULP,University Learning Portal,Lecturer gradebook,Lecturers enter marks and release results to students.,FR,Assessment,Sprint Commitment,Confirmed,At Risk,train
+ULP-R04,SYS-ULP,University Learning Portal,Plagiarism check,Submitted assignments are checked for similarity and a report is shown to lecturers.,FR,Assessment,Sprint Commitment,Confirmed,Dropped,test
+ULP-R05,SYS-ULP,University Learning Portal,Course discussion forums,Each course has a forum for questions and replies.,FR,Community,Weekly Workload,Confirmed,Confirmed,train
+ULP-R06,SYS-ULP,University Learning Portal,Lecture video streaming,Students watch recorded lectures on phones and laptops.,FR,Courses,Sprint Commitment,Confirmed,Confirmed,val
+ULP-R07,SYS-ULP,University Learning Portal,Timetable calendar sync,Students see their timetable and sync it to phone calendars.,FR,Courses,Sprint Commitment,Confirmed,Modified,test
+ULP-R08,SYS-ULP,University Learning Portal,Single sign-on,Users sign in with their university account.,FR,Platform and Access,Weekly Workload,Confirmed,Confirmed,train
+ULP-R09,SYS-ULP,University Learning Portal,"5,000 concurrent users","The portal supports 5,000 simultaneous students during assignment deadlines.",NFR,Platform and Access,Sprint Commitment,Confirmed,At Risk,test
+ULP-R10,SYS-ULP,University Learning Portal,Accessibility WCAG 2.1 AA,The portal meets WCAG 2.1 AA for screen reader and keyboard users.,NFR,Platform and Access,Sprint Commitment,Confirmed,At Risk,test
+ULP-R11,SYS-ULP,University Learning Portal,Course catalogue,Students browse courses and read the syllabus before enrolling.,FR,Courses,Weekly Workload,Confirmed,Modified,train
+ULP-R12,SYS-ULP,University Learning Portal,Attendance tracking,"Lecturers record attendance, for example with a QR code.",FR,Courses,Sprint Commitment,Confirmed,Dropped,train
+ULP-R13,SYS-ULP,University Learning Portal,Online quizzes,Lecturers set quizzes that are marked automatically.,FR,Assessment,Sprint Commitment,Confirmed,At Risk,val
+ULP-R14,SYS-ULP,University Learning Portal,Exam scheduling,The exams office schedules exams and detects student clashes.,FR,Assessment,Weekly Workload,Confirmed,Confirmed,train
+ULP-R15,SYS-ULP,University Learning Portal,Rubric marking,Lecturers mark with rubrics and write feedback.,FR,Assessment,Sprint Commitment,Confirmed,Confirmed,train
+ULP-R16,SYS-ULP,University Learning Portal,Student progress dashboard,"Students see grades, attendance and upcoming deadlines.",FR,Student Support,Sprint Commitment,Confirmed,Confirmed,train
+ULP-R17,SYS-ULP,University Learning Portal,Advisor appointment booking,Students book appointments with their academic advisor.,FR,Student Support,Weekly Workload,Confirmed,Modified,train
+ULP-R18,SYS-ULP,University Learning Portal,Announcements and notifications,Lecturers post announcements that reach students by email and in the portal.,FR,Community,Sprint Commitment,Confirmed,Confirmed,train
+ULP-R19,SYS-ULP,University Learning Portal,Mobile-friendly portal,Every student page works on a phone screen.,NFR,Platform and Access,Sprint Commitment,Confirmed,At Risk,train
+ULP-R20,SYS-ULP,University Learning Portal,Library system integration,Students search the library catalogue and see their loans.,FR,Data and Integration,Weekly Workload,Confirmed,Confirmed,train
+ULP-R21,SYS-ULP,University Learning Portal,Transcript requests,Students request transcripts and certificates online.,FR,Student Support,Sprint Commitment,Confirmed,At Risk,train
+ULP-R22,SYS-ULP,University Learning Portal,Student data privacy,Student data is protected and retained according to university policy.,NFR,Data and Integration,Sprint Commitment,Confirmed,Confirmed,val
+ULP-R23,SYS-ULP,University Learning Portal,Course content backup,Course materials and submissions can be recovered after a failure.,NFR,Data and Integration,Weekly Workload,Confirmed,Modified,test

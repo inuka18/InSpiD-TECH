@@ -1,0 +1,13 @@
+{
+  "name": "inspid-contracts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Hardhat project for the InSPiD-TECH requirement ledger (Solidity contract added in a later step).",
+  "scripts": {
+    "node": "hardhat node --hostname 0.0.0.0",
+    "compile": "hardhat compile"
+  },
+  "devDependencies": {
+    "hardhat": "^2.22.17"
+  }
+}
