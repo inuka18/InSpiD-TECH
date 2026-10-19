@@ -1,0 +1,92 @@
+# Start everything:            docker compose up --build
+# With a local MongoDB too:    docker compose --profile localdb up --build
+# (MongoDB Atlas is the default; see README.md.)
+name: inspid
+
+services:
+  neo4j:
+    image: neo4j:5.26-community
+    environment:
+      NEO4J_AUTH: ${NEO4J_USER}/${NEO4J_PASSWORD}
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - neo4j_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:7474 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  hardhat:
+    build: ./contracts
+    ports:
+      - "8545:8545"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://localhost:8545',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'eth_blockNumber',params:[]})}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  ai-service:
+    build: ./ai-service
+    env_file: .env
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=3).status == 200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  backend:
+    build: ./backend
+    env_file: .env
+    environment:
+      SCENARIO_DIR: /data/scenario
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./data/scenario:/data/scenario:ro
+    depends_on:
+      neo4j:
+        condition: service_healthy
+      hardhat:
+        condition: service_healthy
+      ai-service:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+        required: false # only present with --profile localdb
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:5000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
+  # Optional local database for teammates without Atlas.
+  mongo:
+    image: mongo:7
+    profiles: ["localdb"]
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+volumes:
+  neo4j_data:
+  mongo_data:

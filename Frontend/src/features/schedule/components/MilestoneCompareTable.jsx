@@ -1,0 +1,131 @@
+import { Diamond, CheckCircle2, Clock, AlertTriangle } from "lucide-react";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../../../components/ui/card";
+import { Badge } from "../../../components/ui/badge";
+import { varianceDays, isLate, isAtRisk, formatShortDate } from "../lib/scheduleUtils";
+import { cn } from "../../../lib/utils";
+
+function StatusIcon({ task }) {
+  if (task.status === "done")
+    return <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-500" />;
+  if (isAtRisk(task))
+    return <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-red-500" />;
+  return <Clock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />;
+}
+
+export function MilestoneCompareTable({ tasks = [] }) {
+  const milestones = tasks.filter((t) => t.milestone);
+
+  if (milestones.length === 0) return null;
+
+  const done    = milestones.filter((t) => t.status === "done").length;
+  const atRisk  = milestones.filter(isAtRisk).length;
+  const onTrack = milestones.length - atRisk;
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <Diamond className="h-4 w-4 text-primary" />
+              <CardTitle className="text-base">Milestone Tracker — Original vs Actual</CardTitle>
+            </div>
+            <CardDescription className="mt-0.5">
+              {milestones.length} milestone{milestones.length !== 1 ? "s" : ""} · {done} completed · {atRisk} at risk
+            </CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+              {onTrack} on track
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700 dark:bg-red-900/30 dark:text-red-400">
+              {atRisk} at risk
+            </span>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="p-0">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[560px] border-separate border-spacing-0 text-xs">
+            <thead>
+              <tr className="bg-muted/40">
+                {["", "Milestone", "Phase", "Original Date", "Actual Date", "Variance", "Progress", "Status"].map((h, i) => (
+                  <th
+                    key={i}
+                    className="border-b border-border px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-muted-foreground whitespace-nowrap"
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {milestones.map((task, i) => {
+                const v    = varianceDays(task);
+                const late = isLate(task);
+                const isEven = i % 2 === 0;
+                return (
+                  <tr key={task.id} className={isEven ? "bg-card" : "bg-muted/10"}>
+                    <td className="border-b border-border/40 px-3 py-2.5">
+                      <StatusIcon task={task} />
+                    </td>
+                    <td className="border-b border-border/40 px-3 py-2.5 max-w-[200px]">
+                      <div className="flex items-center gap-1.5">
+                        <Diamond className="h-3 w-3 shrink-0 text-primary" />
+                        <span className="truncate font-semibold text-foreground" title={task.name}>{task.name}</span>
+                        {task.critical && (
+                          <span className="shrink-0 rounded-full bg-red-100 px-1.5 py-0.5 text-[9px] font-bold text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                            Critical
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="border-b border-border/40 px-3 py-2.5 whitespace-nowrap text-muted-foreground">
+                      {task.phaseName ?? "—"}
+                    </td>
+                    <td className="border-b border-border/40 px-3 py-2.5 whitespace-nowrap text-muted-foreground">
+                      {formatShortDate(task.baselineEnd)}
+                    </td>
+                    <td className={cn("border-b border-border/40 px-3 py-2.5 whitespace-nowrap font-semibold", late ? "text-red-600 dark:text-red-400" : "text-foreground")}>
+                      {formatShortDate(task.end)}
+                    </td>
+                    <td className="border-b border-border/40 px-3 py-2.5 whitespace-nowrap">
+                      {v > 0 ? (
+                        <span className="inline-flex items-center gap-1 font-bold text-red-600 dark:text-red-400">
+                          <AlertTriangle className="h-3 w-3" />+{v}d late
+                        </span>
+                      ) : v < 0 ? (
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400">{Math.abs(v)}d early</span>
+                      ) : (
+                        <span className="text-muted-foreground">On time</span>
+                      )}
+                    </td>
+                    <td className="border-b border-border/40 px-3 py-2.5 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
+                          <div
+                            className={cn("h-full rounded-full", task.status === "done" ? "bg-emerald-500" : late ? "bg-red-500" : "bg-primary")}
+                            style={{ width: `${task.progress}%` }}
+                          />
+                        </div>
+                        <span className="text-muted-foreground">{task.progress}%</span>
+                      </div>
+                    </td>
+                    <td className="border-b border-border/40 px-3 py-2.5 whitespace-nowrap">
+                      <Badge
+                        variant={task.status === "done" ? "success" : isAtRisk(task) ? "danger" : task.status === "review" ? "info" : "outline"}
+                        className="text-[9px]"
+                      >
+                        {task.status === "done" ? "Done" : task.status === "review" ? "Review" : task.status === "in-progress" ? "In Progress" : "Not Started"}
+                      </Badge>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
