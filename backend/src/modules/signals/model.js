@@ -38,11 +38,14 @@ const signalSchema = new mongoose.Schema(
     reviewAction: { type: String, enum: REVIEW_ACTIONS, default: null },
     reviewNote: { type: String, default: null },
     statusNotReversed: { type: Boolean, default: false }, // PM rejected/corrected AFTER the status change was applied
+    // The uploaded document this signal came from (the file itself is never stored): { id: sha256 of the text, name }.
+    sourceDocument: { type: new mongoose.Schema({ id: String, name: String }, { _id: false }), default: null },
   },
   { timestamps: true, collection: 'signals' }
 );
 signalSchema.index({ projectId: 1, signalId: 1 }, { unique: true });
 signalSchema.index({ projectId: 1, timestamp: -1 });
+signalSchema.index({ projectId: 1, 'sourceDocument.id': 1 }, { sparse: true });
 
 // Every PM review action is stored here; the export turns accept/correct rows into retraining data.
 const feedbackSchema = new mongoose.Schema(

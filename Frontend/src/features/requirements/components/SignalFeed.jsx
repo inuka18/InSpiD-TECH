@@ -19,10 +19,10 @@ import { Button } from "../../../components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/ui/select";
 import { Skeleton } from "../../../components/ui/skeleton";
 import { Badge } from "../../../components/ui/badge";
-import { Tooltip, TooltipContent, TooltipTrigger } from "../../../components/ui/tooltip";
 import { ClassificationBadge } from "./ClassificationBadge";
 import { ConfidenceMeter } from "./ConfidenceMeter";
 import { SignalSubmitPanel } from "./SignalSubmitPanel";
+import { UploadDocumentDialog } from "./UploadDocumentDialog";
 import { CLASSIFICATIONS } from "../../../data/mockSignals";
 import { reviewSignal } from "../../../services/signalsService";
 import { formatRelativeTime, cn } from "../../../lib/utils";
@@ -47,21 +47,6 @@ function dateKey(iso) {
 function formatDateKey(key) {
   const [y, m, d] = key.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
-}
-
-function RestrictedButton({ label, children }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span tabIndex={0}>
-          <Button variant="outline" size="sm" disabled className="pointer-events-none opacity-60">
-            {children}
-          </Button>
-        </span>
-      </TooltipTrigger>
-      <TooltipContent>{label}</TooltipContent>
-    </Tooltip>
-  );
 }
 
 const REVIEW_FILTERS = [
@@ -228,10 +213,8 @@ export function SignalFeed({
         </Select>
 
         <div className="flex shrink-0 gap-2">
-          <RestrictedButton label="Document upload is not connected to the backend yet">
-            <Upload className="h-4 w-4" />
-            Upload Document
-          </RestrictedButton>
+          {/* Any project member can upload: it finds signals, lets you review them, then saves the approved ones. */}
+          <UploadDocumentDialog projectId={projectId} requirements={requirements} onDone={onChanged} />
         </div>
       </div>
 
@@ -363,6 +346,14 @@ export function SignalFeed({
                     <span className="hidden sm:inline">· {signal.channel}</span>
                     <span>· {formatRelativeTime(signal.timestamp)}</span>
                     <span className="hidden font-mono text-[11px] sm:inline">· {signal.id}</span>
+                    {signal.sourceDocument?.name && (
+                      <span
+                        className="hidden max-w-[11rem] truncate rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground sm:inline"
+                        title={`From the document "${signal.sourceDocument.name}"`}
+                      >
+                        from {signal.sourceDocument.name}
+                      </span>
+                    )}
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5">
                     {isPending && (

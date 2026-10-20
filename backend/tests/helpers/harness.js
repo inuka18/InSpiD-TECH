@@ -56,9 +56,9 @@ async function start() {
 
   // ---- stubbed ai client (the service calls aiClient.classify / aiClient.match at call time)
   const aiClient = require('../../src/shared/aiClient');
-  const original = { classify: aiClient.classify, match: aiClient.match, embed: aiClient.embed };
+  const original = { classify: aiClient.classify, match: aiClient.match, embed: aiClient.embed, classifyBatch: aiClient.classifyBatch, matchBatch: aiClient.matchBatch };
   // embedFn(text) -> vector. Tests set it to control the requirement network; embedDown simulates an ai-service outage.
-  const ai = { calls: { classify: 0, match: 0, embed: 0, embedTexts: 0 }, embedDown: false, embedFn: null, down: false, matchDown: false, label: 'Expectation', confidence: 0.95, similarity: 0.7, matchTo: null };
+  const ai = { calls: { classify: 0, match: 0, embed: 0, embedTexts: 0, classifyBatch: 0, matchBatch: 0 }, classifyFor: null, matchFor: null, embedDown: false, embedFn: null, down: false, matchDown: false, label: 'Expectation', confidence: 0.95, similarity: 0.7, matchTo: null };
   aiClient.classify = async () => {
     ai.calls.classify += 1;
     if (ai.down) throw new AppError(502, 'AI_SERVICE_UNAVAILABLE', 'AI service unreachable (/classify)');
@@ -69,6 +69,24 @@ async function start() {
     if (ai.matchDown) throw new AppError(502, 'AI_SERVICE_UNAVAILABLE', 'AI service unreachable (/match)');
     const first = ai.matchTo || candidates[0].id;
     return [{ id: first, similarity: ai.similarity }, ...candidates.filter((c) => c.id !== first).map((c, i) => ({ id: c.id, similarity: 0.2 - i * 0.01 }))].slice(0, 3);
+  };
+
+  // batch versions used by documents (extract / bulk). classifyFor(text) -> { label, confidence } lets a test decide per text.
+  aiClient.classifyBatch = async (texts) => {
+    ai.calls.classifyBatch += 1;
+    if (ai.down) throw new AppError(502, 'AI_SERVICE_UNAVAILABLE', 'AI service unreachable (/classify/batch)');
+    return texts.map((t) => {
+      const r = ai.classifyFor ? ai.classifyFor(t) : { label: ai.label, confidence: ai.confidence };
+      return { label: r.label, confidence: r.confidence, scores: {}, model_version: 'test-v1' };
+    });
+  };
+  aiClient.matchBatch = async (texts, candidates) => {
+    ai.calls.matchBatch += 1;
+    if (ai.matchDown) throw new AppError(502, 'AI_SERVICE_UNAVAILABLE', 'AI service unreachable (/match/batch)');
+    return texts.map((t) => {
+      const first = (ai.matchFor && ai.matchFor(t, candidates)) || ai.matchTo || candidates[0].id;
+      return [{ id: first, similarity: ai.similarity }, ...candidates.filter((c) => c.id !== first).map((c, i) => ({ id: c.id, similarity: 0.2 - i * 0.01 }))].slice(0, 3);
+    });
   };
 
   aiClient.embed = async (texts) => {
@@ -89,7 +107,21 @@ async function start() {
     return { status: res.status, json, data: json?.data, text };
   }
 
+  // multipart upload: fields are strings, file = { name, buffer, type }
+  async function form(method, path, { token = pm.token, fields = {}, file } = {}) {
+    const fd = new FormData();
+    Object.entries(fields).forEach(([k, v]) => fd.append(k, v));
+    if (file) fd.append('file', new Blob([file.buffer], { type: file.type || 'application/octet-stream' }), file.name);
+    const res = await fetch(`${base}${path}`, { method, headers: token ? { authorization: `Bearer ${token}` } : {}, body: fd });
+    const text = await res.text();
+    let json = null;
+    try { json = JSON.parse(text); } catch { /* not json */ }
+    return { status: res.status, json, data: json?.data };
+  }
+
   async function close() {
+    aiClient.classifyBatch = original.classifyBatch;
+    aiClient.matchBatch = original.matchBatch;
     aiClient.classify = original.classify;
     aiClient.match = original.match;
     aiClient.embed = original.embed;
@@ -100,7 +132,7 @@ async function start() {
     await mongoose.disconnect();
   }
 
-  return { api, ai, projectId, pm, member, outsider, addRequirement, close, models: (n) => mongoose.model(n) };
+  return { api, form, ai, projectId, pm, member, outsider, addRequirement, close, models: (n) => mongoose.model(n) };
 }
 
 module.exports = { start, assertTestDb };

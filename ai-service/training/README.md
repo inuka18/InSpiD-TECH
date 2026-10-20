@@ -114,3 +114,9 @@ under `data/` (for example `data/processed/feedback_SYS-RET.csv`) and pass `/dat
 `docker compose run --rm trainer python -m training.analyze_pipeline` writes `docs/pipeline_analysis.md`: the share of
 scenario test signals at confidence >= 90 for the active model, and requirement-matching accuracy and similarity
 distributions (the basis for `MATCH_MIN_SIMILARITY`).
+
+## Batch endpoints
+
+`POST /classify/batch {texts}` (max 300) uses the same active model and `predict_proba` path as `/classify` and returns
+`[{label, confidence, scores, model_version}]` in the same order. `POST /match/batch {texts, candidates, top_k}` ranks the candidate requirements for
+many texts at once (candidates are embedded once, cached by text hash). The backend uses them for document extraction.

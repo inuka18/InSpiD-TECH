@@ -62,7 +62,9 @@ function readableMessage(error, status) {
  */
 export async function api(path, { method = "GET", body, auth = true, signal } = {}) {
   const headers = { Accept: "application/json" };
-  if (body !== undefined) headers["Content-Type"] = "application/json";
+  // FormData (a file upload) is sent as is: the browser sets the multipart Content-Type with its boundary.
+  const isForm = typeof FormData !== "undefined" && body instanceof FormData;
+  if (body !== undefined && !isForm) headers["Content-Type"] = "application/json";
   const token = getToken();
   if (token && auth) headers.Authorization = `Bearer ${token}`;
 
@@ -71,7 +73,7 @@ export async function api(path, { method = "GET", body, auth = true, signal } = 
     res = await fetch(`${BASE_URL}${path}`, {
       method,
       headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
       signal,
     });
   } catch (err) {

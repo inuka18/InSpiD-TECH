@@ -82,6 +82,17 @@ class ClassifyOut(BaseModel):
     model_version: str
 
 
+class ClassifyBatchIn(BaseModel):
+    texts: List[str] = Field(min_length=1, max_length=300)
+
+
+class ClassifyItem(BaseModel):
+    label: str
+    confidence: float
+    scores: dict
+    model_version: str
+
+
 class EmbedIn(BaseModel):
     texts: List[str] = Field(min_length=1, max_length=512)
 
@@ -107,6 +118,12 @@ class Candidate(BaseModel):
 
 class MatchIn(BaseModel):
     text: str = Field(min_length=1)
+    candidates: List[Candidate] = Field(min_length=1, max_length=2000)
+    top_k: int = Field(default=5, ge=1, le=50)
+
+
+class MatchBatchIn(BaseModel):
+    texts: List[str] = Field(min_length=1, max_length=300)
     candidates: List[Candidate] = Field(min_length=1, max_length=2000)
     top_k: int = Field(default=5, ge=1, le=50)
 
@@ -137,6 +154,22 @@ def classify(body: ClassifyIn):
     return ClassifyOut(label=label, confidence=scores[label], scores=scores, model_version=version)
 
 
+@app.post("/classify/batch", response_model=List[ClassifyItem])
+def classify_batch(body: ClassifyBatchIn):
+    """Same model and the same predict_proba path as /classify, for many texts in one call (the cleaning and the
+    embedding steps are batched inside the model)."""
+    model, version, error = registry.get()
+    if model is None:
+        raise HTTPException(status_code=503, detail=error)
+    proba = model.predict_proba(body.texts)
+    out = []
+    for row in proba:
+        scores = {l: round(float(p), 6) for l, p in zip(LABELS, row)}
+        label = max(scores, key=scores.get)
+        out.append(ClassifyItem(label=label, confidence=scores[label], scores=scores, model_version=version))
+    return out
+
+
 @app.post("/embed", response_model=EmbedOut)
 def embed(body: EmbedIn):
     need_embedder()
@@ -158,3 +191,17 @@ def match(body: MatchIn):
     sims = cand @ q
     order = np.argsort(-sims, kind="stable")[: body.top_k]
     return [MatchItem(id=body.candidates[i].id, similarity=round(float(sims[i]), 6)) for i in order]
+
+
+@app.post("/match/batch", response_model=List[List[MatchItem]])
+def match_batch(body: MatchBatchIn):
+    """/match for many texts at once: the candidates are sent and embedded once (cached by text hash)."""
+    need_embedder()
+    cand = embedder.encode_cached([c.text for c in body.candidates])
+    queries = embedder.encode(body.texts)  # one batched encode for all the texts
+    sims = queries @ cand.T
+    out = []
+    for row in sims:
+        order = np.argsort(-row, kind="stable")[: body.top_k]
+        out.append([MatchItem(id=body.candidates[i].id, similarity=round(float(row[i]), 6)) for i in order])
+    return out

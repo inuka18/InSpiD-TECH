@@ -91,6 +91,7 @@ const signal = {
     applied: { type: 'boolean', description: 'The status rule was run and committed for this signal' },
     reviewAction: { type: 'string', nullable: true, enum: ['accept', 'reject', 'correct'] },
     statusNotReversed: { type: 'boolean', description: 'A PM rejected/corrected this signal AFTER its status change was applied. The status change and ledger entry were NOT reversed.' },
+    sourceDocument: { type: 'object', nullable: true, description: 'The uploaded document this signal came from (the file itself is not stored)', properties: { id: { type: 'string', description: 'sha256 of the document text' }, name: str } },
   },
 };
 const matchResult = {
@@ -175,6 +176,57 @@ module.exports = {
       post: op('signals', 'Preview the answer for a signal: nothing is saved or applied', {
         body: ingestBody, data: ingestResult,
         description: 'Same classification, match, proposed status and review decision as POST /signals, but nothing is written. signal is null, applied is false, wouldApply says whether it would be auto-applied and statusChange is the change it would make. Returns 502 if the AI service is down.',
+      }),
+    },
+    '/projects/{projectId}/signals/extract': {
+      post: op('signals', 'Find signals in a document (meeting notes, standup notes, an email, retrospective notes). Saves nothing.', {
+        data: {
+          type: 'object',
+          properties: {
+            documentId: { type: 'string', description: 'sha256 of the extracted text; send it back to /signals/bulk' }, name: str, source: str,
+            alreadySubmitted: { type: 'boolean', description: 'This document was already submitted to this project (bulk needs force: true)' },
+            modelVersion: { type: 'string', nullable: true }, autoAcceptThreshold: { type: 'integer' }, matchMinSimilarity: { type: 'number' }, autoApplyMinSimilarity: { type: 'number' },
+            counts: { type: 'object', properties: { total: { type: 'integer' }, signals: { type: 'integer' }, none: { type: 'integer' } } },
+            segments: arr({
+              type: 'object',
+              properties: {
+                index: { type: 'integer' }, line: { type: 'integer', description: 'original line number (1-based)' }, text: str,
+                speakerLabel: { type: 'string', nullable: true, description: 'a stripped leading "Name:" prefix, display only' },
+                label: labelEnum, confidence: { type: 'integer' }, match: matchResult, proposedStatus: { ...statusEnum, nullable: true },
+                wouldAutoApply: { type: 'boolean' }, reviewReason: str,
+              },
+            }),
+          },
+        },
+        body: { type: 'object', description: 'JSON { text, name?, source? } for pasted text, OR multipart/form-data with the file in the field "file" plus optional text fields source, authorRole, documentDate', properties: { text: str, name: str, source: { type: 'string', enum: ['Standup', 'Slack', 'Email', 'Teams', 'Jira Comment'], default: 'Standup' }, authorRole: str, documentDate: str } },
+        description: 'Any project member. Accepts .txt, .md, .docx and .pdf (a PDF is 415 if text extraction is unavailable), up to 2 MB; the file is processed in memory, never stored and never logged. '
+          + 'The text is split into lines, bullets and sentences (email headers, greetings, sign-offs, empty lines and segments under 25 characters are ignored; a leading "Name:" prefix is removed and returned as speakerLabel; duplicates are removed). '
+          + 'All segments are classified in one batch call and the non-None ones matched to requirements in one call, with the SAME decision rules as POST /signals/preview. More than 300 segments is a 413. 502 if the AI service is unavailable.',
+      }),
+    },
+    '/projects/{projectId}/signals/bulk': {
+      post: op('signals', 'Save the approved segments of a document through the normal signal flow', {
+        body: {
+          type: 'object', required: ['documentId', 'name', 'items'],
+          properties: {
+            documentId: { type: 'string', description: 'the documentId returned by /signals/extract' }, name: str,
+            source: { type: 'string', enum: ['Standup', 'Slack', 'Email', 'Teams', 'Jira Comment'], default: 'Standup' }, authorRole: str, timestamp: { type: 'string', description: 'Default: now' },
+            force: { type: 'boolean', description: 'Submit a document that was already submitted to this project' },
+            items: { type: 'array', maxItems: 100, items: { type: 'object', required: ['text'], properties: { text: str, requirementId: { type: 'string', description: 'Use this requirement instead of matching (counts as the user\'s choice)' } } } },
+          },
+        },
+        data: {
+          type: 'object',
+          properties: {
+            documentId: str, name: str,
+            summary: { type: 'object', properties: { applied: { type: 'integer' }, pending: { type: 'integer' }, noChange: { type: 'integer' }, failed: { type: 'integer' } } },
+            results: arr({ type: 'object', properties: { index: { type: 'integer' }, text: str, status: { type: 'string', enum: ['applied', 'pending', 'noChange', 'failed'] }, signalId: str, label: labelEnum, confidence: { type: 'integer' }, requirementId: { type: 'string', nullable: true }, reviewStatus: str, reviewReason: str, statusChange: { type: 'object', nullable: true }, error: str } }),
+          },
+        },
+        description: 'Any project member, max 100 items. Items are classified and matched as a batch first (502 and NOTHING saved if the AI service is down), then each item is decided and saved in order through the same flow as POST /signals '
+          + '(review policy, status engine, status history, ledger), so an item sees the status earlier items left behind. Each created signal stores sourceDocument { id, name }. '
+          + 'summary: applied = auto-applied and changed a status; pending = waits for a PM; noChange = accepted with nothing to change (including None); failed = could not be saved (reason in results). '
+          + '409 DOCUMENT_ALREADY_SUBMITTED if this documentId was already submitted to the project, unless force is true.',
       }),
     },
     '/projects/{projectId}/signals/{signalId}': { get: op('signals', 'One signal', { params: [param('signalId', 'SC-0001')], data: signal }) },

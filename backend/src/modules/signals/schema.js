@@ -31,4 +31,27 @@ const reviewBody = z.preprocess(
   })
 );
 
-module.exports = { signalParams, listQuery, createSignalBody, reviewBody };
+// ---- documents. `extract` takes multipart form fields (strings) or JSON, so every field is optional text.
+const SOURCE_DEFAULT = 'Standup';
+const extractBody = z.object({
+  text: z.string().max(2_000_000).optional(),
+  name: z.string().trim().max(200).optional(),
+  source: z.enum(SOURCE_TYPES).default(SOURCE_DEFAULT),
+  authorRole: z.string().trim().max(80).optional(),
+  documentDate: z.coerce.date().optional(),
+});
+
+const bulkBody = z.object({
+  documentId: z.string().regex(/^[a-f0-9]{64}$/, 'documentId must be the sha256 returned by extract'),
+  name: z.string().trim().min(1).max(200),
+  source: z.enum(SOURCE_TYPES).default(SOURCE_DEFAULT),
+  authorRole: z.string().trim().max(80).optional(),
+  timestamp: z.coerce.date().optional(),
+  force: z.boolean().optional(),
+  items: z.array(z.object({
+    text: z.string().trim().min(1).max(5000),
+    requirementId: z.string().trim().min(1).optional(),
+  })).min(1).max(100),
+});
+
+module.exports = { signalParams, listQuery, createSignalBody, reviewBody, extractBody, bulkBody };

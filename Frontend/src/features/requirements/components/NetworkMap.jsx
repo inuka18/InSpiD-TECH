@@ -2,10 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactFlow, {
   Background,
   BackgroundVariant,
-  Controls,
   Panel,
+  ReactFlowProvider,
   useEdgesState,
   useNodesState,
+  useReactFlow,
 } from "reactflow";
 import "reactflow/dist/style.css";
 import { AlertTriangle, ArrowUpRight, Link2, X, MousePointerClick } from "lucide-react";
@@ -17,6 +18,7 @@ import { PathfinderEdge } from "./PathfinderEdge";
 import { NetworkMapContext } from "./networkMapContext";
 import { LinkDetailsPanel } from "./LinkDetailsPanel";
 import { RequirementDetailPanel } from "./RequirementDetailPanel";
+import { MapToolbar, MAX_ZOOM, MIN_ZOOM } from "./MapToolbar";
 import { ManualLinkDialog } from "./ManualLinkDialog";
 import { RestrictedButton } from "./RestrictedButton";
 import { StatusBadge } from "./StatusBadge";
@@ -42,7 +44,7 @@ const STATUS_LEGEND = [
 ];
 
 // `requirements` are the network nodes from the API, `links` its computed (pathfinder) links with weights.
-export function NetworkMap({ projectId, signals = [], requirements, links = [], warning, onOpenRequirement, isPM, manualLinks, onCreateManualLink, onRemoveManualLink }) {
+function NetworkMapInner({ projectId, signals = [], requirements, links = [], warning, onOpenRequirement, isPM, manualLinks, onCreateManualLink, onRemoveManualLink }) {
   const wrapperRef = useRef(null);
   const [popover, setPopover] = useState(null);
   const [linkMode, setLinkMode] = useState(false);
@@ -59,6 +61,84 @@ export function NetworkMap({ projectId, signals = [], requirements, links = [], 
   useEffect(() => {
     panelRef.current = panel;
   }, [panel]);
+
+  // ---- zoom and fullscreen -----------------------------------------------------------------------------
+  const { fitView, zoomIn, zoomOut } = useReactFlow();
+  // Has the user moved or zoomed the map? Only then is fit-to-screen NOT re-applied automatically on resize.
+  const userMoved = useRef(false);
+  const [expanded, setExpanded] = useState(false); // the wrapper fills the viewport (CSS), with or without the Fullscreen API
+  const nativeFullscreen = useRef(false); // true while WE own a real browser fullscreen
+
+  const fit = useCallback(() => {
+    userMoved.current = false; // after "fit" the view is the fitted one again
+    fitView({ padding: 0.15, duration: 200 });
+  }, [fitView]);
+
+  const enterFullscreen = useCallback(async () => {
+    setExpanded(true); // CSS expansion always happens; it is the whole feature when the Fullscreen API is unavailable
+    const root = document.documentElement;
+    if (!root.requestFullscreen) return;
+    try {
+      // The Fullscreen API goes on <html>, not on the map element: the panels, dialogs and toasts are portals on <body>,
+      // so a fullscreen on the map element alone would hide them.
+      await root.requestFullscreen({ navigationUI: "hide" });
+      nativeFullscreen.current = true;
+      // Keyboard Lock (Chrome, Edge): the browser then lets Esc reach the page, so Esc can close a panel first.
+      // Without it (Firefox, Safari) the browser itself leaves fullscreen on Esc.
+      try {
+        await navigator.keyboard?.lock?.(["Escape"]);
+      } catch {
+        /* not supported or refused: fine */
+      }
+    } catch {
+      nativeFullscreen.current = false; // denied (iframe, some phones): stay in the CSS-only expanded mode
+    }
+  }, []);
+
+  const exitFullscreen = useCallback(async () => {
+    setExpanded(false);
+    nativeFullscreen.current = false;
+    try {
+      navigator.keyboard?.unlock?.();
+    } catch {
+      /* ignore */
+    }
+    if (document.fullscreenElement) {
+      try {
+        await document.exitFullscreen();
+      } catch {
+        /* ignore */
+      }
+    }
+  }, []);
+
+  const toggleFullscreen = useCallback(() => (expanded ? exitFullscreen() : enterFullscreen()), [expanded, enterFullscreen, exitFullscreen]);
+
+  // The browser's own exit (its fullscreen control, or Esc without Keyboard Lock) must keep our state correct.
+  useEffect(() => {
+    const onChange = () => {
+      if (!document.fullscreenElement && nativeFullscreen.current) {
+        nativeFullscreen.current = false;
+        setExpanded(false);
+        try {
+          navigator.keyboard?.unlock?.();
+        } catch {
+          /* ignore */
+        }
+      }
+    };
+    document.addEventListener("fullscreenchange", onChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onChange);
+      if (nativeFullscreen.current && document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+    };
+  }, []);
+
+  // The container changed size: re-fit, but only if the user has not moved or zoomed the map themselves.
+  useEffect(() => {
+    const timers = [120, 450].map((ms) => setTimeout(() => { if (!userMoved.current) fitView({ padding: 0.15, duration: 200 }); }, ms));
+    return () => timers.forEach(clearTimeout);
+  }, [expanded, fitView]);
 
   useEffect(() => {
     if (!toast) return;
@@ -220,11 +300,44 @@ export function NetworkMap({ projectId, signals = [], requirements, links = [], 
 
   // Keyboard: Enter/Space on a focused node or link does what a click does; Esc closes the small node popover.
   const handleKeyDown = (e) => {
+    // Esc closes things in this order: the node popover, then an open panel / dialog (they close themselves), and only
+    // then leaves the expanded / fullscreen view.
     if (e.key === "Escape" && popover) {
       setPopover(null);
       // React Flow blurs a selected node on Esc; put focus back on it once that has happened.
       setTimeout(restoreFocus, 0);
       return;
+    }
+    const dialogOpen = Boolean(panelRef.current || dialogPair || document.querySelector('[role="dialog"]'));
+    if (e.key === "Escape") {
+      if (expanded && !dialogOpen) exitFullscreen();
+      return;
+    }
+    // Shortcuts while the map has focus and nothing modal is open: + - 0 F
+    const typing = ["INPUT", "TEXTAREA", "SELECT"].includes(e.target.tagName) || e.target.isContentEditable;
+    if (!typing && !dialogOpen && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (e.key === "+" || e.key === "=") {
+        e.preventDefault();
+        userMoved.current = true;
+        zoomIn({ duration: 150 });
+        return;
+      }
+      if (e.key === "-" || e.key === "_") {
+        e.preventDefault();
+        userMoved.current = true;
+        zoomOut({ duration: 150 });
+        return;
+      }
+      if (e.key === "0") {
+        e.preventDefault();
+        fit();
+        return;
+      }
+      if (e.key === "f" || e.key === "F") {
+        e.preventDefault();
+        toggleFullscreen();
+        return;
+      }
     }
     if (e.key !== "Enter" && e.key !== " ") return;
     const edgeEl = e.target.closest?.(".react-flow__edge");
@@ -251,8 +364,14 @@ export function NetworkMap({ projectId, signals = [], requirements, links = [], 
     <NetworkMapContext.Provider value={mapContext}>
     <div
       ref={wrapperRef}
+      tabIndex={-1}
       onKeyDown={handleKeyDown}
-      className="relative h-[calc(100vh-14rem)] min-h-[520px] w-full overflow-hidden rounded-xl border border-border bg-card"
+      data-fullscreen={expanded ? "true" : "false"}
+      className={cn(
+        "overflow-hidden bg-card outline-none",
+        // z-40: above the app header (z-30), below sheets / dialogs / tooltips / toasts (z-50) that portal onto <body>.
+        expanded ? "fixed inset-0 z-40 h-dvh w-screen" : "relative h-[calc(100dvh-20.5rem)] min-h-[380px] w-full rounded-xl border border-border"
+      )}
     >
       <ReactFlow
         nodes={nodes}
@@ -265,16 +384,20 @@ export function NetworkMap({ projectId, signals = [], requirements, links = [], 
         onPaneClick={() => {
           setPopover(null);
           cancelLinking();
+          wrapperRef.current?.focus({ preventScroll: true }); // so the +, -, 0 and F shortcuts work after clicking the map
         }}
         onMove={() => setPopover(null)}
+        onMoveStart={(event) => {
+          if (event) userMoved.current = true; // a drag, wheel or pinch by the user (programmatic fits pass no event)
+        }}
         fitView
         fitViewOptions={{ padding: 0.15 }}
-        minZoom={0.3}
-        maxZoom={1.6}
+        minZoom={MIN_ZOOM}
+        maxZoom={MAX_ZOOM}
         proOptions={{ hideAttribution: true }}
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="hsl(var(--border))" />
-        <Controls showInteractive={false} />
+        <MapToolbar expanded={expanded} onToggleFullscreen={toggleFullscreen} onFit={fit} onUserZoom={() => { userMoved.current = true; }} />
 
         <Panel position="top-left">
           <div className="rounded-lg border border-border bg-card/95 px-3.5 py-2.5 text-xs shadow-sm backdrop-blur">
@@ -428,7 +551,7 @@ export function NetworkMap({ projectId, signals = [], requirements, links = [], 
       />
 
       {toast && (
-        <div className="absolute bottom-4 right-4 z-30 flex max-w-sm items-start gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground shadow-2xl animate-slide-up">
+        <div className="absolute bottom-16 right-4 z-30 flex max-w-sm items-start gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground shadow-2xl animate-slide-up">
           <span className="flex-1">{toast}</span>
           <button onClick={() => setToast(null)} className="shrink-0 text-muted-foreground hover:text-foreground">
             <X className="h-3.5 w-3.5" />
@@ -437,5 +560,14 @@ export function NetworkMap({ projectId, signals = [], requirements, links = [], 
       )}
     </div>
     </NetworkMapContext.Provider>
+  );
+}
+
+// React Flow's hooks (zoom, fit) need a provider above the map, so the keyboard shortcuts and the toolbar can use them.
+export function NetworkMap(props) {
+  return (
+    <ReactFlowProvider>
+      <NetworkMapInner {...props} />
+    </ReactFlowProvider>
   );
 }

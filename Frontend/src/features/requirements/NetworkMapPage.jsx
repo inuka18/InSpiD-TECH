@@ -41,7 +41,7 @@ export function NetworkMapPage() {
   if (loading || linksLoading) {
     return (
       <div>
-        <Skeleton className="h-[calc(100vh-14rem)] min-h-[520px] w-full rounded-xl" />
+        <Skeleton className="h-[calc(100dvh-20.5rem)] min-h-[380px] w-full rounded-xl" />
         <p className="mt-2 text-xs text-muted-foreground">Loading the network (the first time it is computed from the requirement texts).</p>
       </div>
     );

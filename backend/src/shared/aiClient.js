@@ -3,14 +3,14 @@
 const config = require('../config/env');
 const AppError = require('./AppError');
 
-async function call(path, body) {
+async function call(path, body, timeoutMs = 15000) {
   let res;
   try {
     res = await fetch(`${config.aiServiceUrl}${path}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch {
     throw new AppError(502, 'AI_SERVICE_UNAVAILABLE', `AI service unreachable (${path})`);
@@ -28,4 +28,8 @@ module.exports = {
   similarity: (a, b) => call('/similarity', { a, b }),
   /** candidates: [{ id, text }] -> [{ id, similarity }] ranked, best first */
   match: (text, candidates, topK = 5) => call('/match', { text, candidates, top_k: topK }),
+  /** many texts at once (max 300) -> [{ label, confidence, scores, model_version }] in the same order */
+  classifyBatch: (texts) => call('/classify/batch', { texts }, 90000),
+  /** candidates are sent once -> one ranked [{ id, similarity }] list per text */
+  matchBatch: (texts, candidates, topK = 3) => call('/match/batch', { texts, candidates, top_k: topK }, 90000),
 };

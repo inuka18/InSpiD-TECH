@@ -1,12 +1,16 @@
 'use strict';
+const crypto = require('crypto');
 const AppError = require('../../shared/AppError');
 const aiClient = require('../../shared/aiClient');
 const config = require('../../config/env');
-const { Requirement, StatusHistory } = require('../requirements/model');
-const ledger = require('../ledger/service');
+const { Requirement } = require('../requirements/model');
 const { Signal, Feedback, CLASSIFICATIONS } = require('./model');
 const { proposeStatus } = require('./statusEngine');
 const { decideReview, toConfidencePct } = require('./reviewPolicy');
+const { createWithSeqId } = require('./ids');
+const { finalizeSignal } = require('./finalize');
+const { segmentDocument, SegmentLimitError } = require('./segmentation');
+const { extractTextFromFile } = require('./documentText');
 
 // Seeded = loaded by the seed. Rows seeded before the `seeded` flag existed are recognised by their dataset `split`.
 const isSeeded = (s) => s.seeded === true || Boolean(s.split);
@@ -36,6 +40,7 @@ const toApi = (s) => ({
   applied: s.applied === true,
   reviewAction: s.reviewAction ?? null,
   statusNotReversed: s.statusNotReversed === true,
+  sourceDocument: s.sourceDocument?.id ? { id: s.sourceDocument.id, name: s.sourceDocument.name ?? null } : null,
 });
 
 // Newest first, like a live feed.
@@ -52,73 +57,79 @@ async function getOne(projectId, signalId) {
   return toApi(s);
 }
 
-// ---------------------------------------------------------------- ids (SC-0001, SH-0001, ...)
-async function nextSeq(Model, field, prefix) {
-  const last = await Model.findOne({}, { [field]: 1 }).sort({ [field]: -1 }).collation({ locale: 'en', numericOrdering: true }).lean();
-  const n = last ? Number(String(last[field]).replace(/\D/g, '')) + 1 : 1;
-  return `${prefix}${String(n).padStart(4, '0')}`;
-}
-
-async function createWithSeqId(Model, field, prefix, build) {
-  for (let i = 0; i < 5; i += 1) {
-    try {
-      return await Model.create(build(await nextSeq(Model, field, prefix)));
-    } catch (err) {
-      if (err.code !== 11000) throw err; // id taken by a concurrent request: take the next one
-    }
-  }
-  throw new AppError(409, 'ID_BUSY', 'Could not allocate an id (concurrent writes); try again');
-}
-
 // ------------------------------------------------------------ classify + map + decide (no writes)
-async function analyze(projectId, body) {
-  const threshold = config.autoAcceptConfidence;
-  const a = { threshold, label: null, confidence: null, modelVersion: null, requirement: null, match: null, engine: null, degraded: false, message: null };
+const candidatesOf = (reqs) => reqs.map((r) => ({ id: r.reqId, text: `${r.title}. ${r.description || ''}`.trim() }));
 
+// Ranked matches from the ai-service -> { match, requirement }. A match below MATCH_MIN_SIMILARITY proposes no requirement.
+function rankedToMatch(ranked, reqs) {
+  const alternatives = ranked.slice(0, 3).map((m) => ({ requirementId: m.id, similarity: m.similarity }));
+  const top = alternatives[0];
+  const ok = Boolean(top) && top.similarity >= config.matchMinSimilarity;
+  return {
+    match: { requirementId: ok ? top.requirementId : null, similarity: top ? top.similarity : null, method: 'auto', alternatives },
+    requirement: ok ? reqs.find((r) => r.reqId === top.requirementId) ?? null : null,
+  };
+}
+
+/**
+ * THE shared decision step (mapping thresholds -> status engine -> review policy). Preview, create, extract and bulk
+ * all call this one function, so the rules live in exactly one place.
+ * @param {object} p  text, ai { label, confidence (0-1), model_version }, requirement (lean doc or null), match, degraded, message
+ */
+function decideAnalysis({ text, ai, requirement = null, match = null, degraded = false, message = null }) {
+  const threshold = config.autoAcceptConfidence;
+  const a = {
+    threshold, label: CLASSIFICATIONS.includes(ai?.label) ? ai.label : null, confidence: ai ? toConfidencePct(ai.confidence) : null,
+    modelVersion: ai?.model_version ?? null, requirement, match, engine: null, degraded, message,
+  };
+  if (a.label && a.label !== 'None' && requirement) {
+    a.engine = proposeStatus({ label: a.label, text, currentStatus: requirement.liveStatus });
+  }
+  a.policy = decideReview({
+    label: a.label, confidence: a.confidence, matched: !!requirement, dropProposed: a.engine?.dropProposed ?? false, threshold,
+    matchMethod: match?.method, similarity: match?.similarity, autoApplyMinSimilarity: config.autoApplyMinSimilarity,
+  });
+  return a;
+}
+
+// One message: classify, match, decide. (If the ai-service is down the signal degrades to unclassified / unmapped.)
+async function analyze(projectId, body) {
   let ai;
   try {
     ai = await aiClient.classify(body.text);
   } catch (err) {
     if (!(err instanceof AppError)) throw err;
-    a.degraded = true;
+    const a = decideAnalysis({
+      text: body.text, ai: null, degraded: true,
+      message: `The classifier is unavailable (${err.message}). The signal was stored as unclassified and pending; nothing was applied. A PM can resolve it with a correction.`,
+    });
     a.aiDown = true;
-    a.message = `The classifier is unavailable (${err.message}). The signal was stored as unclassified and pending; nothing was applied. A PM can resolve it with a correction.`;
-    a.policy = decideReview({ label: null, threshold });
     return a;
   }
-  a.label = CLASSIFICATIONS.includes(ai.label) ? ai.label : null;
-  a.confidence = toConfidencePct(ai.confidence);
-  a.modelVersion = ai.model_version ?? null;
-
-  if (a.label && a.label !== 'None') {
+  const label = CLASSIFICATIONS.includes(ai.label) ? ai.label : null;
+  let requirement = null;
+  let match = null;
+  let degraded = false;
+  let message = null;
+  if (label && label !== 'None') {
     if (body.requirementId) {
-      a.requirement = await Requirement.findOne({ projectId, reqId: body.requirementId }).lean();
-      if (!a.requirement) throw new AppError(404, 'NOT_FOUND', `Requirement ${body.requirementId} not found in this project`);
-      a.match = { requirementId: a.requirement.reqId, similarity: null, method: 'manual', alternatives: [] };
+      requirement = await Requirement.findOne({ projectId, reqId: body.requirementId }).lean();
+      if (!requirement) throw new AppError(404, 'NOT_FOUND', `Requirement ${body.requirementId} not found in this project`);
+      match = { requirementId: requirement.reqId, similarity: null, method: 'manual', alternatives: [] };
     } else {
       const reqs = await Requirement.find({ projectId }).sort({ reqId: 1 }).lean();
       if (reqs.length) {
         try {
-          const ranked = await aiClient.match(body.text, reqs.map((r) => ({ id: r.reqId, text: `${r.title}. ${r.description || ''}`.trim() })), 3);
-          const alternatives = ranked.slice(0, 3).map((m) => ({ requirementId: m.id, similarity: m.similarity }));
-          const top = alternatives[0];
-          const ok = top && top.similarity >= config.matchMinSimilarity;
-          a.match = { requirementId: ok ? top.requirementId : null, similarity: top ? top.similarity : null, method: 'auto', alternatives };
-          if (ok) a.requirement = reqs.find((r) => r.reqId === top.requirementId);
+          ({ match, requirement } = rankedToMatch(await aiClient.match(body.text, candidatesOf(reqs), 3), reqs));
         } catch (err) {
           if (!(err instanceof AppError)) throw err;
-          a.degraded = true;
-          a.message = `Requirement matching is unavailable (${err.message}). The signal was stored unmapped and pending; nothing was applied.`;
+          degraded = true;
+          message = `Requirement matching is unavailable (${err.message}). The signal was stored unmapped and pending; nothing was applied.`;
         }
       }
     }
-    if (a.requirement) a.engine = proposeStatus({ label: a.label, text: body.text, currentStatus: a.requirement.liveStatus });
   }
-  a.policy = decideReview({
-    label: a.label, confidence: a.confidence, matched: !!a.requirement, dropProposed: a.engine?.dropProposed ?? false, threshold,
-    matchMethod: a.match?.method, similarity: a.match?.similarity, autoApplyMinSimilarity: config.autoApplyMinSimilarity,
-  });
-  return a;
+  return decideAnalysis({ text: body.text, ai, requirement, match, degraded, message });
 }
 
 function answer(a, { signal = null, applied = false, statusChange = null, ledgerEntry = null, preview = false, wouldApply = undefined } = {}) {
@@ -142,50 +153,23 @@ function answer(a, { signal = null, applied = false, statusChange = null, ledger
   };
 }
 
+// Would this analysis be applied without a PM? (the same condition create() uses)
+const wouldAutoApply = (a) => a.policy.autoAccepted && a.label !== 'None' && !!a.requirement;
+
 // Same answer as create(), but nothing is saved or applied.
 async function preview(projectId, body) {
   const a = await analyze(projectId, body);
   if (a.aiDown) throw new AppError(502, 'AI_SERVICE_UNAVAILABLE', a.message);
-  const wouldApply = a.policy.autoAccepted && a.label !== 'None' && !!a.requirement;
-  return answer(a, {
-    preview: true,
-    wouldApply,
-    statusChange: wouldApply && a.engine.changed ? { from: a.requirement.liveStatus, to: a.engine.proposedStatus } : null,
-  });
+  const would = wouldAutoApply(a);
+  const projected = would
+    ? await finalizeSignal({ projectId, signal: { text: body.text }, label: a.label, requirementId: a.requirement.reqId, dryRun: true })
+    : null;
+  return answer(a, { preview: true, wouldApply: would, statusChange: projected?.statusChange ?? null });
 }
 
-// ---------------------------------------------------------------- applying a status change
-// No multi-document transactions on standalone Mongo, so the order is: conditional requirement update ->
-// status_history -> ledger. The conditional update (liveStatus must still be `from`) stops two concurrent
-// signals from both applying.
-async function applyToRequirement({ projectId, reqId, signal, label, actor }) {
-  const current = await Requirement.findOne({ projectId, reqId }).lean();
-  if (!current) throw new AppError(404, 'NOT_FOUND', `Requirement ${reqId} not found in this project`);
-  const eng = proposeStatus({ label, text: signal.text, currentStatus: current.liveStatus });
-  const from = current.liveStatus;
-  const to = eng.proposedStatus ?? from;
-  if (eng.changed) {
-    const updated = await Requirement.findOneAndUpdate({ projectId, reqId, liveStatus: from }, { $set: { liveStatus: to } }, { new: true }).lean();
-    if (!updated) throw new AppError(409, 'CONCURRENT_UPDATE', `Requirement ${reqId} changed status while this signal was processed`);
-  }
-  await createWithSeqId(StatusHistory, 'historyId', 'SH-', (historyId) => ({
-    projectId, historyId, reqId, signalId: signal.signalId, timestamp: signal.timestamp, label, fromStatus: from, toStatus: to,
-    statusChanged: eng.changed, source: signal.source, authorRole: signal.authorRole,
-    resourceRole: signal.authorRole, granularity: current.granularity,
-  }));
-  let ledgerEntry = null;
-  if (eng.changed) {
-    ledgerEntry = await ledger.appendLedgerEntry({
-      projectId, eventType: 'STATUS_CHANGE', reqId, requirementTitle: current.title, previousStatus: from, newStatus: to,
-      triggeringSignal: signal.text, triggeringSignalId: signal.signalId, actor,
-    });
-  }
-  return { statusChange: eng.changed ? { from, to } : null, ledgerEntry, proposedStatus: eng.proposedStatus, resultingStatus: to };
-}
-
-// ---------------------------------------------------------------- POST /signals
-async function create(projectId, body, user) {
-  const a = await analyze(projectId, body);
+// ---------------------------------------------------------------- saving a signal (POST /signals, bulk)
+// Saves the analysed signal and, when the review policy auto-accepts it, finalises it (status, history, ledger).
+async function createFromAnalysis(projectId, body, user, a, { sourceDocument = null } = {}) {
   const auto = a.policy.autoAccepted;
   const signal = await createWithSeqId(Signal, 'signalId', 'SC-', (signalId) => ({
     projectId, signalId, source: body.source, authorRole: body.authorRole || user.jobTitle || 'Unspecified',
@@ -193,29 +177,147 @@ async function create(projectId, body, user) {
     modelVersion: a.modelVersion, confidence: a.confidence, autoAcceptThreshold: a.threshold, autoApplyMinSimilarity: config.autoApplyMinSimilarity,
     reqId: a.requirement?.reqId ?? null, matchMethod: a.match?.method ?? null, matchSimilarity: a.match?.similarity ?? null,
     matchAlternatives: a.match?.alternatives ?? [], proposedStatus: a.engine?.proposedStatus ?? null,
-    reviewStatus: auto ? 'accepted' : 'pending', seeded: false,
+    reviewStatus: auto ? 'accepted' : 'pending', seeded: false, sourceDocument,
   }));
 
   let applied = false;
   let statusChange = null;
   let ledgerEntry = null;
   let finalReview = a.policy;
-  if (auto && a.label !== 'None' && a.requirement) {
+  if (wouldAutoApply(a)) {
     try {
-      const r = await applyToRequirement({ projectId, reqId: a.requirement.reqId, signal: signal.toObject(), label: a.label, actor: 'auto-accept' });
-      ({ statusChange, ledgerEntry } = r);
-      applied = true;
-      await Signal.updateOne({ _id: signal._id }, { $set: { applied: true, resultingStatus: r.resultingStatus } });
+      const r = await finalizeSignal({ projectId, signal: signal.toObject(), label: a.label, requirementId: a.requirement.reqId, actor: 'auto-accept' });
+      ({ applied, statusChange, ledgerEntry } = r);
     } catch (err) {
       if (!(err instanceof AppError) || err.code !== 'CONCURRENT_UPDATE') throw err;
       await Signal.updateOne({ _id: signal._id }, { $set: { reviewStatus: 'pending' } }); // let a PM decide
       finalReview = { reviewStatus: 'pending', autoAccepted: false, reason: 'concurrent-update' };
-      a.message = err.message + '. The signal was left pending for a PM.';
+      a.message = `${err.message}. The signal was left pending for a PM.`;
     }
   }
   a.policy = finalReview;
   const stored = await Signal.findById(signal._id).lean();
   return answer(a, { signal: toApi(stored), applied, statusChange, ledgerEntry });
+}
+
+async function create(projectId, body, user) {
+  return createFromAnalysis(projectId, body, user, await analyze(projectId, body));
+}
+
+// ---------------------------------------------------------------- documents: extract (saves nothing) and bulk
+const sha256 = (s) => crypto.createHash('sha256').update(s, 'utf8').digest('hex');
+
+// input: { file: { buffer, originalname } } or { text, name }; also source / authorRole / documentDate (echoed, not used here)
+async function extract(projectId, input) {
+  const name = input.file?.originalname || input.name || 'Pasted text';
+  const text = input.file ? await extractTextFromFile(input.file) : String(input.text ?? '').replace(/\r\n?/g, '\n');
+  if (!text.trim()) throw new AppError(422, 'EMPTY_DOCUMENT', 'No text was found');
+
+  let segments;
+  try {
+    segments = segmentDocument(text);
+  } catch (err) {
+    if (err instanceof SegmentLimitError) throw new AppError(413, 'TOO_MANY_SEGMENTS', err.message, { segments: err.count, limit: err.max });
+    throw err;
+  }
+  const documentId = sha256(text.trim());
+  const alreadySubmitted = Boolean(await Signal.exists({ projectId, 'sourceDocument.id': documentId }));
+  const base = {
+    documentId, name, source: input.source || 'Standup', alreadySubmitted,
+    autoAcceptThreshold: config.autoAcceptConfidence, matchMinSimilarity: config.matchMinSimilarity, autoApplyMinSimilarity: config.autoApplyMinSimilarity,
+  };
+  if (!segments.length) {
+    return { ...base, modelVersion: null, segments: [], counts: { total: 0, signals: 0, none: 0 } };
+  }
+
+  // One classification call for all segments, one matching call for the non-None ones (both 502 if the ai-service is down).
+  const classified = await aiClient.classifyBatch(segments.map((s) => s.text));
+  const reqs = await Requirement.find({ projectId }).sort({ reqId: 1 }).lean();
+  const signalIdx = segments.map((_, i) => i).filter((i) => CLASSIFICATIONS.includes(classified[i].label) && classified[i].label !== 'None');
+  const ranked = new Map();
+  if (signalIdx.length && reqs.length) {
+    const lists = await aiClient.matchBatch(signalIdx.map((i) => segments[i].text), candidatesOf(reqs), 3);
+    signalIdx.forEach((i, k) => ranked.set(i, lists[k] ?? []));
+  }
+
+  const out = segments.map((seg, i) => {
+    const ai = classified[i];
+    const isSignal = signalIdx.includes(i);
+    const { match, requirement } = isSignal && ranked.has(i) ? rankedToMatch(ranked.get(i), reqs) : { match: null, requirement: null };
+    const a = decideAnalysis({ text: seg.text, ai, requirement, match });
+    return {
+      index: seg.index, line: seg.line, text: seg.text, speakerLabel: seg.speakerLabel,
+      label: a.label, confidence: a.confidence,
+      match: match && { requirementId: match.requirementId, similarity: match.similarity, alternatives: match.alternatives },
+      proposedStatus: a.engine?.proposedStatus ?? null,
+      wouldAutoApply: wouldAutoApply(a),
+      reviewReason: a.policy.reason,
+    };
+  });
+  return {
+    ...base,
+    modelVersion: classified[0]?.model_version ?? null,
+    segments: out,
+    counts: { total: out.length, signals: signalIdx.length, none: out.length - signalIdx.length },
+  };
+}
+
+const classOf = (r) => (r.reviewStatus === 'pending' ? 'pending' : r.applied && r.statusChange ? 'applied' : 'noChange');
+
+// items: [{ text, requirementId? }] saved in order through the normal create flow. Classification and matching are done for the
+// whole batch first (nothing is saved if the ai-service is down); every item is then decided and finalised one after the other,
+// so an earlier item's status change is seen by the later ones.
+async function bulk(projectId, body, user) {
+  const { documentId, name, source, authorRole, timestamp, items, force } = body;
+  if (!force && (await Signal.exists({ projectId, 'sourceDocument.id': documentId }))) {
+    throw new AppError(409, 'DOCUMENT_ALREADY_SUBMITTED', 'This document was already submitted to this project. Send force: true to submit it again.');
+  }
+
+  const classified = await aiClient.classifyBatch(items.map((it) => it.text)); // throws 502 before anything is saved
+  const reqs = await Requirement.find({ projectId }).sort({ reqId: 1 }).lean();
+  const needMatch = items.map((it, i) => i).filter((i) => !items[i].requirementId && classified[i].label !== 'None' && CLASSIFICATIONS.includes(classified[i].label));
+  const ranked = new Map();
+  if (needMatch.length && reqs.length) {
+    const lists = await aiClient.matchBatch(needMatch.map((i) => items[i].text), candidatesOf(reqs), 3);
+    needMatch.forEach((i, k) => ranked.set(i, lists[k] ?? []));
+  }
+
+  const sourceDocument = { id: documentId, name };
+  const results = [];
+  const summary = { applied: 0, pending: 0, noChange: 0, failed: 0 };
+  for (let i = 0; i < items.length; i += 1) {
+    const it = items[i];
+    try {
+      const ai = classified[i];
+      const label = CLASSIFICATIONS.includes(ai.label) ? ai.label : null;
+      let requirement = null;
+      let match = null;
+      if (label && label !== 'None') {
+        if (it.requirementId) {
+          requirement = await Requirement.findOne({ projectId, reqId: it.requirementId }).lean();
+          if (!requirement) throw new AppError(404, 'NOT_FOUND', `Requirement ${it.requirementId} not found in this project`);
+          match = { requirementId: requirement.reqId, similarity: null, method: 'manual', alternatives: [] };
+        } else if (ranked.has(i)) {
+          ({ match, requirement } = rankedToMatch(ranked.get(i), reqs));
+          // the status may have changed because of an earlier item of this document: read it fresh
+          if (requirement) requirement = await Requirement.findOne({ projectId, reqId: requirement.reqId }).lean();
+        }
+      }
+      const a = decideAnalysis({ text: it.text, ai, requirement, match });
+      const res = await createFromAnalysis(projectId, { text: it.text, source, authorRole, timestamp }, user, a, { sourceDocument });
+      const status = classOf(res);
+      summary[status] += 1;
+      results.push({
+        index: i, text: it.text, status, signalId: res.signal.id, label: res.classification.label, confidence: res.classification.confidence,
+        requirementId: res.match?.requirementId ?? null, reviewStatus: res.reviewStatus, reviewReason: res.reviewReason,
+        statusChange: res.statusChange, message: res.message,
+      });
+    } catch (err) {
+      summary.failed += 1;
+      results.push({ index: i, text: it.text, status: 'failed', error: err instanceof AppError ? err.message : 'Could not save this item' });
+    }
+  }
+  return { documentId, name, results, summary };
 }
 
 // ---------------------------------------------------------------- PM review (+ feedback)
@@ -267,39 +369,37 @@ async function review(projectId, signalId, body, user) {
   const claimed = await Signal.findOneAndUpdate(claim, { $set: set }, { new: true }).lean();
   if (!claimed) throw new AppError(409, 'ALREADY_REVIEWED', 'Signal was reviewed by someone else just now');
 
-  // Apply the status rule: only for pending, API-created signals that end up with a label other than None.
-  let statusChange = null;
-  let ledgerEntry = null;
-  let latest = claimed;
-  if (pending && !seeded && action !== 'reject' && finalLabel !== 'None') {
-    try {
-      const r = await applyToRequirement({ projectId, reqId: finalReq, signal: claimed, label: finalLabel, actor: user.email });
-      ({ statusChange, ledgerEntry } = r);
-      latest = await Signal.findOneAndUpdate({ _id: claimed._id }, { $set: { applied: true, resultingStatus: r.resultingStatus, proposedStatus: r.proposedStatus } }, { new: true }).lean();
-    } catch (err) {
-      await Signal.updateOne({ _id: claimed._id }, { $set: { reviewStatus: 'pending', reviewedBy: null, reviewedAt: null, reviewAction: null, label: s.label, reqId: s.reqId ?? null } });
-      throw err; // the signal is pending again
-    }
+  // The status effect applies only to pending, API-created signals that end up with a label other than None; the feedback
+  // document is written by the same finalize call, after the effect.
+  const effect = pending && !seeded && action !== 'reject' && finalLabel !== 'None';
+  let fin = { statusChange: null, ledgerEntry: null };
+  try {
+    fin = await finalizeSignal({
+      projectId, signal: claimed, label: effect ? finalLabel : null, requirementId: effect ? finalReq : null, actor: user.email,
+      feedback: {
+        projectId, signalId, text: s.text, source: s.source, authorRole: s.authorRole, modelLabel: s.modelLabel ?? s.label ?? null,
+        modelVersion: s.modelVersion ?? null, modelConfidence: s.confidence ?? null, finalLabel: action === 'reject' ? null : finalLabel,
+        action, reviewerId: user.email, signalSeeded: seeded,
+      },
+    });
+  } catch (err) {
+    await Signal.updateOne({ _id: claimed._id }, { $set: { reviewStatus: 'pending', reviewedBy: null, reviewedAt: null, reviewAction: null, label: s.label, reqId: s.reqId ?? null } });
+    throw err; // the signal is pending again
   }
-
-  await Feedback.create({
-    projectId, signalId, text: s.text, source: s.source, authorRole: s.authorRole, modelLabel: s.modelLabel ?? s.label ?? null,
-    modelVersion: s.modelVersion ?? null, modelConfidence: s.confidence ?? null, finalLabel: action === 'reject' ? null : finalLabel,
-    action, reviewerId: user.email, signalSeeded: seeded,
-  });
+  const latest = await Signal.findById(claimed._id).lean();
 
   const notReversed = feedbackOnly && s.applied === true;
   return {
     signal: toApi(latest),
     action,
-    statusChange,
-    ledgerEntry,
+    statusChange: fin.statusChange,
+    ledgerEntry: fin.ledgerEntry,
     statusNotReversed: notReversed,
     message: notReversed
       ? 'Feedback recorded. This signal had already been auto-accepted and applied: its status change and ledger entry were NOT reversed (statusNotReversed: true). A compensating correction is a manual step for now.'
       : feedbackOnly ? 'Feedback recorded (the signal was auto-accepted; nothing had been applied, so nothing needs reversing).'
         : seeded ? 'Review recorded. Seeded signals are already reflected in the data, so no status change was made.'
-          : statusChange ? 'Review recorded and the status change was applied.' : 'Review recorded.',
+          : fin.statusChange ? 'Review recorded and the status change was applied.' : 'Review recorded.',
   };
 }
 
@@ -315,7 +415,7 @@ async function exportFeedbackCsv(projectId) {
   const latest = new Map();
   for (const r of rows) latest.set(normText(r.text), r);
   const lines = ['text,label,source,role', ...[...latest.values()].map((r) => [r.text, r.finalLabel, r.source ?? '', r.authorRole ?? ''].map(csvCell).join(','))];
-  return lines.join('\n') + '\n';
+  return `${lines.join('\n')}\n`;
 }
 
-module.exports = { list, getOne, create, preview, review, exportFeedbackCsv, toApi };
+module.exports = { list, getOne, create, preview, extract, bulk, review, exportFeedbackCsv, toApi };

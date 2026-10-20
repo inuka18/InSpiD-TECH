@@ -124,6 +124,10 @@ They live in `backend/src/modules/integration` and call the other modules' servi
 
 `POST .../signals/preview` returns the same answer and saves nothing.
 
+**Documents.** `POST .../signals/extract` takes a file (multipart field `file`: `.txt`, `.md`, `.docx` or `.pdf`, 2 MB at most) or JSON `{ text, name }`, splits it into statements (email headers, greetings, sign-offs, short lines are ignored; a leading `Name:` becomes `speakerLabel`; duplicates removed; at most 300 segments, otherwise 413), classifies them in one batch call and matches the non-None ones in another, and returns every segment with its label, match, proposed status and `wouldAutoApply`, using the same rules as preview. It **saves nothing**; the file is processed in memory, never stored and never logged. `POST .../signals/bulk` then saves the approved items (max 100) in order through the normal flow, stores `sourceDocument { id, name }` on each signal and returns `{ applied, pending, noChange, failed }` plus per-item results. The same `documentId` is a 409 unless `force: true`; if the ai-service is down nothing is saved (502). PDF text extraction uses `unpdf`; if it is unavailable a PDF is a 415. The ai-service has the matching `POST /classify/batch` and `POST /match/batch`.
+
+Everything that finalises a signal's effect (status update, status history, ledger entry, feedback) lives in ONE function, `finalizeSignal()` in `modules/signals/finalize.js`, used by preview (dry run), create, bulk and review: hook future features in there.
+
 PM review: `POST .../signals/:signalId/review` with `{ action: accept|reject|correct, correctedLabel?, correctedRequirementId?, note? }`.
 Every action writes a `feedback` document; `GET .../feedback/export` (PM only) returns CSV `text,label,source,role` (accept and
 correct rows, de-duplicated, seeded signals left out) that `python -m training.train --extra-data` accepts (see `ai-service/training/README.md`).
