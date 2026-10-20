@@ -1,0 +1,2866 @@
+{
+  "version": "20261020T110553Z",
+  "trained_at": "2026-10-20T11:05:53.763914+00:00",
+  "chosen": "D",
+  "selection": "Selection score = mean(val batch A macro F1, robustness dev macro F1). Best score 0.787. Within 0.02 of it: D, C. The simplest of those was kept: D (Model D (TF-IDF + MiniLM concatenated, one LR)). Simplicity order: keyword < A < B < D < C.",
+  "row_counts": {
+    "scenario_train": 1526,
+    "extra_data": 0,
+    "val_batch_A": 82,
+    "val_all": 338,
+    "test_batch_A": 106,
+    "test_all": 434,
+    "robustness_dev": 50,
+    "robustness_test": 50,
+    "robustness_texts_also_in_training": 0
+  },
+  "tie_margin": 0.02,
+  "auto_accept_thresholds_dev": [
+    50,
+    60,
+    70,
+    80,
+    90
+  ],
+  "recommended_threshold": null,
+  "jira_review_note": "jira_review_sample.csv has no reviewed_label values yet: skipped.",
+  "candidates": {
+    "keyword": {
+      "title": "Keyword baseline",
+      "model_type": "keyword",
+      "hyperparameters": {},
+      "selection_score": 0.40308564751257153,
+      "metrics": {
+        "val_batch_A": {
+          "n": 82,
+          "macro_f1": 0.6116519778643165,
+          "accuracy": 0.6341463414634146,
+          "per_class": {
+            "Constraint": {
+              "precision": 0.7647058823529411,
+              "recall": 0.7647058823529411,
+              "f1": 0.7647058823529411,
+              "support": 17
+            },
+            "Expectation": {
+              "precision": 1.0,
+              "recall": 0.7083333333333334,
+              "f1": 0.8292682926829268,
+              "support": 24
+            },
+            "Completion": {
+              "precision": 0.8571428571428571,
+              "recall": 0.6666666666666666,
+              "f1": 0.75,
+              "support": 18
+            },
+            "Conflict": {
+              "precision": 1.0,
+              "recall": 0.23529411764705882,
+              "f1": 0.38095238095238093,
+              "support": 17
+            },
+            "None": {
+              "precision": 0.2,
+              "recall": 1.0,
+              "f1": 0.3333333333333333,
+              "support": 6
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "Constraint",
+              "Expectation",
+              "Completion",
+              "Conflict",
+              "None"
+            ],
+            "rows_true_cols_pred": [
+              [
+                13,
+                0,
+                0,
+                0,
+                4
+              ],
+              [
+                2,
+                17,
+                1,
+                0,
+                4
+              ],
+              [
+                0,
+                0,
+                12,
+                0,
+                6
+              ],
+              [
+                2,
+                0,
+                1,
+                4,
+                10
+              ],
+              [
+                0,
+                0,
+                0,
+                0,
+                6
+              ]
+            ]
+          }
+        },
+        "val_all": {
+          "n": 338,
+          "macro_f1": 0.6612189826749061,
+          "accuracy": 0.6479289940828402,
+          "per_class": {
+            "Constraint": {
+              "precision": 0.9285714285714286,
+              "recall": 0.6842105263157895,
+              "f1": 0.7878787878787878,
+              "support": 76
+            },
+            "Expectation": {
+              "precision": 0.8620689655172413,
+              "recall": 0.5813953488372093,
+              "f1": 0.6944444444444444,
+              "support": 86
+            },
+            "Completion": {
+              "precision": 0.75,
+              "recall": 0.7924528301886793,
+              "f1": 0.7706422018348624,
+              "support": 53
+            },
+            "Conflict": {
+              "precision": 1.0,
+              "recall": 0.4606741573033708,
+              "f1": 0.6307692307692307,
+              "support": 89
+            },
+            "None": {
+              "precision": 0.2677165354330709,
+              "recall": 1.0,
+              "f1": 0.422360248447205,
+              "support": 34
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "Constraint",
+              "Expectation",
+              "Completion",
+              "Conflict",
+              "None"
+            ],
+            "rows_true_cols_pred": [
+              [
+                52,
+                0,
+                11,
+                0,
+                13
+              ],
+              [
+                2,
+                50,
+                2,
+                0,
+                32
+              ],
+              [
+                0,
+                0,
+                42,
+                0,
+                11
+              ],
+              [
+                2,
+                8,
+                1,
+                41,
+                37
+              ],
+              [
+                0,
+                0,
+                0,
+                0,
+                34
+              ]
+            ]
+          }
+        },
+        "robustness_dev": {
+          "n": 50,
+          "macro_f1": 0.1945193171608266,
+          "accuracy": 0.28,
+          "per_class": {
+            "Constraint": {
+              "precision": 0.5,
+              "recall": 0.1,
+              "f1": 0.16666666666666666,
+              "support": 10
+            },
+            "Expectation": {
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1": 0.0,
+              "support": 10
+            },
+            "Completion": {
+              "precision": 0.75,
+              "recall": 0.3,
+              "f1": 0.42857142857142855,
+              "support": 10
+            },
+            "Conflict": {
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1": 0.0,
+              "support": 10
+            },
+            "None": {
+              "precision": 0.23255813953488372,
+              "recall": 1.0,
+              "f1": 0.37735849056603776,
+              "support": 10
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "Constraint",
+              "Expectation",
+              "Completion",
+              "Conflict",
+              "None"
+            ],
+            "rows_true_cols_pred": [
+              [
+                1,
+                0,
+                0,
+                0,
+                9
+              ],
+              [
+                0,
+                0,
+                1,
+                0,
+                9
+              ],
+              [
+                0,
+                0,
+                3,
+                0,
+                7
+              ],
+              [
+                1,
+                1,
+                0,
+                0,
+                8
+              ],
+              [
+                0,
+                0,
+                0,
+                0,
+                10
+              ]
+            ]
+          }
+        },
+        "test_batch_A": {
+          "n": 106,
+          "macro_f1": 0.5911783116209702,
+          "accuracy": 0.6132075471698113,
+          "per_class": {
+            "Constraint": {
+              "precision": 0.6176470588235294,
+              "recall": 0.9130434782608695,
+              "f1": 0.7368421052631579,
+              "support": 23
+            },
+            "Expectation": {
+              "precision": 0.9473684210526315,
+              "recall": 0.6428571428571429,
+              "f1": 0.7659574468085106,
+              "support": 28
+            },
+            "Completion": {
+              "precision": 0.875,
+              "recall": 0.7368421052631579,
+              "f1": 0.8,
+              "support": 19
+            },
+            "Conflict": {
+              "precision": 0.7777777777777778,
+              "recall": 0.23333333333333334,
+              "f1": 0.358974358974359,
+              "support": 30
+            },
+            "None": {
+              "precision": 0.17857142857142858,
+              "recall": 0.8333333333333334,
+              "f1": 0.29411764705882354,
+              "support": 6
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "Constraint",
+              "Expectation",
+              "Completion",
+              "Conflict",
+              "None"
+            ],
+            "rows_true_cols_pred": [
+              [
+                21,
+                0,
+                1,
+                0,
+                1
+              ],
+              [
+                6,
+                18,
+                0,
+                1,
+                3
+              ],
+              [
+                0,
+                0,
+                14,
+                0,
+                5
+              ],
+              [
+                7,
+                1,
+                1,
+                7,
+                14
+              ],
+              [
+                0,
+                0,
+                0,
+                1,
+                5
+              ]
+            ]
+          },
+          "macro_f1_ci95_bootstrap": [
+            0.5002605745058566,
+            0.665714955875228
+          ]
+        },
+        "test_all": {
+          "n": 434,
+          "macro_f1": 0.673986609490536,
+          "accuracy": 0.6820276497695853,
+          "per_class": {
+            "Constraint": {
+              "precision": 0.7578947368421053,
+              "recall": 0.782608695652174,
+              "f1": 0.7700534759358288,
+              "support": 92
+            },
+            "Expectation": {
+              "precision": 0.8918918918918919,
+              "recall": 0.5892857142857143,
+              "f1": 0.7096774193548387,
+              "support": 112
+            },
+            "Completion": {
+              "precision": 0.7647058823529411,
+              "recall": 0.8904109589041096,
+              "f1": 0.8227848101265823,
+              "support": 73
+            },
+            "Conflict": {
+              "precision": 0.9696969696969697,
+              "recall": 0.512,
+              "f1": 0.6701570680628273,
+              "support": 125
+            },
+            "None": {
+              "precision": 0.2543859649122807,
+              "recall": 0.90625,
+              "f1": 0.3972602739726027,
+              "support": 32
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "Constraint",
+              "Expectation",
+              "Completion",
+              "Conflict",
+              "None"
+            ],
+            "rows_true_cols_pred": [
+              [
+                72,
+                0,
+                13,
+                0,
+                7
+              ],
+              [
+                11,
+                66,
+                6,
+                1,
+                28
+              ],
+              [
+                0,
+                0,
+                65,
+                0,
+                8
+              ],
+              [
+                10,
+                8,
+                1,
+                64,
+                42
+              ],
+              [
+                2,
+                0,
+                0,
+                1,
+                29
+              ]
+            ]
+          }
+        },
+        "robustness_test": {
+          "n": 50,
+          "macro_f1": 0.2074043603455368,
+          "accuracy": 0.3,
+          "per_class": {
+            "Constraint": {
+              "precision": 1.0,
+              "recall": 0.1,
+              "f1": 0.18181818181818182,
+              "support": 10
+            },
+            "Expectation": {
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1": 0.0,
+              "support": 10
+            },
+            "Completion": {
+              "precision": 0.5714285714285714,
+              "recall": 0.4,
+              "f1": 0.47058823529411764,
+              "support": 10
+            },
+            "Conflict": {
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1": 0.0,
+              "support": 10
+            },
+            "None": {
+              "precision": 0.23809523809523808,
+              "recall": 1.0,
+              "f1": 0.38461538461538464,
+              "support": 10
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "Constraint",
+              "Expectation",
+              "Completion",
+              "Conflict",
+              "None"
+            ],
+            "rows_true_cols_pred": [
+              [
+                1,
+                0,
+                2,
+                0,
+                7
+              ],
+              [
+                0,
+                0,
+                0,
+                0,
+                10
+              ],
+              [
+                0,
+                0,
+                4,
+                0,
+                6
+              ],
+              [
+                0,
+                0,
+                1,
+                0,
+                9
+              ],
+              [
+                0,
+                0,
+                0,
+                0,
+                10
+              ]
+            ]
+          },
+          "macro_f1_ci95_bootstrap": [
+            0.10305310765815762,
+            0.30612844611528817
+          ]
+        }
+      },
+      "auto_accept_dev": {
+        "50": {
+          "threshold": 50,
+          "total": 132,
+          "accepted": 130,
+          "accepted_pct": 98.48484848484848,
+          "correct": 66,
+          "precision": 0.5076923076923077
+        },
+        "60": {
+          "threshold": 60,
+          "total": 132,
+          "accepted": 80,
+          "accepted_pct": 60.60606060606061,
+          "correct": 22,
+          "precision": 0.275
+        },
+        "70": {
+          "threshold": 70,
+          "total": 132,
+          "accepted": 80,
+          "accepted_pct": 60.60606060606061,
+          "correct": 22,
+          "precision": 0.275
+        },
+        "80": {
+          "threshold": 80,
+          "total": 132,
+          "accepted": 0,
+          "accepted_pct": 0.0,
+          "correct": 0,
+          "precision": null
+        },
+        "90": {
+          "threshold": 90,
+          "total": 132,
+          "accepted": 0,
+          "accepted_pct": 0.0,
+          "correct": 0,
+          "precision": null
+        }
+      },
+      "auto_accept_test": {
+        "threshold": 90,
+        "total": 156,
+        "accepted": 0,
+        "accepted_pct": 0.0,
+        "correct": 0,
+        "precision": null
+      },
+      "jira_review": null
+    },
+    "A": {
+      "title": "Model A (TF-IDF + LR)",
+      "model_type": "tfidf_lr",
+      "hyperparameters": {
+        "C": 3,
+        "class_weight": "balanced"
+      },
+      "selection_score": 0.7380079500822535,
+      "metrics": {
+        "val_batch_A": {
+          "n": 82,
+          "macro_f1": 0.8596514596514597,
+          "accuracy": 0.8414634146341463,
+          "per_class": {
+            "Constraint": {
+              "precision": 0.8125,
+              "recall": 0.7647058823529411,
+              "f1": 0.7878787878787878,
+              "support": 17
+            },
+            "Expectation": {
+              "precision": 0.9047619047619048,
+              "recall": 0.7916666666666666,
+              "f1": 0.8444444444444444,
+              "support": 24
+            },
+            "Completion": {
+              "precision": 0.8571428571428571,
+              "recall": 1.0,
+              "f1": 0.9230769230769231,
+              "support": 18
+            },
+            "Conflict": {
+              "precision": 0.7222222222222222,
+              "recall": 0.7647058823529411,
+              "f1": 0.7428571428571429,
+              "support": 17
+            },
+            "None": {
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0,
+              "support": 6
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "Constraint",
+              "Expectation",
+              "Completion",
+              "Conflict",
+              "None"
+            ],
+            "rows_true_cols_pred": [
+              [
+                13,
+                1,
+                0,
+                3,
+                0
+              ],
+              [
+                2,
+                19,
+                1,
+                2,
+                0
+              ],
+              [
+                0,
+                0,
+                18,
+                0,
+                0
+              ],
+              [
+                1,
+                1,
+                2,
+                13,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0,
+                6
+              ]
+            ]
+          }
+        },
+        "val_all": {
+          "n": 338,
+          "macro_f1": 0.966884000074802,
+          "accuracy": 0.9615384615384616,
+          "per_class": {
+            "Constraint": {
+              "precision": 0.96,
+              "recall": 0.9473684210526315,
+              "f1": 0.9536423841059603,
+              "support": 76
+            },
+            "Expectation": {
+              "precision": 0.9759036144578314,
+              "recall": 0.9418604651162791,
+              "f1": 0.9585798816568047,
+              "support": 86
+            },
+            "Completion": {
+              "precision": 0.9464285714285714,
+              "recall": 1.0,
+              "f1": 0.9724770642201835,
+              "support": 53
+            },
+            "Conflict": {
+              "precision": 0.9444444444444444,
+              "recall": 0.9550561797752809,
+              "f1": 0.9497206703910615,
+              "support": 89
+            },
+            "None": {
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0,
+              "support": 34
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "Constraint",
+              "Expectation",
+              "Completion",
+              "Conflict",
+              "None"
+            ],
+            "rows_true_cols_pred": [
+              [
+                72,
+                1,
+                0,
+                3,
+                0
+              ],
+              [
+                2,
+                81,
+                1,
+                2,
+                0
+              ],
+              [
+                0,
+                0,
+                53,
+                0,
+                0
+              ],
+              [
+                1,
+                1,
+                2,
+                85,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0,
+                34
+              ]
+            ]
+          }
+        },
+        "robustness_dev": {
+          "n": 50,
+          "macro_f1": 0.6163644405130473,
+          "accuracy": 0.62,
+          "per_class": {
+            "Constraint": {
+              "precision": 0.8571428571428571,
+              "recall": 0.6,
+              "f1": 0.7058823529411765,
+              "support": 10
+            },
+            "Expectation": {
+              "precision": 0.7272727272727273,
+              "recall": 0.8,
+              "f1": 0.7619047619047619,
+              "support": 10
+            },
+            "Completion": {
+              "precision": 0.5555555555555556,
+              "recall": 0.5,
+              "f1": 0.5263157894736842,
+              "support": 10
+            },
+            "Conflict": {
+              "precision": 0.4444444444444444,
+              "recall": 0.4,
+              "f1": 0.42105263157894735,
+              "support": 10
+            },
+            "None": {
+              "precision": 0.5714285714285714,
+              "recall": 0.8,
+              "f1": 0.6666666666666666,
+              "support": 10
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "Constraint",
+              "Expectation",
+              "Completion",
+              "Conflict",
+              "None"
+            ],
+            "rows_true_cols_pred": [
+              [
+                6,
+                0,
+                1,
+                2,
+                1
+              ],
+              [
+                0,
+                8,
+                1,
+                0,
+                1
+              ],
+              [
+                0,
+                1,
+                5,
+                1,
+                3
+              ],
+              [
+                1,
+                2,
+                2,
+                4,
+                1
+              ],
+              [
+                0,
+                0,
+                0,
+                2,
+                8
+              ]
+            ]
+          }
+        },
+        "test_batch_A": {
+          "n": 106,
+          "macro_f1": 0.873960113960114,
+          "accuracy": 0.8490566037735849,
+          "per_class": {
+            "Constraint": {
+              "precision": 0.6875,
+              "recall": 0.9565217391304348,
+              "f1": 0.8,
+              "support": 23
+            },
+            "Expectation": {
+              "precision": 0.8846153846153846,
+              "recall": 0.8214285714285714,
+              "f1": 0.8518518518518519,
+              "support": 28
+            },
+            "Completion": {
+              "precision": 0.85,
+              "recall": 0.8947368421052632,
+              "f1": 0.8717948717948718,
+              "support": 19
+            },
+            "Conflict": {
+              "precision": 1.0,
+              "recall": 0.7333333333333333,
+              "f1": 0.8461538461538461,
+              "support": 30
+            },
+            "None": {
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0,
+              "support": 6
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "Constraint",
+              "Expectation",
+              "Completion",
+              "Conflict",
+              "None"
+            ],
+            "rows_true_cols_pred": [
+              [
+                22,
+                0,
+                1,
+                0,
+                0
+              ],
+              [
+                4,
+                23,
+                1,
+                0,
+                0
+              ],
+              [
+                2,
+                0,
+                17,
+                0,
+                0
+              ],
+              [
+                4,
+                3,
+                1,
+                22,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0,
+                6
+              ]
+            ]
+          },
+          "macro_f1_ci95_bootstrap": [
+            0.8102775803523345,
+            0.9276326270510669
+          ]
+        },
+        "test_all": {
+          "n": 434,
+          "macro_f1": 0.9679795377258535,
+          "accuracy": 0.9631336405529954,
+          "per_class": {
+            "Constraint": {
+              "precision": 0.900990099009901,
+              "recall": 0.9891304347826086,
+              "f1": 0.9430051813471503,
+              "support": 92
+            },
+            "Expectation": {
+              "precision": 0.9727272727272728,
+              "recall": 0.9553571428571429,
+              "f1": 0.963963963963964,
+              "support": 112
+            },
+            "Completion": {
+              "precision": 0.9594594594594594,
+              "recall": 0.9726027397260274,
+              "f1": 0.9659863945578231,
+              "support": 73
+            },
+            "Conflict": {
+              "precision": 1.0,
+              "recall": 0.936,
+              "f1": 0.9669421487603306,
+              "support": 125
+            },
+            "None": {
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0,
+              "support": 32
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "Constraint",
+              "Expectation",
+              "Completion",
+              "Conflict",
+              "None"
+            ],
+            "rows_true_cols_pred": [
+              [
+                91,
+                0,
+                1,
+                0,
+                0
+              ],
+              [
+                4,
+                107,
+                1,
+                0,
+                0
+              ],
+              [
+                2,
+                0,
+                71,
+                0,
+                0
+              ],
+              [
+                4,
+                3,
+                1,
+                117,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0,
+                32
+              ]
+            ]
+          }
+        },
+        "robustness_test": {
+          "n": 50,
+          "macro_f1": 0.6706590193432299,
+          "accuracy": 0.68,
+          "per_class": {
+            "Constraint": {
+              "precision": 0.625,
+              "recall": 0.5,
+              "f1": 0.5555555555555556,
+              "support": 10
+            },
+            "Expectation": {
+              "precision": 0.6363636363636364,
+              "recall": 0.7,
+              "f1": 0.6666666666666666,
+              "support": 10
+            },
+            "Completion": {
+              "precision": 0.8333333333333334,
+              "recall": 0.5,
+              "f1": 0.625,
+              "support": 10
+            },
+            "Conflict": {
+              "precision": 0.7777777777777778,
+              "recall": 0.7,
+              "f1": 0.7368421052631579,
+              "support": 10
+            },
+            "None": {
+              "precision": 0.625,
+              "recall": 1.0,
+              "f1": 0.7692307692307693,
+              "support": 10
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "Constraint",
+              "Expectation",
+              "Completion",
+              "Conflict",
+              "None"
+            ],
+            "rows_true_cols_pred": [
+              [
+                5,
+                2,
+                1,
+                0,
+                2
+              ],
+              [
+                1,
+                7,
+                0,
+                1,
+                1
+              ],
+              [
+                1,
+                0,
+                5,
+                1,
+                3
+              ],
+              [
+                1,
+                2,
+                0,
+                7,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0,
+                10
+              ]
+            ]
+          },
+          "macro_f1_ci95_bootstrap": [
+            0.5202581289569119,
+            0.7933486312399356
+          ]
+        }
+      },
+      "auto_accept_dev": {
+        "50": {
+          "threshold": 50,
+          "total": 132,
+          "accepted": 69,
+          "accepted_pct": 52.27272727272727,
+          "correct": 64,
+          "precision": 0.927536231884058
+        },
+        "60": {
+          "threshold": 60,
+          "total": 132,
+          "accepted": 52,
+          "accepted_pct": 39.39393939393939,
+          "correct": 50,
+          "precision": 0.9615384615384616
+        },
+        "70": {
+          "threshold": 70,
+          "total": 132,
+          "accepted": 35,
+          "accepted_pct": 26.515151515151516,
+          "correct": 33,
+          "precision": 0.9428571428571428
+        },
+        "80": {
+          "threshold": 80,
+          "total": 132,
+          "accepted": 21,
+          "accepted_pct": 15.909090909090908,
+          "correct": 20,
+          "precision": 0.9523809523809523
+        },
+        "90": {
+          "threshold": 90,
+          "total": 132,
+          "accepted": 7,
+          "accepted_pct": 5.303030303030303,
+          "correct": 7,
+          "precision": 1.0
+        }
+      },
+      "auto_accept_test": {
+        "threshold": 90,
+        "total": 156,
+        "accepted": 16,
+        "accepted_pct": 10.256410256410257,
+        "correct": 16,
+        "precision": 1.0
+      },
+      "jira_review": null
+    },
+    "B": {
+      "title": "Model B (MiniLM + LR)",
+      "model_type": "minilm_lr",
+      "hyperparameters": {
+        "C": 100,
+        "class_weight": "balanced"
+      },
+      "selection_score": 0.6407196155719903,
+      "metrics": {
+        "val_batch_A": {
+          "n": 82,
+          "macro_f1": 0.7275469246200953,
+          "accuracy": 0.7195121951219512,
+          "per_class": {
+            "Constraint": {
+              "precision": 0.75,
+              "recall": 0.7058823529411765,
+              "f1": 0.7272727272727273,
+              "support": 17
+            },
+            "Expectation": {
+              "precision": 0.8823529411764706,
+              "recall": 0.625,
+              "f1": 0.7317073170731707,
+              "support": 24
+            },
+            "Completion": {
+              "precision": 0.7647058823529411,
+              "recall": 0.7222222222222222,
+              "f1": 0.7428571428571429,
+              "support": 18
+            },
+            "Conflict": {
+              "precision": 0.56,
+              "recall": 0.8235294117647058,
+              "f1": 0.6666666666666666,
+              "support": 17
+            },
+            "None": {
+              "precision": 0.7142857142857143,
+              "recall": 0.8333333333333334,
+              "f1": 0.7692307692307693,
+              "support": 6
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "Constraint",
+              "Expectation",
+              "Completion",
+              "Conflict",
+              "None"
+            ],
+            "rows_true_cols_pred": [
+              [
+                12,
+                1,
+                1,
+                3,
+                0
+              ],
+              [
+                3,
+                15,
+                1,
+                4,
+                1
+              ],
+              [
+                0,
+                0,
+                13,
+                4,
+                1
+              ],
+              [
+                1,
+                1,
+                1,
+                14,
+                0
+              ],
+              [
+                0,
+                0,
+                1,
+                0,
+                5
+              ]
+            ]
+          }
+        },
+        "val_all": {
+          "n": 338,
+          "macro_f1": 0.8528981080401387,
+          "accuracy": 0.8431952662721893,
+          "per_class": {
+            "Constraint": {
+              "precision": 0.8243243243243243,
+              "recall": 0.8026315789473685,
+              "f1": 0.8133333333333334,
+              "support": 76
+            },
+            "Expectation": {
+              "precision": 0.8875,
+              "recall": 0.8255813953488372,
+              "f1": 0.8554216867469879,
+              "support": 86
+            },
+            "Completion": {
+              "precision": 0.8775510204081632,
+              "recall": 0.8113207547169812,
+              "f1": 0.8431372549019608,
+              "support": 53
+            },
+            "Conflict": {
+              "precision": 0.7745098039215687,
+              "recall": 0.8876404494382022,
+              "f1": 0.8272251308900523,
+              "support": 89
+            },
+            "None": {
+              "precision": 0.9393939393939394,
+              "recall": 0.9117647058823529,
+              "f1": 0.9253731343283582,
+              "support": 34
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "Constraint",
+              "Expectation",
+              "Completion",
+              "Conflict",
+              "None"
+            ],
+            "rows_true_cols_pred": [
+              [
+                61,
+                3,
+                1,
+                11,
+                0
+              ],
+              [
+                5,
+                71,
+                2,
+                7,
+                1
+              ],
+              [
+                1,
+                3,
+                43,
+                5,
+                1
+              ],
+              [
+                7,
+                2,
+                1,
+                79,
+                0
+              ],
+              [
+                0,
+                1,
+                2,
+                0,
+                31
+              ]
+            ]
+          }
+        },
+        "robustness_dev": {
+          "n": 50,
+          "macro_f1": 0.5538923065238854,
+          "accuracy": 0.56,
+          "per_class": {
+            "Constraint": {
+              "precision": 0.5555555555555556,
+              "recall": 0.5,
+              "f1": 0.5263157894736842,
+              "support": 10
+            },
+            "Expectation": {
+              "precision": 0.5,
+              "recall": 0.5,
+              "f1": 0.5,
+              "support": 10
+            },
+            "Completion": {
+              "precision": 0.5,
+              "recall": 0.4,
+              "f1": 0.4444444444444444,
+              "support": 10
+            },
+            "Conflict": {
+              "precision": 0.5454545454545454,
+              "recall": 0.6,
+              "f1": 0.5714285714285714,
+              "support": 10
+            },
+            "None": {
+              "precision": 0.6666666666666666,
+              "recall": 0.8,
+              "f1": 0.7272727272727273,
+              "support": 10
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "Constraint",
+              "Expectation",
+              "Completion",
+              "Conflict",
+              "None"
+            ],
+            "rows_true_cols_pred": [
+              [
+                5,
+                1,
+                2,
+                2,
+                0
+              ],
+              [
+                2,
+                5,
+                0,
+                2,
+                1
+              ],
+              [
+                0,
+                2,
+                4,
+                1,
+                3
+              ],
+              [
+                1,
+                2,
+                1,
+                6,
+                0
+              ],
+              [
+                1,
+                0,
+                1,
+                0,
+                8
+              ]
+            ]
+          }
+        },
+        "test_batch_A": {
+          "n": 106,
+          "macro_f1": 0.6829873829873829,
+          "accuracy": 0.660377358490566,
+          "per_class": {
+            "Constraint": {
+              "precision": 0.5161290322580645,
+              "recall": 0.6956521739130435,
+              "f1": 0.5925925925925926,
+              "support": 23
+            },
+            "Expectation": {
+              "precision": 0.7391304347826086,
+              "recall": 0.6071428571428571,
+              "f1": 0.6666666666666666,
+              "support": 28
+            },
+            "Completion": {
+              "precision": 0.7391304347826086,
+              "recall": 0.8947368421052632,
+              "f1": 0.8095238095238095,
+              "support": 19
+            },
+            "Conflict": {
+              "precision": 0.6818181818181818,
+              "recall": 0.5,
+              "f1": 0.5769230769230769,
+              "support": 30
+            },
+            "None": {
+              "precision": 0.7142857142857143,
+              "recall": 0.8333333333333334,
+              "f1": 0.7692307692307693,
+              "support": 6
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "Constraint",
+              "Expectation",
+              "Completion",
+              "Conflict",
+              "None"
+            ],
+            "rows_true_cols_pred": [
+              [
+                16,
+                2,
+                1,
+                4,
+                0
+              ],
+              [
+                7,
+                17,
+                1,
+                2,
+                1
+              ],
+              [
+                0,
+                2,
+                17,
+                0,
+                0
+              ],
+              [
+                8,
+                2,
+                4,
+                15,
+                1
+              ],
+              [
+                0,
+                0,
+                0,
+                1,
+                5
+              ]
+            ]
+          },
+          "macro_f1_ci95_bootstrap": [
+            0.5819667908730144,
+            0.7682879574402098
+          ]
+        },
+        "test_all": {
+          "n": 434,
+          "macro_f1": 0.8222024654571911,
+          "accuracy": 0.8064516129032258,
+          "per_class": {
+            "Constraint": {
+              "precision": 0.6507936507936508,
+              "recall": 0.8913043478260869,
+              "f1": 0.7522935779816514,
+              "support": 92
+            },
+            "Expectation": {
+              "precision": 0.8421052631578947,
+              "recall": 0.7142857142857143,
+              "f1": 0.7729468599033816,
+              "support": 112
+            },
+            "Completion": {
+              "precision": 0.8658536585365854,
+              "recall": 0.9726027397260274,
+              "f1": 0.9161290322580645,
+              "support": 73
+            },
+            "Conflict": {
+              "precision": 0.898989898989899,
+              "recall": 0.712,
+              "f1": 0.7946428571428571,
+              "support": 125
+            },
+            "None": {
+              "precision": 0.875,
+              "recall": 0.875,
+              "f1": 0.875,
+              "support": 32
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "Constraint",
+              "Expectation",
+              "Completion",
+              "Conflict",
+              "None"
+            ],
+            "rows_true_cols_pred": [
+              [
+                82,
+                4,
+                1,
+                5,
+                0
+              ],
+              [
+                20,
+                80,
+                5,
+                4,
+                3
+              ],
+              [
+                0,
+                2,
+                71,
+                0,
+                0
+              ],
+              [
+                23,
+                7,
+                5,
+                89,
+                1
+              ],
+              [
+                1,
+                2,
+                0,
+                1,
+                28
+              ]
+            ]
+          }
+        },
+        "robustness_test": {
+          "n": 50,
+          "macro_f1": 0.8139485076327182,
+          "accuracy": 0.82,
+          "per_class": {
+            "Constraint": {
+              "precision": 0.75,
+              "recall": 0.6,
+              "f1": 0.6666666666666666,
+              "support": 10
+            },
+            "Expectation": {
+              "precision": 0.9,
+              "recall": 0.9,
+              "f1": 0.9,
+              "support": 10
+            },
+            "Completion": {
+              "precision": 0.8333333333333334,
+              "recall": 1.0,
+              "f1": 0.9090909090909091,
+              "support": 10
+            },
+            "Conflict": {
+              "precision": 0.7777777777777778,
+              "recall": 0.7,
+              "f1": 0.7368421052631579,
+              "support": 10
+            },
+            "None": {
+              "precision": 0.8181818181818182,
+              "recall": 0.9,
+              "f1": 0.8571428571428571,
+              "support": 10
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "Constraint",
+              "Expectation",
+              "Completion",
+              "Conflict",
+              "None"
+            ],
+            "rows_true_cols_pred": [
+              [
+                6,
+                1,
+                2,
+                0,
+                1
+              ],
+              [
+                0,
+                9,
+                0,
+                1,
+                0
+              ],
+              [
+                0,
+                0,
+                10,
+                0,
+                0
+              ],
+              [
+                2,
+                0,
+                0,
+                7,
+                1
+              ],
+              [
+                0,
+                0,
+                0,
+                1,
+                9
+              ]
+            ]
+          },
+          "macro_f1_ci95_bootstrap": [
+            0.6946631986434618,
+            0.9139360613810741
+          ]
+        }
+      },
+      "auto_accept_dev": {
+        "50": {
+          "threshold": 50,
+          "total": 132,
+          "accepted": 125,
+          "accepted_pct": 94.6969696969697,
+          "correct": 86,
+          "precision": 0.688
+        },
+        "60": {
+          "threshold": 60,
+          "total": 132,
+          "accepted": 113,
+          "accepted_pct": 85.60606060606061,
+          "correct": 79,
+          "precision": 0.6991150442477876
+        },
+        "70": {
+          "threshold": 70,
+          "total": 132,
+          "accepted": 101,
+          "accepted_pct": 76.51515151515152,
+          "correct": 73,
+          "precision": 0.7227722772277227
+        },
+        "80": {
+          "threshold": 80,
+          "total": 132,
+          "accepted": 89,
+          "accepted_pct": 67.42424242424242,
+          "correct": 67,
+          "precision": 0.7528089887640449
+        },
+        "90": {
+          "threshold": 90,
+          "total": 132,
+          "accepted": 77,
+          "accepted_pct": 58.333333333333336,
+          "correct": 62,
+          "precision": 0.8051948051948052
+        }
+      },
+      "auto_accept_test": {
+        "threshold": 90,
+        "total": 156,
+        "accepted": 97,
+        "accepted_pct": 62.17948717948718,
+        "correct": 77,
+        "precision": 0.7938144329896907
+      },
+      "jira_review": null
+    },
+    "C": {
+      "title": "Model C (soft voting A+B)",
+      "model_type": "voting",
+      "hyperparameters": {
+        "weight_a": 0.8
+      },
+      "selection_score": 0.7844536737099665,
+      "metrics": {
+        "val_batch_A": {
+          "n": 82,
+          "macro_f1": 0.8722406807532666,
+          "accuracy": 0.8536585365853658,
+          "per_class": {
+            "Constraint": {
+              "precision": 0.8125,
+              "recall": 0.7647058823529411,
+              "f1": 0.7878787878787878,
+              "support": 17
+            },
+            "Expectation": {
+              "precision": 0.9090909090909091,
+              "recall": 0.8333333333333334,
+              "f1": 0.8695652173913043,
+              "support": 24
+            },
+            "Completion": {
+              "precision": 0.9411764705882353,
+              "recall": 0.8888888888888888,
+              "f1": 0.9142857142857143,
+              "support": 18
+            },
+            "Conflict": {
+              "precision": 0.7142857142857143,
+              "recall": 0.8823529411764706,
+              "f1": 0.7894736842105263,
+              "support": 17
+            },
+            "None": {
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0,
+              "support": 6
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "Constraint",
+              "Expectation",
+              "Completion",
+              "Conflict",
+              "None"
+            ],
+            "rows_true_cols_pred": [
+              [
+                13,
+                1,
+                0,
+                3,
+                0
+              ],
+              [
+                2,
+                20,
+                1,
+                1,
+                0
+              ],
+              [
+                0,
+                0,
+                16,
+                2,
+                0
+              ],
+              [
+                1,
+                1,
+                0,
+                15,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0,
+                6
+              ]
+            ]
+          }
+        },
+        "val_all": {
+          "n": 338,
+          "macro_f1": 0.9691641587862858,
+          "accuracy": 0.9644970414201184,
+          "per_class": {
+            "Constraint": {
+              "precision": 0.96,
+              "recall": 0.9473684210526315,
+              "f1": 0.9536423841059603,
+              "support": 76
+            },
+            "Expectation": {
+              "precision": 0.9761904761904762,
+              "recall": 0.9534883720930233,
+              "f1": 0.9647058823529412,
+              "support": 86
+            },
+            "Completion": {
+              "precision": 0.9807692307692307,
+              "recall": 0.9622641509433962,
+              "f1": 0.9714285714285714,
+              "support": 53
+            },
+            "Conflict": {
+              "precision": 0.9354838709677419,
+              "recall": 0.9775280898876404,
+              "f1": 0.9560439560439561,
+              "support": 89
+            },
+            "None": {
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0,
+              "support": 34
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "Constraint",
+              "Expectation",
+              "Completion",
+              "Conflict",
+              "None"
+            ],
+            "rows_true_cols_pred": [
+              [
+                72,
+                1,
+                0,
+                3,
+                0
+              ],
+              [
+                2,
+                82,
+                1,
+                1,
+                0
+              ],
+              [
+                0,
+                0,
+                51,
+                2,
+                0
+              ],
+              [
+                1,
+                1,
+                0,
+                87,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0,
+                34
+              ]
+            ]
+          }
+        },
+        "robustness_dev": {
+          "n": 50,
+          "macro_f1": 0.6966666666666667,
+          "accuracy": 0.7,
+          "per_class": {
+            "Constraint": {
+              "precision": 0.75,
+              "recall": 0.6,
+              "f1": 0.6666666666666666,
+              "support": 10
+            },
+            "Expectation": {
+              "precision": 0.8,
+              "recall": 0.8,
+              "f1": 0.8,
+              "support": 10
+            },
+            "Completion": {
+              "precision": 0.75,
+              "recall": 0.6,
+              "f1": 0.6666666666666666,
+              "support": 10
+            },
+            "Conflict": {
+              "precision": 0.6,
+              "recall": 0.6,
+              "f1": 0.6,
+              "support": 10
+            },
+            "None": {
+              "precision": 0.6428571428571429,
+              "recall": 0.9,
+              "f1": 0.75,
+              "support": 10
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "Constraint",
+              "Expectation",
+              "Completion",
+              "Conflict",
+              "None"
+            ],
+            "rows_true_cols_pred": [
+              [
+                6,
+                0,
+                1,
+                3,
+                0
+              ],
+              [
+                0,
+                8,
+                1,
+                0,
+                1
+              ],
+              [
+                0,
+                1,
+                6,
+                0,
+                3
+              ],
+              [
+                2,
+                1,
+                0,
+                6,
+                1
+              ],
+              [
+                0,
+                0,
+                0,
+                1,
+                9
+              ]
+            ]
+          }
+        },
+        "test_batch_A": {
+          "n": 106,
+          "macro_f1": 0.8657205477960195,
+          "accuracy": 0.8490566037735849,
+          "per_class": {
+            "Constraint": {
+              "precision": 0.6666666666666666,
+              "recall": 0.9565217391304348,
+              "f1": 0.7857142857142857,
+              "support": 23
+            },
+            "Expectation": {
+              "precision": 0.92,
+              "recall": 0.8214285714285714,
+              "f1": 0.8679245283018868,
+              "support": 28
+            },
+            "Completion": {
+              "precision": 1.0,
+              "recall": 0.8947368421052632,
+              "f1": 0.9444444444444444,
+              "support": 19
+            },
+            "Conflict": {
+              "precision": 0.8846153846153846,
+              "recall": 0.7666666666666667,
+              "f1": 0.8214285714285714,
+              "support": 30
+            },
+            "None": {
+              "precision": 1.0,
+              "recall": 0.8333333333333334,
+              "f1": 0.9090909090909091,
+              "support": 6
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "Constraint",
+              "Expectation",
+              "Completion",
+              "Conflict",
+              "None"
+            ],
+            "rows_true_cols_pred": [
+              [
+                22,
+                0,
+                0,
+                1,
+                0
+              ],
+              [
+                4,
+                23,
+                0,
+                1,
+                0
+              ],
+              [
+                2,
+                0,
+                17,
+                0,
+                0
+              ],
+              [
+                5,
+                2,
+                0,
+                23,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                1,
+                5
+              ]
+            ]
+          },
+          "macro_f1_ci95_bootstrap": [
+            0.7854021886615892,
+            0.9282774467499448
+          ]
+        },
+        "test_all": {
+          "n": 434,
+          "macro_f1": 0.9672115620972281,
+          "accuracy": 0.9631336405529954,
+          "per_class": {
+            "Constraint": {
+              "precision": 0.8921568627450981,
+              "recall": 0.9891304347826086,
+              "f1": 0.9381443298969072,
+              "support": 92
+            },
+            "Expectation": {
+              "precision": 0.981651376146789,
+              "recall": 0.9553571428571429,
+              "f1": 0.9683257918552036,
+              "support": 112
+            },
+            "Completion": {
+              "precision": 1.0,
+              "recall": 0.9726027397260274,
+              "f1": 0.9861111111111112,
+              "support": 73
+            },
+            "Conflict": {
+              "precision": 0.9752066115702479,
+              "recall": 0.944,
+              "f1": 0.959349593495935,
+              "support": 125
+            },
+            "None": {
+              "precision": 1.0,
+              "recall": 0.96875,
+              "f1": 0.9841269841269841,
+              "support": 32
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "Constraint",
+              "Expectation",
+              "Completion",
+              "Conflict",
+              "None"
+            ],
+            "rows_true_cols_pred": [
+              [
+                91,
+                0,
+                0,
+                1,
+                0
+              ],
+              [
+                4,
+                107,
+                0,
+                1,
+                0
+              ],
+              [
+                2,
+                0,
+                71,
+                0,
+                0
+              ],
+              [
+                5,
+                2,
+                0,
+                118,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                1,
+                31
+              ]
+            ]
+          }
+        },
+        "robustness_test": {
+          "n": 50,
+          "macro_f1": 0.7819163292847503,
+          "accuracy": 0.78,
+          "per_class": {
+            "Constraint": {
+              "precision": 0.6666666666666666,
+              "recall": 0.6,
+              "f1": 0.631578947368421,
+              "support": 10
+            },
+            "Expectation": {
+              "precision": 1.0,
+              "recall": 0.8,
+              "f1": 0.8888888888888888,
+              "support": 10
+            },
+            "Completion": {
+              "precision": 0.875,
+              "recall": 0.7,
+              "f1": 0.7777777777777778,
+              "support": 10
+            },
+            "Conflict": {
+              "precision": 0.8888888888888888,
+              "recall": 0.8,
+              "f1": 0.8421052631578947,
+              "support": 10
+            },
+            "None": {
+              "precision": 0.625,
+              "recall": 1.0,
+              "f1": 0.7692307692307693,
+              "support": 10
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "Constraint",
+              "Expectation",
+              "Completion",
+              "Conflict",
+              "None"
+            ],
+            "rows_true_cols_pred": [
+              [
+                6,
+                0,
+                1,
+                0,
+                3
+              ],
+              [
+                1,
+                8,
+                0,
+                0,
+                1
+              ],
+              [
+                0,
+                0,
+                7,
+                1,
+                2
+              ],
+              [
+                2,
+                0,
+                0,
+                8,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0,
+                10
+              ]
+            ]
+          },
+          "macro_f1_ci95_bootstrap": [
+            0.6640491752256459,
+            0.8819569344969803
+          ]
+        }
+      },
+      "auto_accept_dev": {
+        "50": {
+          "threshold": 50,
+          "total": 132,
+          "accepted": 74,
+          "accepted_pct": 56.06060606060606,
+          "correct": 66,
+          "precision": 0.8918918918918919
+        },
+        "60": {
+          "threshold": 60,
+          "total": 132,
+          "accepted": 56,
+          "accepted_pct": 42.42424242424242,
+          "correct": 53,
+          "precision": 0.9464285714285714
+        },
+        "70": {
+          "threshold": 70,
+          "total": 132,
+          "accepted": 39,
+          "accepted_pct": 29.545454545454547,
+          "correct": 37,
+          "precision": 0.9487179487179487
+        },
+        "80": {
+          "threshold": 80,
+          "total": 132,
+          "accepted": 23,
+          "accepted_pct": 17.424242424242426,
+          "correct": 22,
+          "precision": 0.9565217391304348
+        },
+        "90": {
+          "threshold": 90,
+          "total": 132,
+          "accepted": 10,
+          "accepted_pct": 7.575757575757576,
+          "correct": 10,
+          "precision": 1.0
+        }
+      },
+      "auto_accept_test": {
+        "threshold": 90,
+        "total": 156,
+        "accepted": 17,
+        "accepted_pct": 10.897435897435898,
+        "correct": 17,
+        "precision": 1.0
+      },
+      "jira_review": null
+    },
+    "D": {
+      "title": "Model D (TF-IDF + MiniLM concatenated, one LR)",
+      "model_type": "concat_lr",
+      "hyperparameters": {
+        "C": 100,
+        "class_weight": "balanced",
+        "scale": 0.5
+      },
+      "selection_score": 0.7868179541663523,
+      "metrics": {
+        "val_batch_A": {
+          "n": 82,
+          "macro_f1": 0.8833727504379677,
+          "accuracy": 0.8658536585365854,
+          "per_class": {
+            "Constraint": {
+              "precision": 0.8666666666666667,
+              "recall": 0.7647058823529411,
+              "f1": 0.8125,
+              "support": 17
+            },
+            "Expectation": {
+              "precision": 0.9090909090909091,
+              "recall": 0.8333333333333334,
+              "f1": 0.8695652173913043,
+              "support": 24
+            },
+            "Completion": {
+              "precision": 0.9411764705882353,
+              "recall": 0.8888888888888888,
+              "f1": 0.9142857142857143,
+              "support": 18
+            },
+            "Conflict": {
+              "precision": 0.7272727272727273,
+              "recall": 0.9411764705882353,
+              "f1": 0.8205128205128205,
+              "support": 17
+            },
+            "None": {
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0,
+              "support": 6
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "Constraint",
+              "Expectation",
+              "Completion",
+              "Conflict",
+              "None"
+            ],
+            "rows_true_cols_pred": [
+              [
+                13,
+                1,
+                0,
+                3,
+                0
+              ],
+              [
+                2,
+                20,
+                1,
+                1,
+                0
+              ],
+              [
+                0,
+                0,
+                16,
+                2,
+                0
+              ],
+              [
+                0,
+                1,
+                0,
+                16,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0,
+                6
+              ]
+            ]
+          }
+        },
+        "val_all": {
+          "n": 338,
+          "macro_f1": 0.9715766175322589,
+          "accuracy": 0.9674556213017751,
+          "per_class": {
+            "Constraint": {
+              "precision": 0.972972972972973,
+              "recall": 0.9473684210526315,
+              "f1": 0.96,
+              "support": 76
+            },
+            "Expectation": {
+              "precision": 0.9761904761904762,
+              "recall": 0.9534883720930233,
+              "f1": 0.9647058823529412,
+              "support": 86
+            },
+            "Completion": {
+              "precision": 0.9807692307692307,
+              "recall": 0.9622641509433962,
+              "f1": 0.9714285714285714,
+              "support": 53
+            },
+            "Conflict": {
+              "precision": 0.9361702127659575,
+              "recall": 0.9887640449438202,
+              "f1": 0.9617486338797814,
+              "support": 89
+            },
+            "None": {
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0,
+              "support": 34
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "Constraint",
+              "Expectation",
+              "Completion",
+              "Conflict",
+              "None"
+            ],
+            "rows_true_cols_pred": [
+              [
+                72,
+                1,
+                0,
+                3,
+                0
+              ],
+              [
+                2,
+                82,
+                1,
+                1,
+                0
+              ],
+              [
+                0,
+                0,
+                51,
+                2,
+                0
+              ],
+              [
+                0,
+                1,
+                0,
+                88,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0,
+                34
+              ]
+            ]
+          }
+        },
+        "robustness_dev": {
+          "n": 50,
+          "macro_f1": 0.6902631578947369,
+          "accuracy": 0.7,
+          "per_class": {
+            "Constraint": {
+              "precision": 0.8333333333333334,
+              "recall": 0.5,
+              "f1": 0.625,
+              "support": 10
+            },
+            "Expectation": {
+              "precision": 0.8,
+              "recall": 0.8,
+              "f1": 0.8,
+              "support": 10
+            },
+            "Completion": {
+              "precision": 0.5555555555555556,
+              "recall": 0.5,
+              "f1": 0.5263157894736842,
+              "support": 10
+            },
+            "Conflict": {
+              "precision": 0.6363636363636364,
+              "recall": 0.7,
+              "f1": 0.6666666666666666,
+              "support": 10
+            },
+            "None": {
+              "precision": 0.7142857142857143,
+              "recall": 1.0,
+              "f1": 0.8333333333333334,
+              "support": 10
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "Constraint",
+              "Expectation",
+              "Completion",
+              "Conflict",
+              "None"
+            ],
+            "rows_true_cols_pred": [
+              [
+                5,
+                0,
+                2,
+                3,
+                0
+              ],
+              [
+                0,
+                8,
+                1,
+                0,
+                1
+              ],
+              [
+                0,
+                1,
+                5,
+                1,
+                3
+              ],
+              [
+                1,
+                1,
+                1,
+                7,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0,
+                10
+              ]
+            ]
+          }
+        },
+        "test_batch_A": {
+          "n": 106,
+          "macro_f1": 0.8973613822019807,
+          "accuracy": 0.8773584905660378,
+          "per_class": {
+            "Constraint": {
+              "precision": 0.7333333333333333,
+              "recall": 0.9565217391304348,
+              "f1": 0.8301886792452831,
+              "support": 23
+            },
+            "Expectation": {
+              "precision": 0.96,
+              "recall": 0.8571428571428571,
+              "f1": 0.9056603773584906,
+              "support": 28
+            },
+            "Completion": {
+              "precision": 0.9411764705882353,
+              "recall": 0.8421052631578947,
+              "f1": 0.8888888888888888,
+              "support": 19
+            },
+            "Conflict": {
+              "precision": 0.8928571428571429,
+              "recall": 0.8333333333333334,
+              "f1": 0.8620689655172413,
+              "support": 30
+            },
+            "None": {
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0,
+              "support": 6
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "Constraint",
+              "Expectation",
+              "Completion",
+              "Conflict",
+              "None"
+            ],
+            "rows_true_cols_pred": [
+              [
+                22,
+                0,
+                0,
+                1,
+                0
+              ],
+              [
+                3,
+                24,
+                0,
+                1,
+                0
+              ],
+              [
+                2,
+                0,
+                16,
+                1,
+                0
+              ],
+              [
+                3,
+                1,
+                1,
+                25,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0,
+                6
+              ]
+            ]
+          },
+          "macro_f1_ci95_bootstrap": [
+            0.8400633592532891,
+            0.9465952929423516
+          ]
+        },
+        "test_all": {
+          "n": 434,
+          "macro_f1": 0.9740438608937569,
+          "accuracy": 0.9700460829493087,
+          "per_class": {
+            "Constraint": {
+              "precision": 0.9191919191919192,
+              "recall": 0.9891304347826086,
+              "f1": 0.9528795811518325,
+              "support": 92
+            },
+            "Expectation": {
+              "precision": 0.9908256880733946,
+              "recall": 0.9642857142857143,
+              "f1": 0.9773755656108597,
+              "support": 112
+            },
+            "Completion": {
+              "precision": 0.9859154929577465,
+              "recall": 0.958904109589041,
+              "f1": 0.9722222222222222,
+              "support": 73
+            },
+            "Conflict": {
+              "precision": 0.975609756097561,
+              "recall": 0.96,
+              "f1": 0.967741935483871,
+              "support": 125
+            },
+            "None": {
+              "precision": 1.0,
+              "recall": 1.0,
+              "f1": 1.0,
+              "support": 32
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "Constraint",
+              "Expectation",
+              "Completion",
+              "Conflict",
+              "None"
+            ],
+            "rows_true_cols_pred": [
+              [
+                91,
+                0,
+                0,
+                1,
+                0
+              ],
+              [
+                3,
+                108,
+                0,
+                1,
+                0
+              ],
+              [
+                2,
+                0,
+                70,
+                1,
+                0
+              ],
+              [
+                3,
+                1,
+                1,
+                120,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0,
+                32
+              ]
+            ]
+          }
+        },
+        "robustness_test": {
+          "n": 50,
+          "macro_f1": 0.7135449735449735,
+          "accuracy": 0.72,
+          "per_class": {
+            "Constraint": {
+              "precision": 0.7,
+              "recall": 0.7,
+              "f1": 0.7,
+              "support": 10
+            },
+            "Expectation": {
+              "precision": 1.0,
+              "recall": 0.8,
+              "f1": 0.8888888888888888,
+              "support": 10
+            },
+            "Completion": {
+              "precision": 1.0,
+              "recall": 0.4,
+              "f1": 0.5714285714285714,
+              "support": 10
+            },
+            "Conflict": {
+              "precision": 0.6363636363636364,
+              "recall": 0.7,
+              "f1": 0.6666666666666666,
+              "support": 10
+            },
+            "None": {
+              "precision": 0.5882352941176471,
+              "recall": 1.0,
+              "f1": 0.7407407407407407,
+              "support": 10
+            }
+          },
+          "confusion_matrix": {
+            "labels": [
+              "Constraint",
+              "Expectation",
+              "Completion",
+              "Conflict",
+              "None"
+            ],
+            "rows_true_cols_pred": [
+              [
+                7,
+                0,
+                0,
+                0,
+                3
+              ],
+              [
+                1,
+                8,
+                0,
+                1,
+                0
+              ],
+              [
+                0,
+                0,
+                4,
+                3,
+                3
+              ],
+              [
+                2,
+                0,
+                0,
+                7,
+                1
+              ],
+              [
+                0,
+                0,
+                0,
+                0,
+                10
+              ]
+            ]
+          },
+          "macro_f1_ci95_bootstrap": [
+            0.5661213192937331,
+            0.8316920995670996
+          ]
+        }
+      },
+      "auto_accept_dev": {
+        "50": {
+          "threshold": 50,
+          "total": 132,
+          "accepted": 118,
+          "accepted_pct": 89.39393939393939,
+          "correct": 102,
+          "precision": 0.864406779661017
+        },
+        "60": {
+          "threshold": 60,
+          "total": 132,
+          "accepted": 104,
+          "accepted_pct": 78.78787878787878,
+          "correct": 92,
+          "precision": 0.8846153846153846
+        },
+        "70": {
+          "threshold": 70,
+          "total": 132,
+          "accepted": 96,
+          "accepted_pct": 72.72727272727273,
+          "correct": 86,
+          "precision": 0.8958333333333334
+        },
+        "80": {
+          "threshold": 80,
+          "total": 132,
+          "accepted": 81,
+          "accepted_pct": 61.36363636363637,
+          "correct": 73,
+          "precision": 0.9012345679012346
+        },
+        "90": {
+          "threshold": 90,
+          "total": 132,
+          "accepted": 54,
+          "accepted_pct": 40.90909090909091,
+          "correct": 51,
+          "precision": 0.9444444444444444
+        }
+      },
+      "auto_accept_test": {
+        "threshold": 90,
+        "total": 156,
+        "accepted": 89,
+        "accepted_pct": 57.05128205128205,
+        "correct": 88,
+        "precision": 0.9887640449438202
+      },
+      "jira_review": null
+    }
+  }
+}

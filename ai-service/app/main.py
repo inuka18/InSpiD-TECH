@@ -1,31 +1,74 @@
 """InSPiD-TECH AI service.
 
-Every endpoint below returns PLACEHOLDER values. The real models arrive later:
-  - /classify   -> signal classifier (Constraint / Expectation / Completion / Conflict / None)
-  - /embed      -> sentence-transformers embeddings
+/classify uses the trained model; /embed and /similarity still return PLACEHOLDER values:
+  - /classify   -> REAL: signal classifier (Constraint / Expectation / Completion / Conflict / None)
+  - /embed     -> sentence-transformers embeddings
   - /similarity -> cosine similarity on those embeddings
 The backend only talks to this service through backend/src/shared/aiClient.js.
 """
-from typing import List
+import os
+import threading
+from pathlib import Path
+from typing import List, Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-app = FastAPI(title="InSPiD-TECH AI service", version="0.1.0")
+from app.signal_model import LABELS, load_model, read_current
 
-LABELS = ["Constraint", "Expectation", "Completion", "Conflict", "None"]
+app = FastAPI(title="InSPiD-TECH AI service", version="0.2.0")
+
 EMBED_DIM = 384  # all-MiniLM-L6-v2 size, the likely model
+MODELS_DIR = Path(os.environ.get("MODELS_DIR", "/app/models"))
+
+
+class ModelRegistry:
+    """Holds the active classifier and reloads it when current.json changes (mtime check)."""
+
+    def __init__(self, models_dir: Path):
+        self.dir = models_dir
+        self.lock = threading.Lock()
+        self.mtime = None
+        self.version: Optional[str] = None
+        self.model = None
+        self.error = "No model has been loaded yet."
+
+    def get(self):
+        cur = self.dir / "current.json"
+        try:
+            mtime = cur.stat().st_mtime_ns
+        except FileNotFoundError:
+            with self.lock:
+                self.model, self.version, self.mtime = None, None, None
+                self.error = f"No trained model: {cur} does not exist. Run the training script (see ai-service/training/README.md)."
+            return None, None, self.error
+        with self.lock:
+            if mtime != self.mtime:
+                try:
+                    version = read_current(self.dir)
+                    self.model, self.version = load_model(self.dir, version), version
+                    self.error = None
+                except Exception as exc:  # bad json, missing model file, unpickle error
+                    self.model, self.version = None, None
+                    self.error = f"Could not load the active model from {cur}: {exc}"
+                self.mtime = mtime
+            return self.model, self.version, self.error
+
+
+registry = ModelRegistry(MODELS_DIR)
 
 
 class ClassifyIn(BaseModel):
     text: str = Field(min_length=1)
+    source: Optional[str] = None  # accepted for the API contract; the model is text-only
+    role: Optional[str] = None  # accepted for the API contract; the model is text-only
 
 
 class ClassifyOut(BaseModel):
     label: str
     confidence: float
     scores: dict
-    placeholder: bool = True
+    model_version: str
 
 
 class EmbedIn(BaseModel):
@@ -55,8 +98,13 @@ def health():
 
 @app.post("/classify", response_model=ClassifyOut)
 def classify(body: ClassifyIn):
-    # TODO: replace with the trained classifier.
-    return ClassifyOut(label="None", confidence=0.0, scores={l: 0.0 for l in LABELS})
+    model, version, error = registry.get()
+    if model is None:
+        raise HTTPException(status_code=503, detail=error)
+    proba = model.predict_proba([body.text])[0]
+    scores = {l: round(float(p), 6) for l, p in zip(LABELS, proba)}
+    label = max(scores, key=scores.get)
+    return ClassifyOut(label=label, confidence=scores[label], scores=scores, model_version=version)
 
 
 @app.post("/embed", response_model=EmbedOut)

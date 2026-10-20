@@ -1,6 +1,7 @@
 # Start everything:            docker compose up --build
 # With a local MongoDB too:    docker compose --profile localdb up --build
 # (MongoDB Atlas is the default; see README.md.)
+# Classifier training (separate profile, never part of `up`): see ai-service/training/README.md
 name: inspid
 
 services:
@@ -38,8 +39,13 @@ services:
   ai-service:
     build: ./ai-service
     env_file: .env
+    environment:
+      MODELS_DIR: /app/models
     ports:
       - "8000:8000"
+    volumes:
+      - ./ai-service/models:/app/models:ro # trained classifier; /classify reloads when current.json changes
+      - ml_cache:/cache
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=3).status == 200 else 1)"]
       interval: 10s
@@ -87,6 +93,33 @@ services:
       timeout: 5s
       retries: 6
 
+  # ---- Classifier training jobs: NOT started by a normal `docker compose up` (profile "train").
+  # Run them with `docker compose run --rm trainer python -m training.<script>`; see ai-service/training/README.md.
+  trainer:
+    build: ./ai-service
+    profiles: ["train"]
+    working_dir: /app
+    command: ["python", "-m", "training.train"]
+    environment:
+      DATA_DIR: /data
+      DOCS_DIR: /docs
+      MODELS_DIR: /app/models
+      EMBED_CACHE_DIR: /cache/embeddings
+    volumes:
+      - ./data:/data:ro
+      - ./docs:/docs
+      - ./ai-service/models:/app/models
+      - ./ai-service/training:/app/training
+      - ml_cache:/cache # Hugging Face weights + cached embeddings (fast reruns)
+
+  # Same as trainer, plus a writable data/processed so it can create jira_review_sample.csv.
+  review-sample:
+    extends: trainer
+    command: ["python", "-m", "training.make_review_sample"]
+    volumes:
+      - ./data/processed:/data/processed:rw
+
 volumes:
+  ml_cache:
   neo4j_data:
   mongo_data:
