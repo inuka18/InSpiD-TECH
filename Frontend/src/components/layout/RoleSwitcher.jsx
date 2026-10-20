@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Check, LogOut, ShieldCheck, User } from "lucide-react";
+import { LogOut, RefreshCcw, ShieldCheck, User } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,28 +10,29 @@ import {
 } from "../ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "../ui/avatar";
 import { useRole } from "../../context/RoleContext";
-import { cn } from "../../lib/utils";
 
-const ROLE_OPTIONS = [
-  { value: "pm", label: "Project Manager", icon: ShieldCheck },
-  { value: "member", label: "Team Member", icon: User },
-];
-
+// The account menu in the top bar: who is signed in, and "Log out / switch account".
+// (Roles come from the real login now, so there is no role picker any more.)
 export function RoleSwitcher() {
-  const { currentUser, role, switchRole, logout } = useRole();
+  const { currentUser, role, logout } = useRole();
   const navigate = useNavigate();
 
   if (!currentUser) return null;
 
-  const handleLogout = () => {
+  const signOut = () => {
     logout();
     navigate("/login", { replace: true });
   };
 
+  const RoleIcon = role === "pm" ? ShieldCheck : User;
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="flex items-center gap-2 rounded-full outline-none ring-offset-background transition-shadow focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+        <button
+          aria-label="Account menu"
+          className="flex items-center gap-2 rounded-full outline-none ring-offset-background transition-shadow focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
           <Avatar className="h-8 w-8">
             <AvatarFallback>{currentUser.initials}</AvatarFallback>
           </Avatar>
@@ -43,21 +44,18 @@ export function RoleSwitcher() {
             <span className="text-sm font-semibold text-foreground">{currentUser.name}</span>
             <span className="text-xs text-muted-foreground">{currentUser.title}</span>
             <span className="text-xs text-muted-foreground">{currentUser.email}</span>
+            <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-primary">
+              <RoleIcon className="h-3 w-3" />
+              {role === "pm" ? "Project Manager" : "Team Member"}
+            </span>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuLabel className="text-[11px] uppercase tracking-wide">
-          Viewing as
-        </DropdownMenuLabel>
-        {ROLE_OPTIONS.map((opt) => (
-          <DropdownMenuItem key={opt.value} onSelect={() => switchRole(opt.value)} className="gap-2.5">
-            <opt.icon className="h-4 w-4 text-muted-foreground" />
-            <span className="flex-1">{opt.label}</span>
-            {role === opt.value && <Check className="h-3.5 w-3.5 text-primary" />}
-          </DropdownMenuItem>
-        ))}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={handleLogout} className={cn("gap-2.5 text-destructive")}>
+        <DropdownMenuItem onSelect={signOut} className="gap-2.5">
+          <RefreshCcw className="h-4 w-4 text-muted-foreground" />
+          Switch account
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={signOut} className="gap-2.5 text-destructive">
           <LogOut className="h-4 w-4" />
           Log out
         </DropdownMenuItem>

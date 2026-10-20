@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { HelpCircle, GitCompareArrows, Link2, Unlink, ArrowUpRight } from "lucide-react";
+import { HelpCircle, GitCompareArrows, Link2, Unlink, ArrowUpRight, Gauge } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
@@ -55,6 +55,22 @@ export function AlignmentScorePage() {
 
   const selectedEntry = history.find((d) => d.date === selectedDate) ?? null;
   const drivingSignal = selectedEntry?.driverSignalId ? getSignalById(selectedEntry.driverSignalId) : null;
+
+  // There is no alignment endpoint in the backend yet, so a real project has no history to show.
+  if (!loading && history.length === 0) {
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center gap-2 p-10 text-center">
+          <Gauge className="h-7 w-7 text-muted-foreground" />
+          <p className="text-sm font-semibold text-foreground">Alignment score is not available yet.</p>
+          <p className="max-w-md text-sm text-muted-foreground">
+            It needs the alignment model, which is not connected to the backend. Requirements, the network, the ledger and
+            signal analytics already use real data.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6">

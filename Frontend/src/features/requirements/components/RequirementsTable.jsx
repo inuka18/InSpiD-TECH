@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Search, ListChecks } from "lucide-react";
+import { Search, ListChecks, AlertCircle } from "lucide-react";
 import { EmptyState } from "../../../components/common/EmptyState";
 import { Input } from "../../../components/ui/input";
 import {
@@ -13,33 +13,65 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Skeleton } from "../../../components/ui/skeleton";
 import { StatusBadge } from "./StatusBadge";
 import { DetectRequirementsDialog } from "./DetectRequirementsDialog";
-import { STATUSES, RESOURCE_ROLES } from "../../../data/mockRequirements";
+import { STATUSES } from "../../../data/mockRequirements";
+import { clusterMeta, clustersOf } from "../../../lib/clusters";
 import { formatRelativeTime } from "../../../lib/utils";
 
+// Most requirements have no status change yet, so the history can be empty: "Last updated" is then unknown.
 function lastUpdatedOf(req) {
-  return req.statusHistory[req.statusHistory.length - 1].timestamp;
+  const history = req.statusHistory ?? [];
+  return history.length ? history[history.length - 1].timestamp : null;
 }
 
-export function RequirementsTable({ requirements, loading, onSelectRequirement, projectId, isPM, onRequirementsCreated }) {
+export function RequirementsTable({ requirements, loading, error, onRetry, onSelectRequirement, projectId, isPM, onRequirementsCreated }) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
+  const [clusterFilter, setClusterFilter] = useState("all");
+
+  // Filter options come from the data (the real roles and computed clusters), not fixed lists.
+  const roles = useMemo(() => [...new Set(requirements.map((r) => r.resourceRole).filter(Boolean))].sort(), [requirements]);
+  const clusters = useMemo(() => clustersOf(requirements), [requirements]);
 
   const filtered = useMemo(() => {
     return requirements
       .filter((r) => (statusFilter === "all" ? true : r.liveStatus === statusFilter))
       .filter((r) => (roleFilter === "all" ? true : r.resourceRole === roleFilter))
+      .filter((r) => (clusterFilter === "all" ? true : clusterMeta(r).id === clusterFilter))
       .filter((r) => {
         if (!search.trim()) return true;
         const q = search.toLowerCase();
         return (
           r.id.toLowerCase().includes(q) ||
           r.title.toLowerCase().includes(q) ||
-          r.description.toLowerCase().includes(q)
+          (r.description ?? "").toLowerCase().includes(q)
         );
       })
-      .sort((a, b) => new Date(lastUpdatedOf(b)) - new Date(lastUpdatedOf(a)));
-  }, [requirements, search, statusFilter, roleFilter]);
+      // Most recently changed first; requirements never changed go last, in id order.
+      .sort((a, b) => {
+        const ta = lastUpdatedOf(a);
+        const tb = lastUpdatedOf(b);
+        if (ta && tb) return new Date(tb) - new Date(ta);
+        if (ta) return -1;
+        if (tb) return 1;
+        return a.id.localeCompare(b.id);
+      });
+  }, [requirements, search, statusFilter, roleFilter, clusterFilter]);
+
+  if (error && !loading) {
+    return (
+      <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border py-14 text-center">
+        <AlertCircle className="h-6 w-6 text-status-dropped-fg" />
+        <p className="text-sm font-medium text-foreground">Could not load the requirements.</p>
+        <p className="max-w-md text-sm text-muted-foreground">{error.message}</p>
+        {onRetry && (
+          <button onClick={onRetry} className="text-sm font-medium text-primary hover:underline">
+            Try again
+          </button>
+        )}
+      </div>
+    );
+  }
 
   if (!loading && requirements.length === 0) {
     return (
@@ -77,13 +109,26 @@ export function RequirementsTable({ requirements, loading, onSelectRequirement, 
             ))}
           </SelectContent>
         </Select>
+        <Select value={clusterFilter} onValueChange={setClusterFilter}>
+          <SelectTrigger className="w-full sm:w-60">
+            <SelectValue placeholder="Cluster" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All clusters</SelectItem>
+            {clusters.map((c) => (
+              <SelectItem key={c.id} value={c.id}>
+                {c.label} ({c.count})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Select value={roleFilter} onValueChange={setRoleFilter}>
           <SelectTrigger className="w-full sm:w-52">
             <SelectValue placeholder="Resource role" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All resource roles</SelectItem>
-            {RESOURCE_ROLES.map((role) => (
+            {roles.map((role) => (
               <SelectItem key={role} value={role}>
                 {role}
               </SelectItem>
@@ -98,6 +143,7 @@ export function RequirementsTable({ requirements, loading, onSelectRequirement, 
             <TableRow>
               <TableHead>Requirement ID</TableHead>
               <TableHead>Title</TableHead>
+              <TableHead>Cluster</TableHead>
               <TableHead>Live Status</TableHead>
               <TableHead>Affected Resource Role</TableHead>
               <TableHead>Granularity Level</TableHead>
@@ -108,7 +154,7 @@ export function RequirementsTable({ requirements, loading, onSelectRequirement, 
             {loading &&
               Array.from({ length: 8 }).map((_, i) => (
                 <TableRow key={i}>
-                  {Array.from({ length: 6 }).map((__, j) => (
+                  {Array.from({ length: 7 }).map((__, j) => (
                     <TableCell key={j}>
                       <Skeleton className="h-4 w-full max-w-[10rem]" />
                     </TableCell>
@@ -118,39 +164,39 @@ export function RequirementsTable({ requirements, loading, onSelectRequirement, 
 
             {!loading && filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
                   No requirements match the current filters.
                 </TableCell>
               </TableRow>
             )}
 
             {!loading &&
-              filtered.map((req) => (
-                <TableRow
-                  key={req.id}
-                  onClick={() => onSelectRequirement(req.id)}
-                  className="cursor-pointer"
-                >
-                  <TableCell className="font-mono text-xs font-medium text-primary">
-                    {req.id}
-                  </TableCell>
-                  <TableCell className="max-w-xs">
-                    <span className="line-clamp-1 font-medium text-foreground">{req.title}</span>
-                  </TableCell>
-                  <TableCell>
-                    <StatusBadge status={req.liveStatus} />
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                    {req.resourceRole}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                    {req.granularity}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                    {formatRelativeTime(lastUpdatedOf(req))}
-                  </TableCell>
-                </TableRow>
-              ))}
+              filtered.map((req) => {
+                const cluster = clusterMeta(req);
+                const updated = lastUpdatedOf(req);
+                return (
+                  <TableRow key={req.id} onClick={() => onSelectRequirement(req.id)} className="cursor-pointer">
+                    <TableCell className="font-mono text-xs font-medium text-primary">{req.id}</TableCell>
+                    <TableCell className="max-w-xs">
+                      <span className="line-clamp-1 font-medium text-foreground">{req.title}</span>
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: cluster.color }} />
+                        {cluster.label}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge status={req.liveStatus} />
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-sm text-muted-foreground">{req.resourceRole}</TableCell>
+                    <TableCell className="whitespace-nowrap text-sm text-muted-foreground">{req.granularity}</TableCell>
+                    <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                      {updated ? formatRelativeTime(updated) : "No changes yet"}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
           </TableBody>
         </Table>
       </div>

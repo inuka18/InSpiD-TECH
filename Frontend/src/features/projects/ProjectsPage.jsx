@@ -4,10 +4,8 @@ import { PageHeader } from "../../components/common/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Skeleton } from "../../components/ui/skeleton";
 import { CreateProjectDialog } from "./components/CreateProjectDialog";
-import { useProjects } from "../../hooks/useProjects";
 import { useProject } from "../../context/ProjectContext";
 import { useRole, ROLES } from "../../context/RoleContext";
-import { getTeamForProject } from "../../data/mockTeam";
 import { HEALTH_STATUS } from "../../data/mockProjects";
 import { formatDateTime } from "../../lib/utils";
 
@@ -28,8 +26,7 @@ function ProjectCardSkeleton() {
 
 export function ProjectsPage() {
   const { role } = useRole();
-  const { projects: visibleProjects, extraTeamForProject } = useProject();
-  const { loading } = useProjects();
+  const { projects: visibleProjects, teamForProject, loading, error } = useProject();
   const navigate = useNavigate();
 
   const openProject = (id) => {
@@ -52,7 +49,13 @@ export function ProjectsPage() {
         {loading &&
           Array.from({ length: 3 }).map((_, i) => <ProjectCardSkeleton key={i} />)}
 
-        {!loading && visibleProjects.length === 0 && (
+        {!loading && error && (
+          <div className="col-span-full rounded-xl border border-dashed border-border py-16 text-center text-sm text-status-dropped-fg">
+            Could not load projects: {error.message}
+          </div>
+        )}
+
+        {!loading && !error && visibleProjects.length === 0 && (
           <div className="col-span-full rounded-xl border border-dashed border-border py-16 text-center text-sm text-muted-foreground">
             You're not staffed on any projects yet.
           </div>
@@ -60,7 +63,7 @@ export function ProjectsPage() {
 
         {!loading &&
           visibleProjects.map((project) => {
-            const teamSize = getTeamForProject(project.id).length + extraTeamForProject(project.id).length;
+            const teamSize = teamForProject(project.id).length;
             const health = HEALTH_STATUS[project.health] ?? HEALTH_STATUS["on-track"];
 
             return (
@@ -93,9 +96,13 @@ export function ProjectsPage() {
                     </div>
 
                     <div className="rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                      <span className="font-medium text-foreground">{project.activeSprint.name}</span>
-                      <br />
-                      through {formatDateTime(project.activeSprint.endDate)}
+                      <span className="font-medium text-foreground">{project.activeSprint?.name ?? "No sprint data"}</span>
+                      {project.activeSprint?.endDate && (
+                        <>
+                          <br />
+                          through {formatDateTime(project.activeSprint.endDate)}
+                        </>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

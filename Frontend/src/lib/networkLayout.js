@@ -1,26 +1,13 @@
-// Pure layout computation for the requirements network map. Kept separate
-// from the react-flow rendering component so the clustering logic can be
-// unit-reasoned about (or swapped for a real force-directed layout from a
-// backend) without touching any rendering code.
+// Pure layout computation for the requirements network map. Kept separate from the react-flow rendering
+// component so the clustering/placement logic can be reasoned about without touching any rendering code.
+//
+// Nodes are grouped by their COMPUTED cluster (node.cluster, "cluster-1", ...; null = "Ungrouped"). There is no fixed
+// cluster list: cluster boxes are laid out on a grid sized from what the API returned, and coloured from lib/clusters.
+// Edges are the backend's Pathfinder links; the line width follows each link's weight (cosine similarity).
+import { clusterMeta, clustersOf } from "./clusters";
 
 export const NODE_WIDTH = 200;
 export const NODE_HEIGHT = 66;
-
-// Hand-placed anchor points, arranged to loosely mirror a real system
-// architecture map (auth/checkout/payments/fraud near each other on one
-// side, catalog/loyalty/fulfillment/reporting grouped on the other).
-const CLUSTER_ANCHORS = {
-  auth: { x: 160, y: 140 },
-  checkout: { x: 540, y: 100 },
-  payments: { x: 920, y: 150 },
-  fraud: { x: 1280, y: 90 },
-  compliance: { x: 1020, y: 430 },
-  catalog: { x: 200, y: 480 },
-  loyalty: { x: 560, y: 560 },
-  fulfillment: { x: 940, y: 700 },
-  notifications: { x: 1300, y: 460 },
-  reporting: { x: 560, y: 800 },
-};
 
 function clusterRadius(count) {
   if (count <= 1) return 0;
@@ -28,22 +15,35 @@ function clusterRadius(count) {
   return 100 + count * 18;
 }
 
-export function buildNetworkLayout(requirements, clusters) {
-  const byCluster = new Map();
-  requirements.forEach((req) => {
-    if (!byCluster.has(req.cluster)) byCluster.set(req.cluster, []);
-    byCluster.get(req.cluster).push(req);
-  });
+// Link weight -> stroke width in px. Scaled between the weakest and strongest link of this network.
+export function strokeWidthFor(weight, lo, hi) {
+  if (weight == null) return 1.4;
+  if (hi - lo < 1e-9) return 2.4;
+  return 1 + 4 * ((weight - lo) / (hi - lo));
+}
+
+export function buildNetworkLayout(requirements, links = []) {
+  const clusters = clustersOf(requirements); // ordered: numbered clusters first, "Ungrouped" last
+  const byCluster = new Map(clusters.map((c) => [c.id, []]));
+  requirements.forEach((req) => byCluster.get(clusterMeta(req).id).push(req));
+
+  // Grid of cluster cells, sized from the biggest cluster so boxes never overlap.
+  const cols = Math.max(1, Math.ceil(Math.sqrt(clusters.length)));
+  const maxRadius = Math.max(0, ...clusters.map((c) => clusterRadius(c.count)));
+  const cellW = 2 * maxRadius + NODE_WIDTH + 220;
+  const cellH = 2 * maxRadius * 0.78 + NODE_HEIGHT + 260;
 
   const positions = new Map();
   const clusterBoxes = [];
 
-  byCluster.forEach((members, clusterId) => {
-    const anchor = CLUSTER_ANCHORS[clusterId] ?? { x: 700, y: 450 };
+  clusters.forEach((cluster, index) => {
+    const members = byCluster.get(cluster.id);
+    const anchor = { x: (index % cols) * cellW + cellW / 2, y: Math.floor(index / cols) * cellH + cellH / 2 };
     const radius = clusterRadius(members.length);
 
     members.forEach((req, i) => {
-      let x, y;
+      let x;
+      let y;
       if (members.length === 1) {
         x = anchor.x;
         y = anchor.y;
@@ -63,11 +63,10 @@ export function buildNetworkLayout(requirements, clusters) {
     const minY = Math.min(...ys) - NODE_HEIGHT / 2 - pad - 18; // extra top room for the label
     const maxY = Math.max(...ys) + NODE_HEIGHT / 2 + pad;
 
-    const meta = clusters.find((c) => c.id === clusterId);
     clusterBoxes.push({
-      id: clusterId,
-      label: meta?.label ?? clusterId,
-      color: meta?.color ?? "#94a3b8",
+      id: cluster.id,
+      label: cluster.label,
+      color: cluster.color,
       x: minX,
       y: minY,
       width: maxX - minX,
@@ -76,11 +75,7 @@ export function buildNetworkLayout(requirements, clusters) {
     });
   });
 
-  // Cluster backgrounds are draggable as a group: each requirement node
-  // below declares the matching `bg-${clusterId}` node as its parentNode,
-  // so react-flow moves every member along with its cluster automatically
-  // while still allowing each member to be dragged individually within it
-  // (constrained to the cluster's box via `extent: "parent"`).
+  // Cluster backgrounds are draggable as a group: each requirement node declares its `bg-<clusterId>` node as parent.
   const clusterBgNodes = clusterBoxes.map((box) => ({
     id: `bg-${box.id}`,
     type: "clusterBackground",
@@ -96,57 +91,52 @@ export function buildNetworkLayout(requirements, clusters) {
 
   const requirementNodes = requirements.map((req) => {
     const pos = positions.get(req.id) ?? { x: 0, y: 0 };
+    const meta = clusterMeta(req);
     const absoluteX = pos.x - NODE_WIDTH / 2;
     const absoluteY = pos.y - NODE_HEIGHT / 2;
-    const box = clusterBoxById.get(req.cluster);
+    const box = clusterBoxById.get(meta.id);
 
     return {
       id: req.id,
       type: "requirementNode",
-      // Relative to the parent cluster box's top-left corner once a parent
-      // is set; react-flow resolves the absolute render position itself.
+      // Relative to the parent cluster box's top-left corner once a parent is set.
       position: box ? { x: absoluteX - box.x, y: absoluteY - box.y } : { x: absoluteX, y: absoluteY },
-      parentNode: box ? `bg-${req.cluster}` : undefined,
+      parentNode: box ? `bg-${meta.id}` : undefined,
       extent: box ? "parent" : undefined,
-      data: { requirement: req },
+      data: { requirement: req, clusterColor: meta.color },
       draggable: true,
       zIndex: 10,
     };
   });
 
-  // Build undirected, deduplicated edges from relatedIds.
+  // The backend's computed (Pathfinder) links, deduplicated. Manual links are drawn separately by NetworkMap.
+  const byId = new Map(requirements.map((r) => [r.id, r]));
+  const auto = links.filter((l) => l.kind === "pathfinder" && byId.has(l.source) && byId.has(l.target));
+  const weights = auto.map((l) => l.weight).filter((w) => w != null);
+  const lo = weights.length ? Math.min(...weights) : 0;
+  const hi = weights.length ? Math.max(...weights) : 0;
+
   const seenPairs = new Set();
   const edges = [];
-  requirements.forEach((req) => {
-    (req.relatedIds || []).forEach((relId) => {
-      if (!requirements.some((r) => r.id === relId)) return;
-      const key = [req.id, relId].sort().join("__");
-      if (seenPairs.has(key)) return;
-      seenPairs.add(key);
-
-      const related = requirements.find((r) => r.id === relId);
-      const sameCluster = related.cluster === req.cluster;
-
-      edges.push({
-        id: `e-${key}`,
-        source: req.id,
-        target: relId,
-        type: "smoothstep",
-        animated: false,
-        style: {
-          stroke: sameCluster ? "#94a3b8" : "#c7cdd6",
-          strokeWidth: sameCluster ? 1.6 : 1.2,
-          strokeDasharray: sameCluster ? undefined : "4 4",
-        },
-      });
+  auto.forEach((link) => {
+    const key = [link.source, link.target].sort().join("__");
+    if (seenPairs.has(key)) return;
+    seenPairs.add(key);
+    const sameCluster = clusterMeta(byId.get(link.source)).id === clusterMeta(byId.get(link.target)).id;
+    edges.push({
+      id: `e-${key}`,
+      source: link.source,
+      target: link.target,
+      type: "smoothstep",
+      animated: false,
+      data: { weight: link.weight },
+      style: {
+        stroke: sameCluster ? "#94a3b8" : "#a8b0bd",
+        strokeWidth: strokeWidthFor(link.weight, lo, hi),
+        strokeDasharray: sameCluster ? undefined : "4 4",
+      },
     });
   });
 
-  // Manual links (from mockManualLinks.js) are intentionally not built
-  // here. NetworkMap.jsx merges them into the edge list on its own, kept
-  // out of this function entirely so the Pathfinder-style automatic
-  // clustering/linking logic above stays byte-for-byte what it was before
-  // manual linking existed, unaffected by manual links being added or
-  // removed.
-  return { nodes: [...clusterBgNodes, ...requirementNodes], edges, clusterBoxes };
+  return { nodes: [...clusterBgNodes, ...requirementNodes], edges, clusterBoxes, weightRange: { lo, hi } };
 }

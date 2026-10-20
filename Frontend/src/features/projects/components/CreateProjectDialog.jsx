@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
 import {
@@ -16,23 +17,33 @@ import { Textarea } from "../../../components/ui/textarea";
 import { Label } from "../../../components/ui/label";
 import { useProject } from "../../../context/ProjectContext";
 
-const EMPTY_FORM = { name: "", description: "", startDate: "", inviteesRaw: "" };
+const EMPTY_FORM = { name: "", description: "" };
 
 export function CreateProjectDialog() {
   const { addProject } = useProject();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
   const set = (key) => (e) => setForm((prev) => ({ ...prev, [key]: e.target.value }));
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.name.trim()) return;
-    const created = addProject(form);
-    setForm(EMPTY_FORM);
-    setOpen(false);
-    if (created) navigate(`/projects/${created.id}`);
+    setSubmitting(true);
+    setError("");
+    try {
+      const created = await addProject(form);
+      setForm(EMPTY_FORM);
+      setOpen(false);
+      if (created) navigate(`/projects/${created.id}`);
+    } catch (err) {
+      setError(err.message || "Could not create the project.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -72,20 +83,15 @@ export function CreateProjectDialog() {
               rows={3}
             />
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="proj-start">Start date</Label>
-            <Input id="proj-start" type="date" value={form.startDate} onChange={set("startDate")} />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="proj-invitees">Initial team members</Label>
-            <Textarea
-              id="proj-invitees"
-              placeholder="One name or email per line, e.g. jane@company.com"
-              value={form.inviteesRaw}
-              onChange={set("inviteesRaw")}
-              rows={3}
-            />
-          </div>
+          <p className="text-xs text-muted-foreground">
+            Start date and initial members are not stored yet. Add people from the project's Team page after creating it.
+          </p>
+
+          {error && (
+            <p role="alert" className="rounded-lg border border-status-dropped-fg/30 bg-status-dropped-bg px-3 py-2 text-sm text-status-dropped-fg">
+              {error}
+            </p>
+          )}
 
           <div className="flex justify-end gap-2 pt-2">
             <DialogClose asChild>
@@ -93,7 +99,10 @@ export function CreateProjectDialog() {
                 Cancel
               </Button>
             </DialogClose>
-            <Button type="submit">Create project</Button>
+            <Button type="submit" disabled={submitting || !form.name.trim()}>
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Create project
+            </Button>
           </div>
         </form>
       </DialogContent>

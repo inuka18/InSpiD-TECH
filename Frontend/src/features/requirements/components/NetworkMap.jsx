@@ -8,7 +8,7 @@ import ReactFlow, {
   useNodesState,
 } from "reactflow";
 import "reactflow/dist/style.css";
-import { ArrowUpRight, Link2, X, MousePointerClick } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, Link2, X, MousePointerClick } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { RequirementNode } from "./RequirementNode";
 import { ClusterBackgroundNode } from "./ClusterBackgroundNode";
@@ -17,7 +17,7 @@ import { ManualLinkDialog } from "./ManualLinkDialog";
 import { RestrictedButton } from "./RestrictedButton";
 import { StatusBadge } from "./StatusBadge";
 import { buildNetworkLayout } from "../../../lib/networkLayout";
-import { CLUSTERS } from "../../../data/mockRequirements";
+import { clusterMeta } from "../../../lib/clusters";
 import { cn } from "../../../lib/utils";
 
 const nodeTypes = {
@@ -35,7 +35,8 @@ const STATUS_LEGEND = [
   { status: "Dropped", swatch: "bg-status-dropped-fg" },
 ];
 
-export function NetworkMap({ requirements, onOpenRequirement, isPM, manualLinks, onCreateManualLink, onRemoveManualLink }) {
+// `requirements` are the network nodes from the API, `links` its computed (pathfinder) links with weights.
+export function NetworkMap({ requirements, links = [], warning, onOpenRequirement, isPM, manualLinks, onCreateManualLink, onRemoveManualLink }) {
   const wrapperRef = useRef(null);
   const [popover, setPopover] = useState(null);
   const [linkMode, setLinkMode] = useState(false);
@@ -53,17 +54,16 @@ export function NetworkMap({ requirements, onOpenRequirement, isPM, manualLinks,
   // The automatic layout (nodes + Pathfinder-style edges), entirely
   // unchanged from before this feature existed, still memoized on
   // `requirements` alone, so nothing about it reacts to manual links.
-  const layout = useMemo(() => buildNetworkLayout(requirements, CLUSTERS), [requirements]);
+  const layout = useMemo(() => buildNetworkLayout(requirements, links), [requirements, links]);
 
   const requirementById = useMemo(() => new Map(requirements.map((r) => [r.id, r])), [requirements]);
 
   const isAlreadyLinked = useCallback(
     (aId, bId) => {
-      const a = requirementById.get(aId);
-      if (a?.relatedIds?.includes(bId)) return true;
+      if (links.some((l) => l.kind === "pathfinder" && ((l.source === aId && l.target === bId) || (l.source === bId && l.target === aId)))) return true;
       return manualLinks.some((l) => (l.sourceId === aId && l.targetId === bId) || (l.sourceId === bId && l.targetId === aId));
     },
-    [requirementById, manualLinks]
+    [links, manualLinks]
   );
 
   const handleRemoveLinkRequest = useCallback(
@@ -105,10 +105,10 @@ export function NetworkMap({ requirements, onOpenRequirement, isPM, manualLinks,
   }, [layout.edges, manualEdges, setEdges]);
 
   const clusterCount = useMemo(
-    () => new Set(requirements.map((r) => r.cluster)).size,
+    () => new Set(requirements.map((r) => clusterMeta(r).id)).size,
     [requirements]
   );
-  const alignmentScore = 91; // Illustrative, would be computed by the ML alignment model.
+  const legendClusters = layout.clusterBoxes;
 
   const cancelLinking = useCallback(() => {
     setPendingSourceId(null);
@@ -197,9 +197,9 @@ export function NetworkMap({ requirements, onOpenRequirement, isPM, manualLinks,
           <div className="rounded-lg border border-border bg-card/95 px-3.5 py-2.5 text-xs shadow-sm backdrop-blur">
             <span className="font-semibold text-foreground">{requirements.length} requirements</span>
             <span className="mx-1.5 text-muted-foreground">·</span>
-            <span className="text-muted-foreground">{clusterCount} clusters detected</span>
+            <span className="text-muted-foreground">{clusterCount} cluster{clusterCount === 1 ? "" : "s"}</span>
             <span className="mx-1.5 text-muted-foreground">·</span>
-            <span className="font-semibold text-primary">Alignment score: {alignmentScore}%</span>
+            <span className="text-muted-foreground">{layout.edges.length} computed links</span>
           </div>
         </Panel>
 
@@ -247,11 +247,21 @@ export function NetworkMap({ requirements, onOpenRequirement, isPM, manualLinks,
               ))}
             </div>
             <div className="my-2 border-t border-border" />
+            <p className="mb-1.5 font-semibold text-foreground">Clusters</p>
+            <div className="flex max-h-32 flex-col gap-1.5 overflow-y-auto pr-1 scrollbar-thin">
+              {legendClusters.map((c) => (
+                <div key={c.id} className="flex items-center gap-2">
+                  <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: c.color }} />
+                  <span className="max-w-[12rem] truncate text-muted-foreground">{c.label}</span>
+                </div>
+              ))}
+            </div>
+            <div className="my-2 border-t border-border" />
             <p className="mb-1.5 font-semibold text-foreground">Connections</p>
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center gap-2">
-                <span className="h-0 w-4 border-t border-muted-foreground/60" />
-                <span className="text-muted-foreground">Automatic (detected)</span>
+                <span className="h-0 w-4 border-t-[3px] border-muted-foreground/60" />
+                <span className="text-muted-foreground">Computed from text (thicker = more similar)</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="h-0 w-4 border-t-[1.8px] border-dashed border-status-ripple-fg" />
@@ -262,6 +272,13 @@ export function NetworkMap({ requirements, onOpenRequirement, isPM, manualLinks,
           </div>
         </Panel>
       </ReactFlow>
+
+      {warning && (
+        <div className="absolute left-1/2 top-3 z-30 flex max-w-xl -translate-x-1/2 items-start gap-2 rounded-lg border border-status-atrisk-fg/30 bg-status-atrisk-bg px-3 py-2 text-xs text-status-atrisk-fg shadow-sm">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>{warning}</span>
+        </div>
+      )}
 
       {popover && (
         <div

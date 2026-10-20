@@ -40,3 +40,15 @@ export function truncateHash(hash, lead = 6, tail = 4) {
   if (!hash || hash.length <= lead + tail) return hash;
   return `${hash.slice(0, lead)}…${hash.slice(-tail)}`;
 }
+
+// "Developer (RET)" -> "DR", "Kavindu Silva" -> "KS"
+export function initialsFor(name) {
+  const parts = String(name || "")
+    .replace(/[()]/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (parts.length === 0) return "??";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}

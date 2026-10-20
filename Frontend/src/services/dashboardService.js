@@ -1,4 +1,5 @@
-import { mockRequirements, STATUSES } from "../data/mockRequirements";
+import { STATUSES } from "../data/mockRequirements";
+import { fetchRequirements } from "./requirementsService";
 import { getTasksForProject } from "../data/mockSchedule";
 import { getTeamForProject } from "../data/mockTeam";
 import { getRetrospectivesForProject } from "../data/mockRetrospectives";
@@ -6,11 +7,9 @@ import { mockActions, getDisplayStatus } from "../data/mockActions";
 import { SPRINT_LABELS } from "../data/mockCrossValidation";
 import { delay } from "./simulatedLatency";
 
+// Requirement data is real (API); the rest of the dashboard summary below is still mock data.
 export async function fetchRequirementsStatusBreakdown(projectId) {
-  await delay(400);
-  const scoped = projectId
-    ? mockRequirements.filter((r) => r.projectId === projectId)
-    : mockRequirements;
+  const scoped = await fetchRequirements(projectId);
   return STATUSES.map((status) => ({
     status,
     count: scoped.filter((r) => r.liveStatus === status).length,
@@ -20,9 +19,7 @@ export async function fetchRequirementsStatusBreakdown(projectId) {
 export async function fetchDashboardSummary(projectId) {
   await delay(400);
 
-  const requirements = projectId
-    ? mockRequirements.filter((r) => r.projectId === projectId)
-    : mockRequirements;
+  const requirements = await fetchRequirements(projectId);
   const atRisk = requirements.filter((r) => r.liveStatus === "At Risk").length;
 
   const tasks = projectId ? getTasksForProject(projectId) : [];
