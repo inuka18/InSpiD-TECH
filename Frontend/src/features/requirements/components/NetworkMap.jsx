@@ -13,11 +13,16 @@ import { Button } from "../../../components/ui/button";
 import { RequirementNode } from "./RequirementNode";
 import { ClusterBackgroundNode } from "./ClusterBackgroundNode";
 import { ManualLinkEdge } from "./ManualLinkEdge";
+import { PathfinderEdge } from "./PathfinderEdge";
+import { NetworkMapContext } from "./networkMapContext";
+import { LinkDetailsPanel } from "./LinkDetailsPanel";
+import { RequirementDetailPanel } from "./RequirementDetailPanel";
 import { ManualLinkDialog } from "./ManualLinkDialog";
 import { RestrictedButton } from "./RestrictedButton";
 import { StatusBadge } from "./StatusBadge";
 import { buildNetworkLayout } from "../../../lib/networkLayout";
 import { clusterMeta } from "../../../lib/clusters";
+import { manualToDetail } from "../../../lib/networkStats";
 import { cn } from "../../../lib/utils";
 
 const nodeTypes = {
@@ -26,6 +31,7 @@ const nodeTypes = {
 };
 const edgeTypes = {
   manual: ManualLinkEdge,
+  semantic: PathfinderEdge,
 };
 
 const STATUS_LEGEND = [
@@ -36,7 +42,7 @@ const STATUS_LEGEND = [
 ];
 
 // `requirements` are the network nodes from the API, `links` its computed (pathfinder) links with weights.
-export function NetworkMap({ requirements, links = [], warning, onOpenRequirement, isPM, manualLinks, onCreateManualLink, onRemoveManualLink }) {
+export function NetworkMap({ projectId, signals = [], requirements, links = [], warning, onOpenRequirement, isPM, manualLinks, onCreateManualLink, onRemoveManualLink }) {
   const wrapperRef = useRef(null);
   const [popover, setPopover] = useState(null);
   const [linkMode, setLinkMode] = useState(false);
@@ -44,6 +50,15 @@ export function NetworkMap({ requirements, links = [], warning, onOpenRequiremen
   const [dialogPair, setDialogPair] = useState(null); // { source, target }
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState(null);
+  // The open side panel, shown on this page (the map is never unmounted, so zoom and pan are kept):
+  //   { type: "requirement", id, backTo? }  or  { type: "link", link }
+  const [panel, setPanel] = useState(null);
+  // What to focus when a panel closes: the node or link that was clicked. { kind: "node" | "edge", id }
+  const focusTarget = useRef(null);
+  const panelRef = useRef(null); // latest panel, readable from the close-focus handler
+  useEffect(() => {
+    panelRef.current = panel;
+  }, [panel]);
 
   useEffect(() => {
     if (!toast) return;
@@ -139,7 +154,8 @@ export function NetworkMap({ requirements, links = [], warning, onOpenRequiremen
       const bounds = wrapperRef.current?.getBoundingClientRect();
       if (!bounds) return;
       const x = Math.min(event.clientX - bounds.left, bounds.width - 260);
-      const y = Math.min(event.clientY - bounds.top, bounds.height - 160);
+      const y = Math.min(event.clientY - bounds.top, bounds.height - 200);
+      focusTarget.current = { kind: "node", id: node.id };
       setPopover({ requirement: node.data.requirement, x, y });
     },
     [linkMode, pendingSourceId, isAlreadyLinked, requirementById, cancelLinking]
@@ -166,9 +182,76 @@ export function NetworkMap({ requirements, links = [], warning, onOpenRequiremen
     setPopover(null);
   };
 
+  // ---- side panels (they open on this page, so the map keeps its zoom and pan)
+  const openLink = useCallback((link, edgeId) => {
+    focusTarget.current = { kind: "edge", id: edgeId };
+    setPopover(null);
+    setPanel({ type: "link", link });
+  }, []);
+
+  const openRequirementPanel = useCallback((id) => {
+    setPopover(null);
+    setPanel({ type: "requirement", id });
+  }, []);
+
+  // Switching between a link and one of its requirements stays inside the panels; "back" returns to the link.
+  const switchToRequirement = useCallback((id) => {
+    setPanel((p) => ({ type: "requirement", id, backTo: p?.type === "link" ? p.link : p?.backTo }));
+  }, []);
+
+  // When the last panel closes, focus goes back to the node or link that was clicked.
+  const restoreFocus = useCallback(() => {
+    const t = focusTarget.current;
+    if (!t || !wrapperRef.current) return;
+    const selector =
+      t.kind === "node" ? `.react-flow__node[data-id="${CSS.escape(t.id)}"]` : `.react-flow__edge[data-testid="rf__edge-${CSS.escape(t.id)}"]`;
+    wrapperRef.current.querySelector(selector)?.focus({ preventScroll: true });
+  }, []);
+
+  const handleCloseAutoFocus = useCallback(
+    (e) => {
+      e.preventDefault();
+      if (!panelRef.current) restoreFocus(); // not when we are only switching to the other panel
+    },
+    [restoreFocus]
+  );
+
+  const mapContext = useMemo(() => ({ linkMode, openLink }), [linkMode, openLink]);
+
+  // Keyboard: Enter/Space on a focused node or link does what a click does; Esc closes the small node popover.
+  const handleKeyDown = (e) => {
+    if (e.key === "Escape" && popover) {
+      setPopover(null);
+      // React Flow blurs a selected node on Esc; put focus back on it once that has happened.
+      setTimeout(restoreFocus, 0);
+      return;
+    }
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const edgeEl = e.target.closest?.(".react-flow__edge");
+    const nodeEl = e.target.closest?.(".react-flow__node");
+    if (edgeEl) {
+      const id = edgeEl.getAttribute("data-testid")?.replace(/^rf__edge-/, "");
+      const edge = edges.find((x) => x.id === id);
+      e.preventDefault();
+      if (linkMode || !edge?.data?.link) return; // link mode: edges do nothing
+      openLink(edge.type === "manual" ? manualToDetail(edge.data.link) : edge.data.link, id);
+    } else if (nodeEl) {
+      const node = nodes.find((n) => n.id === nodeEl.getAttribute("data-id"));
+      if (!node) return;
+      e.preventDefault();
+      const r = nodeEl.getBoundingClientRect();
+      handleNodeClick({ clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 }, node);
+    }
+  };
+
+  const panelLink = panel?.type === "link" ? panel.link : null;
+  const backTo = panel?.type === "requirement" ? panel.backTo : null;
+
   return (
+    <NetworkMapContext.Provider value={mapContext}>
     <div
       ref={wrapperRef}
+      onKeyDown={handleKeyDown}
       className="relative h-[calc(100vh-14rem)] min-h-[520px] w-full overflow-hidden rounded-xl border border-border bg-card"
     >
       <ReactFlow
@@ -291,14 +374,49 @@ export function NetworkMap({ requirements, links = [], warning, onOpenRequiremen
             <StatusBadge status={popover.requirement.liveStatus} />
           </div>
           <button
-            onClick={() => onOpenRequirement(popover.requirement.id)}
+            onClick={() => openRequirementPanel(popover.requirement.id)}
             className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
           >
             View full detail panel
             <ArrowUpRight className="h-3 w-3" />
           </button>
+          <button
+            onClick={() => onOpenRequirement(popover.requirement.id)}
+            className="mt-1.5 block text-[11px] text-muted-foreground hover:text-foreground hover:underline"
+          >
+            Open in requirements list
+          </button>
         </div>
       )}
+
+      <RequirementDetailPanel
+        requirementId={panel?.type === "requirement" ? panel.id : null}
+        projectId={projectId}
+        requirements={requirements}
+        open={panel?.type === "requirement"}
+        onOpenChange={(open) => !open && setPanel(null)}
+        onSelectRequirement={switchToRequirement}
+        onBack={backTo ? () => setPanel({ type: "link", link: backTo }) : undefined}
+        backLabel={backTo ? `Back to link ${backTo.source ?? backTo.sourceId} ↔ ${backTo.target ?? backTo.targetId}` : undefined}
+        onCloseAutoFocus={handleCloseAutoFocus}
+      />
+
+      <LinkDetailsPanel
+        link={panelLink}
+        open={panel?.type === "link"}
+        onOpenChange={(open) => !open && setPanel(null)}
+        onCloseAutoFocus={handleCloseAutoFocus}
+        projectId={projectId}
+        nodes={requirements}
+        links={links}
+        signals={signals}
+        isPM={isPM}
+        onSelectRequirement={switchToRequirement}
+        onRemoveManualLink={async (raw) => {
+          await handleRemoveLinkRequest(raw);
+          setPanel(null);
+        }}
+      />
 
       <ManualLinkDialog
         open={Boolean(dialogPair)}
@@ -318,5 +436,6 @@ export function NetworkMap({ requirements, links = [], warning, onOpenRequiremen
         </div>
       )}
     </div>
+    </NetworkMapContext.Provider>
   );
 }

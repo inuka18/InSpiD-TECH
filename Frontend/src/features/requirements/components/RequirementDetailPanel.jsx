@@ -15,13 +15,15 @@ import { useRequirement } from "../../../hooks/useRequirements";
 import { clusterMeta as clusterMetaOf } from "../../../lib/clusters";
 
 // `requirements` (the loaded list) is only used to show titles for the related requirements.
-export function RequirementDetailPanel({ requirementId, projectId, requirements = [], open, onOpenChange, onSelectRequirement }) {
+// Optional: `onBack` + `backLabel` add a "back" button (used when the panel was opened from a link on the network map);
+// `onCloseAutoFocus` lets the opener decide where focus goes when the panel closes.
+export function RequirementDetailPanel({ requirementId, projectId, requirements = [], open, onOpenChange, onSelectRequirement, onBack, backLabel, onCloseAutoFocus }) {
   const { data: requirement, loading, error } = useRequirement(requirementId, projectId);
   const clusterMeta = requirement ? clusterMetaOf(requirement) : null;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="flex flex-col p-0">
+      <SheetContent className="flex flex-col p-0" onCloseAutoFocus={onCloseAutoFocus}>
         {error && !loading ? (
           <div className="p-6 text-sm text-status-dropped-fg">Could not load this requirement: {error.message}</div>
         ) : loading || !requirement ? (
@@ -34,6 +36,11 @@ export function RequirementDetailPanel({ requirementId, projectId, requirements 
         ) : (
           <>
             <SheetHeader>
+              {onBack && (
+                <button type="button" onClick={onBack} className="mb-1 w-fit text-xs font-medium text-primary hover:underline">
+                  ← {backLabel ?? "Back"}
+                </button>
+              )}
               <span className="font-mono text-xs font-medium text-primary">{requirement.id}</span>
               <SheetTitle>{requirement.title}</SheetTitle>
               <div className="flex flex-wrap items-center gap-2 pt-1">

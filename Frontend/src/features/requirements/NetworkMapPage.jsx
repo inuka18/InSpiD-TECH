@@ -5,6 +5,7 @@ import { EmptyState } from "../../components/common/EmptyState";
 import { Skeleton } from "../../components/ui/skeleton";
 import { useNetwork } from "../../hooks/useNetwork";
 import { useManualLinks } from "../../hooks/useManualLinks";
+import { useSignals } from "../../hooks/useSignals";
 import { useActiveProject } from "../../hooks/useActiveProject";
 import { useRole, ROLES } from "../../context/RoleContext";
 import { createManualLink, deleteManualLink } from "../../services/manualLinksService";
@@ -16,6 +17,8 @@ export function NetworkMapPage() {
   // The first request computes the network on the server (it embeds the requirement texts), so it can take a few seconds.
   const { data: network, loading, error, reload } = useNetwork(activeProjectId);
   const { data: manualLinks, setData: setManualLinks, loading: linksLoading } = useManualLinks(activeProjectId);
+  // Signals are only used for the per-requirement signal counts in the link details panel.
+  const { data: signals } = useSignals(activeProjectId);
   const navigate = useNavigate();
 
   const handleCreateManualLink = async ({ sourceId, targetId, reason }) => {
@@ -71,6 +74,8 @@ export function NetworkMapPage() {
     <NetworkMap
       // Remount when the computed network changes so the layout is rebuilt.
       key={`${network.nodes.length}-${network.links.length}-${network.clusters.length}`}
+      projectId={activeProjectId}
+      signals={signals}
       requirements={network.nodes}
       links={network.links}
       warning={network.warning}

@@ -127,9 +127,10 @@ export function buildNetworkLayout(requirements, links = []) {
       id: `e-${key}`,
       source: link.source,
       target: link.target,
-      type: "smoothstep",
+      type: "semantic", // PathfinderEdge: clickable, hover highlight
       animated: false,
-      data: { weight: link.weight },
+      zIndex: 5, // above the cluster background boxes (0) so the line can be hovered and clicked, below the requirement nodes (10)
+      data: { weight: link.weight, link },
       style: {
         stroke: sameCluster ? "#94a3b8" : "#a8b0bd",
         strokeWidth: strokeWidthFor(link.weight, lo, hi),

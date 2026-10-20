@@ -73,8 +73,9 @@ npm run dev
 - `http://localhost:5000/api/docs` : Swagger. `POST /auth/login`, then **Authorize** with the token
 - `http://localhost:7474` : Neo4j browser, `http://localhost:8545` : Hardhat node (JSON-RPC)
 
-Seed users (`@inspid.test`): `pm.ret@`, `pm.hms@`, `pm.mba@`, `pm.ulp@` (PM, password `SEED_PM_PASSWORD`) and
-TeamMembers such as `developer.ret@` (password `SEED_MEMBER_PASSWORD`). The seed prints the full list.
+Seed users (`@inspid.test`): `pm.ret@`, `pm.hms@`, `pm.mba@`, `pm.ulp@` (PM, password `SEED_PM_PASSWORD`). Two of the PMs manage two
+projects: `pm.ret@` manages SYS-RET and SYS-HMS, `pm.mba@` manages SYS-MBA and SYS-ULP (re-running the seed adds the second project;
+`pm.hms@` and `pm.ulp@` keep only their own). TeamMembers such as `developer.ret@` (password `SEED_MEMBER_PASSWORD`). The seed prints the full list.
 
 ## API conventions
 

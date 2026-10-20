@@ -20,6 +20,12 @@ const { sha, rechainSeedEntries, verifyChain } = require('../modules/ledger/serv
 const PENDING_PER_PROJECT = 3; // most recent requirement-linked signals left "pending" for the Accept/Reject demo
 const MEMBERS_PER_PROJECT = 4;
 const EMAIL_DOMAIN = 'inspid.test';
+// Two PMs manage two projects each (everyone else keeps just their own). Keyed by email; the first project is the
+// user's primary one (users.projectId) and never changes. pm.hms and pm.ulp keep only their own project.
+const EXTRA_PROJECTS = {
+  [`pm.ret@${EMAIL_DOMAIN}`]: ['SYS-HMS'],
+  [`pm.mba@${EMAIL_DOMAIN}`]: ['SYS-ULP'],
+};
 
 // cast is off, so every value stays a string and the label "None" stays text.
 const readCsv = (file) =>
@@ -154,14 +160,24 @@ async function main() {
     [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, MEMBERS_PER_PROJECT)
       .forEach(([role]) => users.push({ email: `${slug(role)}.${c}@${EMAIL_DOMAIN}`, role: 'TeamMember', jobTitle: role, projectId: p.project_id }));
   }
+  // Extra projects (only those that exist in the CSV); $addToSet makes re-running safe.
+  const known = new Set(projects.map((p) => p.project_id));
+  for (const u of users) {
+    const extras = (EXTRA_PROJECTS[u.email] || []).filter((id) => {
+      if (!known.has(id)) console.warn(`  warning: ${u.email} should also manage ${id}, which is not in scenario_projects.csv (skipped)`);
+      return known.has(id);
+    });
+    u.allProjects = [u.projectId, ...extras];
+  }
+  const labelOf = (u) => `${u.jobTitle} (${u.allProjects.map((id) => code(id).toUpperCase()).join(', ')})`;
   const pmHash = await bcrypt.hash(config.seed.pmPassword, 10);
   const memberHash = await bcrypt.hash(config.seed.memberPassword, 10);
   await User.bulkWrite(users.map((u) => ({
     updateOne: {
       filter: { email: u.email },
       update: {
-        $set: { name: `${u.jobTitle} (${code(u.projectId).toUpperCase()})`, role: u.role, jobTitle: u.jobTitle, projectId: u.projectId, passwordHash: u.role === 'PM' ? pmHash : memberHash },
-        $addToSet: { projectIds: u.projectId },
+        $set: { name: labelOf(u), role: u.role, jobTitle: u.jobTitle, projectId: u.projectId, passwordHash: u.role === 'PM' ? pmHash : memberHash },
+        $addToSet: { projectIds: { $each: u.allProjects } },
       },
       upsert: true,
     },
@@ -169,7 +185,7 @@ async function main() {
   console.log(`  ${'users'.padEnd(18)} ${String(users.length).padStart(5)} rows`);
 
   console.log('\nDemo logins (passwords are SEED_PM_PASSWORD / SEED_MEMBER_PASSWORD from .env):');
-  for (const u of users) console.log(`  ${u.role.padEnd(10)} ${u.email.padEnd(40)} ${u.projectId}`);
+  for (const u of users) console.log(`  ${u.role.padEnd(10)} ${u.email.padEnd(40)} ${u.allProjects.join(', ')}`);
   console.log(`\nNext: npm run network:build  (computes the requirement network and clusters; needs the ai-service)\nPending signals left for the Accept/Reject demo: ${pending.size}`);
 }
 
