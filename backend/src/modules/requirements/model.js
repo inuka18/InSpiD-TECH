@@ -11,7 +11,11 @@ const requirementSchema = new mongoose.Schema(
     title: { type: String, required: true },
     description: { type: String, default: '' },
     type: { type: String, enum: ['FR', 'NFR'] },
-    groupId: { type: String, default: '' }, // theme group; exposed as "cluster"
+    groupId: { type: String, default: '' }, // CSV group_id: the ground-truth ANSWER KEY. Never used to form or name clusters.
+    clusterId: { type: String, default: null }, // computed cluster, e.g. cluster-2 (network service)
+    clusterLabel: { type: String, default: null }, // e.g. "Cluster 2 (payments, wallet)"
+    embedding: { type: [Number], select: false }, // MiniLM vector of title + description (cache for the network)
+    embeddingTextHash: { type: String, default: null }, // sha1 of the text the embedding was computed from
     granularity: { type: String, enum: GRANULARITIES },
     initialStatus: { type: String, enum: STATUSES, default: 'Confirmed' },
     finalStatus: { type: String, enum: STATUSES }, // from the CSV, kept for evaluating the status engine
@@ -37,6 +41,8 @@ const statusHistorySchema = new mongoose.Schema(
     statusChanged: Boolean,
     source: String,
     authorRole: String,
+    resourceRole: String, // the author role of the triggering signal
+    granularity: String, // the requirement's granularity when the row was written
   },
   { collection: 'status_history' }
 );

@@ -102,3 +102,15 @@ There is no automatic retraining and no feedback endpoint.
 2. Fill `reviewed_label` with Constraint, Expectation, Completion, Conflict or None.
 3. `eval_review` prints macro F1, per-class scores, the confusion matrix and how often the weak label agreed with
    you; the next `train` run also adds this score to the comparison table.
+
+## Using PM feedback from the backend
+
+`GET /api/v1/projects/:projectId/feedback/export` (PM only) returns CSV with the columns `text,label,source,role`. Save it
+under `data/` (for example `data/processed/feedback_SYS-RET.csv`) and pass `/data/processed/feedback_SYS-RET.csv` to
+`train --extra-data`, then `promote`. Nothing is retrained automatically.
+
+## Backend defaults evidence
+
+`docker compose run --rm trainer python -m training.analyze_pipeline` writes `docs/pipeline_analysis.md`: the share of
+scenario test signals at confidence >= 90 for the active model, and requirement-matching accuracy and similarity
+distributions (the basis for `MATCH_MIN_SIMILARITY`).

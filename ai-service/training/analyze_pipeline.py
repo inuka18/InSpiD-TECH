@@ -1,0 +1,131 @@
+"""Evidence for the backend defaults: AUTO_ACCEPT_CONFIDENCE (90) and MATCH_MIN_SIMILARITY (0.30).
+
+    python -m training.analyze_pipeline [--version V]
+
+1. Confidence: with the ACTIVE model (or --version), the share of scenario test signals at or above 90
+   confidence, and how often those are right.
+2. Requirement matching: for scenario val+test signals that have a req_id and a non-None label, rank that
+   project's requirements (title + description) with the same MiniLM code /match uses, using the scenario
+   text as it is. Reports top-1 / top-3 accuracy and the similarity distribution (median, p10, p90) for
+   correct and incorrect top-1 matches, per project.
+Writes docs/pipeline_analysis.md and docs/pipeline_analysis.json. Nothing here trains or tunes anything.
+"""
+import argparse
+import json
+
+import numpy as np
+import pandas as pd
+
+from app.embedder import Embedder
+from app.signal_model import LABELS, load_model, read_current
+from training import common as C
+
+CONF_THRESHOLD = 90
+SIM_THRESHOLDS = [0.2, 0.3, 0.4, 0.5]
+
+
+def pct(x):
+    return "-" if x is None or (isinstance(x, float) and np.isnan(x)) else f"{100 * x:.1f}%"
+
+
+def dist(a):
+    a = np.asarray(a, dtype=float)
+    if len(a) == 0:
+        return {"n": 0, "median": None, "p10": None, "p90": None}
+    return {"n": int(len(a)), "median": float(np.median(a)), "p10": float(np.percentile(a, 10)), "p90": float(np.percentile(a, 90))}
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--version", help="model version (default: the active one)")
+    args = ap.parse_args()
+    version = args.version or read_current(C.MODELS_DIR)
+    if not version:
+        C.fail("no active model (current.json missing).")
+    model = load_model(C.MODELS_DIR, version)
+
+    scen = C.load_scenario()
+    sp = C.scenario_splits(scen)
+    out = {"model_version": version, "confidence_threshold": CONF_THRESHOLD}
+
+    # ---------------------------------------------------------------- 1. confidence
+    conf_rows = {}
+    for name in ("test_A", "test_all"):
+        df = sp[name]
+        proba = model.predict_proba(list(df.text))
+        conf = np.rint(proba.max(axis=1) * 100).astype(int)  # same rounding as the backend
+        pred = np.array(C.predict_labels(proba))
+        hit = conf >= CONF_THRESHOLD
+        y = df.label.to_numpy()
+        acc = float((pred[hit] == y[hit]).mean()) if hit.any() else None
+        conf_rows[name] = {"n": int(len(df)), "at_or_above": int(hit.sum()), "share": float(hit.mean()), "precision": acc,
+                           "non_none_at_or_above": int((hit & (pred != "None")).sum()),
+                           "confidence_quartiles": [int(np.percentile(conf, q)) for q in (25, 50, 75)]}
+    out["confidence"] = conf_rows
+
+    # ---------------------------------------------------------------- 2. requirement matching
+    reqs = pd.read_csv(C.DATA_DIR / "scenario" / "scenario_requirements.csv", keep_default_na=False)
+    emb = Embedder()
+    emb.load()
+    if not emb.ready:
+        C.fail(f"embedding model not available: {emb.error}")
+    rows = []
+    for pid, group in reqs.groupby("project_id"):
+        ids = list(group.req_id)
+        cand = emb.encode_cached([f"{t}. {d}".strip() for t, d in zip(group.title, group.description)])
+        sig = scen[(scen.project_id == pid) & scen.split.isin(["val", "test"]) & (scen.req_id != "") & (scen.label != "None")]
+        if sig.empty:
+            continue
+        q = emb.encode(list(sig.text))
+        sims = q @ cand.T
+        order = np.argsort(-sims, axis=1)
+        for i, (_, s) in enumerate(sig.iterrows()):
+            top = [ids[j] for j in order[i, :3]]
+            rows.append({"project": pid, "split": s.split, "true": s.req_id, "top1": top[0], "sim": float(sims[i, order[i, 0]]),
+                         "hit1": top[0] == s.req_id, "hit3": s.req_id in top})
+    m = pd.DataFrame(rows)
+
+    def block(df):
+        right, wrong = df[df.hit1], df[~df.hit1]
+        return {"n": int(len(df)), "top1": float(df.hit1.mean()), "top3": float(df.hit3.mean()),
+                "sim_correct_top1": dist(right.sim), "sim_incorrect_top1": dist(wrong.sim),
+                "by_min_similarity": {str(t): {"correct_kept": float((right.sim >= t).mean()) if len(right) else None,
+                                              "incorrect_kept": float((wrong.sim >= t).mean()) if len(wrong) else None,
+                                              "share_mapped": float((df.sim >= t).mean())} for t in SIM_THRESHOLDS}}
+
+    out["matching"] = {"all": block(m), "by_split": {s: block(m[m.split == s]) for s in ("val", "test")},
+                       "by_project": {p: block(m[m.project == p]) for p in sorted(m.project.unique())}}
+
+    # ---------------------------------------------------------------- report
+    L = [f"# Pipeline analysis (backend defaults)", "",
+         f"Active model: `{version}`. Generated by `training.analyze_pipeline`. Scenario text used as it is. Nothing is trained or tuned here.", "",
+         f"## 1. Confidence >= {CONF_THRESHOLD} (AUTO_ACCEPT_CONFIDENCE) on the scenario test split", "",
+         "| Set | Rows | At or above 90 | Share | Precision among them | Non-None among them | Confidence quartiles (25/50/75) |", "|---|---|---|---|---|---|---|"]
+    for name, label in (("test_A", "Test batch A"), ("test_all", "Test all batches")):
+        r = conf_rows[name]
+        L.append(f"| {label} | {r['n']} | {r['at_or_above']} | {pct(r['share'])} | {pct(r['precision'])} | {r['non_none_at_or_above']} | {'/'.join(map(str, r['confidence_quartiles']))} |")
+    L += ["", f"## 2. Requirement matching (scenario val + test signals with a req_id and a non-None label, n={len(m)})", "",
+          "| Group | n | Top-1 | Top-3 |", "|---|---|---|---|"]
+    groups = [("All", out["matching"]["all"])] + [(f"split {s}", out["matching"]["by_split"][s]) for s in ("val", "test")] + \
+             [(p, out["matching"]["by_project"][p]) for p in out["matching"]["by_project"]]
+    for name, b in groups:
+        L.append(f"| {name} | {b['n']} | {pct(b['top1'])} | {pct(b['top3'])} |")
+    L += ["", "Similarity of the top-1 match (median, 10th and 90th percentile):", "",
+          "| Group | Correct top-1 (n, median, p10, p90) | Incorrect top-1 (n, median, p10, p90) |", "|---|---|---|"]
+    f3 = lambda d: "-" if d["n"] == 0 else f"{d['n']}, {d['median']:.2f}, {d['p10']:.2f}, {d['p90']:.2f}"
+    for name, b in groups:
+        L.append(f"| {name} | {f3(b['sim_correct_top1'])} | {f3(b['sim_incorrect_top1'])} |")
+    L += ["", "Effect of the minimum-similarity cut-off (all projects): `correct kept` = correct top-1 matches that would still be mapped; "
+          "`incorrect kept` = wrong top-1 matches that would still be mapped; `mapped` = share of all these signals mapped.", "",
+          "| MATCH_MIN_SIMILARITY | Correct kept | Incorrect kept | Mapped |", "|---|---|---|---|"]
+    for t, v in out["matching"]["all"]["by_min_similarity"].items():
+        L.append(f"| {t} | {pct(v['correct_kept'])} | {pct(v['incorrect_kept'])} | {pct(v['share_mapped'])} |")
+    L.append("")
+    C.DOCS_DIR.mkdir(parents=True, exist_ok=True)
+    (C.DOCS_DIR / "pipeline_analysis.md").write_text("\n".join(L), encoding="utf-8")
+    (C.DOCS_DIR / "pipeline_analysis.json").write_text(json.dumps(out, indent=2), encoding="utf-8")
+    print("\n".join(L))
+
+
+if __name__ == "__main__":
+    main()

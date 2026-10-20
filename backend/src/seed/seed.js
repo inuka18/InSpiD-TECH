@@ -13,9 +13,9 @@ const { User } = require('../modules/auth/model');
 const { Project } = require('../modules/projects/model');
 const { Requirement, StatusHistory } = require('../modules/requirements/model');
 const { Signal } = require('../modules/signals/model');
-const { RequirementLink } = require('../modules/network/model');
+const { RequirementLink, NetworkGroundTruth } = require('../modules/network/model');
 const { LedgerEntry } = require('../modules/ledger/model');
-const { GENESIS_HASH, sha } = require('../modules/ledger/service');
+const { sha, rechainSeedEntries, verifyChain } = require('../modules/ledger/service');
 
 const PENDING_PER_PROJECT = 3; // most recent requirement-linked signals left "pending" for the Accept/Reject demo
 const MEMBERS_PER_PROJECT = 4;
@@ -56,7 +56,7 @@ async function main() {
   const pairs = readCsv('scenario_related_pairs.csv');
 
   await connectDb();
-  await Promise.all([User, Project, Requirement, StatusHistory, Signal, RequirementLink, LedgerEntry].map((m) => m.init()));
+  await Promise.all([User, Project, Requirement, StatusHistory, Signal, RequirementLink, NetworkGroundTruth, LedgerEntry].map((m) => m.init()));
   console.log(`Seeding database "${config.mongoDbName}" from ${config.scenarioDir}`);
 
   // ---- projects
@@ -91,21 +91,30 @@ async function main() {
     upsert({ projectId: s.project_id, signalId: s.signal_id }, {
       source: s.source, authorRole: s.author_role, timestamp: new Date(s.timestamp), text: s.text, label: s.label,
       reqId: blankToNull(s.req_id), resultingStatus: blankToNull(s.resulting_status), split: s.split, batch: s.batch,
+      seeded: true, // its effect is already in the requirement/status data; the review flow only updates reviewStatus
     }, { reviewStatus: pending.has(s.signal_id) ? 'pending' : 'accepted', confidence: null })), 'signals');
 
-  // ---- status_history
+  // ---- status_history (resourceRole = author role, granularity = the requirement's)
+  const granularityOf = new Map(requirements.map((r) => [`${r.project_id}|${r.req_id}`, r.granularity]));
   await bulkUpsert(StatusHistory, history.map((h) =>
     upsert({ projectId: h.project_id, historyId: h.history_id }, {
       reqId: h.req_id, signalId: h.signal_id, timestamp: new Date(h.timestamp), label: h.label,
       fromStatus: h.from_status, toStatus: h.to_status, statusChanged: h.status_changed === '1', source: h.source, authorRole: h.author_role,
+      resourceRole: h.author_role, granularity: granularityOf.get(`${h.project_id}|${h.req_id}`) ?? null,
     })), 'status_history');
 
-  // ---- requirement_links
-  await bulkUpsert(RequirementLink, pairs.map((p) =>
-    upsert({ projectId: p.project_id, reqA: p.req_a, reqB: p.req_b, relationType: p.relation_type }, {})), 'requirement_links');
+  // ---- network_ground_truth: scenario_related_pairs.csv is the ANSWER KEY for evaluating the network, not the network.
+  // (The network itself is computed from the requirement texts: npm run network:build.)
+  await bulkUpsert(NetworkGroundTruth, pairs.map((p) =>
+    upsert({ projectId: p.project_id, reqA: p.req_a, reqB: p.req_b, relationType: p.relation_type }, {})), 'network_ground_truth');
+  // Older seeds stored those pairs as requirement_links (rows without a `kind`). They are now in network_ground_truth.
+  const legacy = await RequirementLink.deleteMany({ kind: { $exists: false } });
+  if (legacy.deletedCount) console.log(`  removed ${legacy.deletedCount} legacy CSV-pair rows from requirement_links (now in network_ground_truth)`);
 
   // ---- ledger_entries: PLACEHOLDERS built from the status changes (NOT blockchain transactions).
-  // Hashes are sha256 of the history id and chained per project. A later step replaces these with real Hardhat txs.
+  // Chain fields are only written when an entry is first inserted, so re-seeding never breaks an existing chain.
+  // On a FRESH ledger (no entries yet) the chain is built right after with rechainSeedEntries().
+  const freshLedger = (await LedgerEntry.countDocuments()) === 0;
   const titleOf = new Map(requirements.map((r) => [`${r.project_id}|${r.req_id}`, r.title]));
   const textOf = new Map(signals.map((s) => [s.signal_id, s.text]));
   const ledgerOps = [];
@@ -113,18 +122,26 @@ async function main() {
     const changes = history
       .filter((h) => h.project_id === p.project_id && h.status_changed === '1')
       .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp) || a.history_id.localeCompare(b.history_id));
-    let prev = GENESIS_HASH;
     changes.forEach((h, i) => {
-      const txHash = sha(`placeholder|${h.project_id}|${h.history_id}`);
       ledgerOps.push(upsert({ projectId: h.project_id, historyId: h.history_id }, {
-        txHash, eventType: 'Status Change', reqId: h.req_id, requirementTitle: titleOf.get(`${h.project_id}|${h.req_id}`),
+        reqId: h.req_id, requirementTitle: titleOf.get(`${h.project_id}|${h.req_id}`),
         previousStatus: h.from_status, newStatus: h.to_status, triggeringSignal: textOf.get(h.signal_id) ?? null,
-        actor: h.author_role, timestamp: new Date(h.timestamp), blockNumber: i + 1, previousBlockHash: prev, isPlaceholder: true,
+        triggeringSignalId: h.signal_id, actor: h.author_role, timestamp: new Date(h.timestamp),
+      }, {
+        eventType: 'STATUS_CHANGE', txHash: sha(`seed|${h.project_id}|${h.history_id}`), blockNumber: i + 1,
+        previousBlockHash: '', onChain: false, isPlaceholder: true, createdVia: 'seed',
       }));
-      prev = txHash;
     });
   }
   await bulkUpsert(LedgerEntry, ledgerOps, 'ledger_entries');
+  if (freshLedger) {
+    const r = await rechainSeedEntries();
+    const bad = [];
+    for (const p of projects) if (!(await verifyChain(p.project_id)).valid) bad.push(p.project_id);
+    console.log(`  ledger chain built for ${r.projects} projects (${r.entries} entries); verify: ${bad.length ? 'FAILED for ' + bad.join(', ') : 'valid'}`);
+  } else {
+    console.log('  ledger already had entries, so the chain was left as it is (run `npm run rechain` only if it does not verify).');
+  }
 
   // ---- users: 1 PM + a few TeamMembers per project, from the author_role column
   const users = [];
@@ -153,7 +170,7 @@ async function main() {
 
   console.log('\nDemo logins (passwords are SEED_PM_PASSWORD / SEED_MEMBER_PASSWORD from .env):');
   for (const u of users) console.log(`  ${u.role.padEnd(10)} ${u.email.padEnd(40)} ${u.projectId}`);
-  console.log(`\nPending signals left for the Accept/Reject demo: ${pending.size}`);
+  console.log(`\nNext: npm run network:build  (computes the requirement network and clusters; needs the ai-service)\nPending signals left for the Accept/Reject demo: ${pending.size}`);
 }
 
 main()

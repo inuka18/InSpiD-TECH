@@ -1,9 +1,9 @@
 """InSPiD-TECH AI service.
 
-/classify uses the trained model; /embed and /similarity still return PLACEHOLDER values:
-  - /classify   -> REAL: signal classifier (Constraint / Expectation / Completion / Conflict / None)
-  - /embed     -> sentence-transformers embeddings
-  - /similarity -> cosine similarity on those embeddings
+  - /classify   -> signal classifier (Constraint / Expectation / Completion / Conflict / None)
+  - /embed      -> all-MiniLM-L6-v2 vectors (normalized)
+  - /similarity -> cosine similarity of two texts
+  - /match      -> rank candidate texts by similarity to a text
 The backend only talks to this service through backend/src/shared/aiClient.js.
 """
 import os
@@ -11,14 +11,25 @@ import threading
 from pathlib import Path
 from typing import List, Optional
 
+from contextlib import asynccontextmanager
+
+import numpy as np
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-from app.signal_model import LABELS, load_model, read_current
+from app.embedder import Embedder
+from app.signal_model import EMBED_MODEL_NAME, LABELS, load_model, read_current
 
-app = FastAPI(title="InSPiD-TECH AI service", version="0.2.0")
+embedder = Embedder()
 
-EMBED_DIM = 384  # all-MiniLM-L6-v2 size, the likely model
+
+@asynccontextmanager
+async def lifespan(_app):
+    embedder.load()  # once, at startup (the weights come from the ml_cache volume after the first download)
+    yield
+
+
+app = FastAPI(title="InSPiD-TECH AI service", version="0.3.0", lifespan=lifespan)
 MODELS_DIR = Path(os.environ.get("MODELS_DIR", "/app/models"))
 
 
@@ -72,28 +83,47 @@ class ClassifyOut(BaseModel):
 
 
 class EmbedIn(BaseModel):
-    texts: List[str] = Field(min_length=1)
+    texts: List[str] = Field(min_length=1, max_length=512)
 
 
 class EmbedOut(BaseModel):
-    embeddings: List[List[float]]
-    dim: int
-    placeholder: bool = True
+    vectors: List[List[float]]
+    model: str
 
 
 class SimilarityIn(BaseModel):
-    text_a: str
-    text_b: str
+    a: str = Field(min_length=1)
+    b: str = Field(min_length=1)
 
 
 class SimilarityOut(BaseModel):
-    score: float
-    placeholder: bool = True
+    similarity: float
+
+
+class Candidate(BaseModel):
+    id: str
+    text: str = Field(min_length=1)
+
+
+class MatchIn(BaseModel):
+    text: str = Field(min_length=1)
+    candidates: List[Candidate] = Field(min_length=1, max_length=2000)
+    top_k: int = Field(default=5, ge=1, le=50)
+
+
+class MatchItem(BaseModel):
+    id: str
+    similarity: float
+
+
+def need_embedder():
+    if not embedder.ready:
+        raise HTTPException(status_code=503, detail=f"Embedding model not available: {embedder.error}")
 
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "ai-service", "placeholder": True}
+    return {"status": "ok", "service": "ai-service", "embedder_ready": embedder.ready}
 
 
 @app.post("/classify", response_model=ClassifyOut)
@@ -109,11 +139,22 @@ def classify(body: ClassifyIn):
 
 @app.post("/embed", response_model=EmbedOut)
 def embed(body: EmbedIn):
-    # TODO: replace with sentence-transformers encode().
-    return EmbedOut(embeddings=[[0.0] * EMBED_DIM for _ in body.texts], dim=EMBED_DIM)
+    need_embedder()
+    return EmbedOut(vectors=embedder.encode(body.texts).tolist(), model=EMBED_MODEL_NAME)
 
 
 @app.post("/similarity", response_model=SimilarityOut)
 def similarity(body: SimilarityIn):
-    # TODO: replace with cosine similarity of real embeddings.
-    return SimilarityOut(score=0.0)
+    need_embedder()
+    va, vb = embedder.encode([body.a, body.b])
+    return SimilarityOut(similarity=round(float(np.dot(va, vb)), 6))  # vectors are normalized -> cosine
+
+
+@app.post("/match", response_model=List[MatchItem])
+def match(body: MatchIn):
+    need_embedder()
+    q = embedder.encode([body.text])[0]
+    cand = embedder.encode_cached([c.text for c in body.candidates])  # candidate vectors cached by text hash
+    sims = cand @ q
+    order = np.argsort(-sims, kind="stable")[: body.top_k]
+    return [MatchItem(id=body.candidates[i].id, similarity=round(float(sims[i]), 6)) for i in order]

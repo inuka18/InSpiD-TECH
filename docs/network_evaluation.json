@@ -1,0 +1,459 @@
+{
+  "generatedAt": "2026-10-20T14:28:57.415Z",
+  "database": "inspid_test",
+  "embeddingModel": "sentence-transformers/all-MiniLM-L6-v2",
+  "clustering": {
+    "usedByApp": "k-based",
+    "rule": "k = clamp(round(sqrt(n)), 3, 8)"
+  },
+  "kBased": [
+    {
+      "projectId": "SYS-HMS",
+      "nodes": 26,
+      "k": 5,
+      "ari": 0.05971404541631622,
+      "nmi": 0.33670927147622304,
+      "clusters": 5,
+      "avgSize": 5.2,
+      "groundTruthGroups": 6
+    },
+    {
+      "projectId": "SYS-MBA",
+      "nodes": 34,
+      "k": 6,
+      "ari": 0.08980403149766825,
+      "nmi": 0.4354428318666397,
+      "clusters": 6,
+      "avgSize": 5.666666666666667,
+      "groundTruthGroups": 9
+    },
+    {
+      "projectId": "SYS-RET",
+      "nodes": 31,
+      "k": 6,
+      "ari": 0.22012578616352202,
+      "nmi": 0.5279962832454611,
+      "clusters": 6,
+      "avgSize": 5.166666666666667,
+      "groundTruthGroups": 7
+    },
+    {
+      "projectId": "SYS-ULP",
+      "nodes": 23,
+      "k": 5,
+      "ari": 0.0805489260143198,
+      "nmi": 0.33718152198455237,
+      "clusters": 5,
+      "avgSize": 4.6,
+      "groundTruthGroups": 6
+    }
+  ],
+  "cutoffConstantKeptForComparison": 0.6,
+  "cutoffInSample": {
+    "cutoff": 0.6,
+    "meanAri": 0.21408186544948338,
+    "sweep": [
+      {
+        "c": 0.3,
+        "ari": 0
+      },
+      {
+        "c": 0.32,
+        "ari": 0
+      },
+      {
+        "c": 0.34,
+        "ari": 0.029813727667437156
+      },
+      {
+        "c": 0.36,
+        "ari": 0.029813727667437156
+      },
+      {
+        "c": 0.38,
+        "ari": 0.029813727667437156
+      },
+      {
+        "c": 0.4,
+        "ari": 0.05214067113257077
+      },
+      {
+        "c": 0.42,
+        "ari": 0.05214067113257077
+      },
+      {
+        "c": 0.44,
+        "ari": 0.08848825080519927
+      },
+      {
+        "c": 0.46,
+        "ari": 0.09381232385930104
+      },
+      {
+        "c": 0.48,
+        "ari": 0.09561608836170371
+      },
+      {
+        "c": 0.5,
+        "ari": 0.13206156119374124
+      },
+      {
+        "c": 0.52,
+        "ari": 0.13092255247642198
+      },
+      {
+        "c": 0.54,
+        "ari": 0.17137023440389723
+      },
+      {
+        "c": 0.56,
+        "ari": 0.18437058659106925
+      },
+      {
+        "c": 0.58,
+        "ari": 0.19192570688520205
+      },
+      {
+        "c": 0.6,
+        "ari": 0.21408186544948338
+      },
+      {
+        "c": 0.62,
+        "ari": 0.19846253960657023
+      },
+      {
+        "c": 0.64,
+        "ari": 0.19741429289327794
+      },
+      {
+        "c": 0.66,
+        "ari": 0.163523071918547
+      },
+      {
+        "c": 0.68,
+        "ari": 0.15471626508607914
+      },
+      {
+        "c": 0.7,
+        "ari": 0.0926996703296254
+      },
+      {
+        "c": 0.72,
+        "ari": 0.0790444034207035
+      },
+      {
+        "c": 0.74,
+        "ari": 0.03359171685077129
+      },
+      {
+        "c": 0.76,
+        "ari": 0.013938717863062758
+      },
+      {
+        "c": 0.78,
+        "ari": 0.003787794459077438
+      },
+      {
+        "c": 0.8,
+        "ari": 0.005088612071289876
+      },
+      {
+        "c": 0.82,
+        "ari": 0.0003179403626483524
+      },
+      {
+        "c": 0.84,
+        "ari": 0.0020765408810966795
+      },
+      {
+        "c": 0.86,
+        "ari": -0.0017252609897364587
+      },
+      {
+        "c": 0.88,
+        "ari": 0
+      },
+      {
+        "c": 0.9,
+        "ari": 0
+      }
+    ]
+  },
+  "lopo": [
+    {
+      "projectId": "SYS-HMS",
+      "nodes": 26,
+      "cutoff": 0.6,
+      "ari": 0.22172949002217296,
+      "nmi": 0.6557046860791446,
+      "clusters": 14,
+      "avgSize": 1.8571428571428572
+    },
+    {
+      "projectId": "SYS-MBA",
+      "nodes": 34,
+      "cutoff": 0.6,
+      "ari": 0.14763511513644703,
+      "nmi": 0.6286136915597451,
+      "clusters": 13,
+      "avgSize": 2.6153846153846154
+    },
+    {
+      "projectId": "SYS-RET",
+      "nodes": 31,
+      "cutoff": 0.6,
+      "ari": 0.25641990405418114,
+      "nmi": 0.7235446404701729,
+      "clusters": 18,
+      "avgSize": 1.7222222222222223
+    },
+    {
+      "projectId": "SYS-ULP",
+      "nodes": 23,
+      "cutoff": 0.58,
+      "ari": 0.13843648208469056,
+      "nmi": 0.5910358646550089,
+      "clusters": 10,
+      "avgSize": 2.3
+    }
+  ],
+  "inSampleRows": [
+    {
+      "projectId": "SYS-HMS",
+      "nodes": 26,
+      "cutoff": 0.6,
+      "ari": 0.22172949002217296,
+      "nmi": 0.6557046860791446,
+      "clusters": 14,
+      "avgSize": 1.8571428571428572,
+      "groundTruthGroups": 6
+    },
+    {
+      "projectId": "SYS-MBA",
+      "nodes": 34,
+      "cutoff": 0.6,
+      "ari": 0.14763511513644703,
+      "nmi": 0.6286136915597451,
+      "clusters": 13,
+      "avgSize": 2.6153846153846154,
+      "groundTruthGroups": 9
+    },
+    {
+      "projectId": "SYS-RET",
+      "nodes": 31,
+      "cutoff": 0.6,
+      "ari": 0.25641990405418114,
+      "nmi": 0.7235446404701729,
+      "clusters": 18,
+      "avgSize": 1.7222222222222223,
+      "groundTruthGroups": 7
+    },
+    {
+      "projectId": "SYS-ULP",
+      "nodes": 23,
+      "cutoff": 0.6,
+      "ari": 0.23054295258513238,
+      "nmi": 0.5358758197000091,
+      "clusters": 7,
+      "avgSize": 3.2857142857142856,
+      "groundTruthGroups": 6
+    }
+  ],
+  "perProject": [
+    {
+      "projectId": "SYS-HMS",
+      "nodes": 26,
+      "groupsInTruth": 6,
+      "pathfinderEdges": 25,
+      "allPairs": 325,
+      "edgeReductionPct": 92.3076923076923,
+      "nn": {
+        "counted": 26,
+        "minilm": {
+          "hit1": 12,
+          "hit3": 21
+        },
+        "tfidf": {
+          "hit1": 13,
+          "hit3": 16
+        },
+        "random": {
+          "hit1": 4.000000000000001,
+          "hit3": 10.412608695652171
+        }
+      },
+      "edgePrecision": {
+        "pathfinder": 0.56,
+        "topSimilarity": 0.6,
+        "allPairs": 0.17846153846153845,
+        "pathfinderEdgeCount": 25,
+        "goodPathfinderEdges": 14,
+        "goodTopEdges": 15
+      },
+      "connectivity": {
+        "groups": 6,
+        "inside": 0.16666666666666666,
+        "wholeGraph": 1
+      }
+    },
+    {
+      "projectId": "SYS-MBA",
+      "nodes": 34,
+      "groupsInTruth": 9,
+      "pathfinderEdges": 33,
+      "allPairs": 561,
+      "edgeReductionPct": 94.11764705882352,
+      "nn": {
+        "counted": 34,
+        "minilm": {
+          "hit1": 12,
+          "hit3": 20
+        },
+        "tfidf": {
+          "hit1": 13,
+          "hit3": 20
+        },
+        "random": {
+          "hit1": 3.2727272727272707,
+          "hit3": 9.034640762463342
+        }
+      },
+      "edgePrecision": {
+        "pathfinder": 0.36363636363636365,
+        "topSimilarity": 0.3333333333333333,
+        "allPairs": 0.11051693404634581,
+        "pathfinderEdgeCount": 33,
+        "goodPathfinderEdges": 12,
+        "goodTopEdges": 11
+      },
+      "connectivity": {
+        "groups": 9,
+        "inside": 0.3333333333333333,
+        "wholeGraph": 1
+      }
+    },
+    {
+      "projectId": "SYS-RET",
+      "nodes": 31,
+      "groupsInTruth": 7,
+      "pathfinderEdges": 30,
+      "allPairs": 465,
+      "edgeReductionPct": 93.5483870967742,
+      "nn": {
+        "counted": 31,
+        "minilm": {
+          "hit1": 17,
+          "hit3": 24
+        },
+        "tfidf": {
+          "hit1": 6,
+          "hit3": 20
+        },
+        "random": {
+          "hit1": 3.6000000000000005,
+          "hit3": 9.866995073891626
+        }
+      },
+      "edgePrecision": {
+        "pathfinder": 0.5333333333333333,
+        "topSimilarity": 0.5,
+        "allPairs": 0.13763440860215054,
+        "pathfinderEdgeCount": 30,
+        "goodPathfinderEdges": 16,
+        "goodTopEdges": 15
+      },
+      "connectivity": {
+        "groups": 7,
+        "inside": 0.2857142857142857,
+        "wholeGraph": 1
+      }
+    },
+    {
+      "projectId": "SYS-ULP",
+      "nodes": 23,
+      "groupsInTruth": 6,
+      "pathfinderEdges": 22,
+      "allPairs": 253,
+      "edgeReductionPct": 91.30434782608697,
+      "nn": {
+        "counted": 23,
+        "minilm": {
+          "hit1": 9,
+          "hit3": 16
+        },
+        "tfidf": {
+          "hit1": 6,
+          "hit3": 11
+        },
+        "random": {
+          "hit1": 3.4545454545454533,
+          "hit3": 9.015584415584417
+        }
+      },
+      "edgePrecision": {
+        "pathfinder": 0.45454545454545453,
+        "topSimilarity": 0.3181818181818182,
+        "allPairs": 0.18972332015810275,
+        "pathfinderEdgeCount": 22,
+        "goodPathfinderEdges": 10,
+        "goodTopEdges": 7
+      },
+      "connectivity": {
+        "groups": 6,
+        "inside": 0,
+        "wholeGraph": 1
+      }
+    }
+  ],
+  "overall": {
+    "nodes": 114,
+    "pathfinderEdges": 110,
+    "allPairs": 1604,
+    "nn": {
+      "counted": 114,
+      "minilm": {
+        "hit1": 50,
+        "hit3": 81
+      },
+      "tfidf": {
+        "hit1": 38,
+        "hit3": 67
+      },
+      "random": {
+        "hit1": 14.327272727272724,
+        "hit3": 38.32982894759156
+      }
+    },
+    "goodPathfinderEdges": 52,
+    "goodTopEdges": 48,
+    "groups": 28,
+    "insideConnected": 6,
+    "wholeConnected": 28,
+    "lopo": {
+      "ari": 0.19105524782437294,
+      "nmi": 0.6497247206910179
+    },
+    "inSample": {
+      "ari": 0.21408186544948338,
+      "nmi": 0.6359347094522679
+    },
+    "kBased": {
+      "ari": 0.11254819727295658,
+      "nmi": 0.409332477143219
+    },
+    "clusterSummary": {
+      "kBased": {
+        "clusters": 22,
+        "avgSize": 5.181818181818182
+      },
+      "cutoffLopo": {
+        "clusters": 55,
+        "avgSize": 2.0727272727272728
+      },
+      "cutoffInSample": {
+        "clusters": 52,
+        "avgSize": 2.1923076923076925
+      }
+    }
+  }
+}

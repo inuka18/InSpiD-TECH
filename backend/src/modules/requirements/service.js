@@ -3,6 +3,7 @@ const AppError = require('../../shared/AppError');
 const { Signal } = require('../signals/model');
 const { RequirementLink } = require('../network/model');
 const ledger = require('../ledger/service');
+const network = require('../network/service');
 const { Requirement, StatusHistory } = require('./model');
 
 // Shape follows the frontend mockRequirements rows.
@@ -15,7 +16,8 @@ function toApi(r, relatedIds = [], statusHistory = []) {
     liveStatus: r.liveStatus,
     resourceRole: r.resourceRole,
     granularity: r.granularity,
-    cluster: r.groupId,
+    cluster: r.clusterId ?? null, // computed by the network service; null until it has run
+    clusterLabel: r.clusterLabel ?? null,
     type: r.type,
     relatedIds,
     statusHistory,
@@ -54,9 +56,11 @@ async function getOne(projectId, reqId) {
   return (await hydrate(projectId, [r]))[0];
 }
 
+// Computed clusters (never group_id), as { id, label }.
 async function clusters(projectId) {
-  const groups = await Requirement.distinct('groupId', { projectId });
-  return groups.filter(Boolean).sort().map((g) => ({ id: g, label: g }));
+  const rows = await Requirement.find({ projectId, clusterId: { $ne: null } }, { clusterId: 1, clusterLabel: 1 }).lean();
+  const seen = new Map(rows.map((r) => [r.clusterId, r.clusterLabel]));
+  return [...seen.entries()].sort((a, b) => Number(a[0].replace(/\D/g, '')) - Number(b[0].replace(/\D/g, ''))).map(([id, label]) => ({ id, label }));
 }
 
 async function nextReqId(projectId) {
@@ -76,23 +80,23 @@ async function create(projectId, body, user) {
     ...rest, projectId, reqId: await nextReqId(projectId), groupId: cluster || '',
     initialStatus: 'Confirmed', finalStatus: 'Confirmed', liveStatus: 'Confirmed', resourceRole: body.resourceRole || 'Unassigned',
   });
-  await ledger.appendPlaceholderEntry({
-    projectId, eventType: 'Requirement Created', reqId: doc.reqId, requirementTitle: doc.title,
+  await ledger.appendLedgerEntry({
+    projectId, eventType: 'REQUIREMENT_CREATED', reqId: doc.reqId, requirementTitle: doc.title,
     previousStatus: null, newStatus: 'Confirmed', actor: user.email,
   });
-  return toApi(doc.toObject());
+  await network.onRequirementChanged(projectId, doc.reqId, user);
+  return toApi((await Requirement.findOne({ projectId, reqId: doc.reqId }).lean()));
 }
 
-async function update(projectId, reqId, body) {
+async function update(projectId, reqId, body, user) {
   const { cluster, ...rest } = body;
   const set = { ...rest, ...(cluster !== undefined ? { groupId: cluster } : {}) };
   const r = await Requirement.findOneAndUpdate({ projectId, reqId }, { $set: set }, { new: true }).lean();
   if (!r) throw new AppError(404, 'NOT_FOUND', `Requirement ${reqId} not found`);
+  if (body.title !== undefined || body.description !== undefined) await network.onRequirementChanged(projectId, reqId, user);
   return (await hydrate(projectId, [r]))[0];
 }
 
-// TODO (status engine): applyStatusFromSignal(projectId, reqId, signal) implements the rules in
-// DATA_README.md (Expectation/Completion -> Confirmed, Constraint -> Modified,
-// Conflict -> At Risk / Dropped), writes status_history and a ledger entry.
+// The status engine lives in signals/ (statusEngine.js + service.js): it applies a signal to a requirement.
 
 module.exports = { list, getOne, clusters, create, update };

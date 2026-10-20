@@ -20,10 +20,12 @@ async function call(path, body) {
 }
 
 module.exports = {
-  /** -> { label, confidence, scores, placeholder } */
+  /** -> { label, confidence (0-1), scores, model_version } */
   classify: (text) => call('/classify', { text }),
-  /** -> { embeddings, dim, placeholder } */
+  /** -> { vectors, model } */
   embed: (texts) => call('/embed', { texts }),
-  /** -> { score, placeholder } */
-  similarity: (textA, textB) => call('/similarity', { text_a: textA, text_b: textB }),
+  /** -> { similarity } */
+  similarity: (a, b) => call('/similarity', { a, b }),
+  /** candidates: [{ id, text }] -> [{ id, similarity }] ranked, best first */
+  match: (text, candidates, topK = 5) => call('/match', { text, candidates, top_k: topK }),
 };

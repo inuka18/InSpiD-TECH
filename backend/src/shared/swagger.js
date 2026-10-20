@@ -35,35 +35,91 @@ const requirement = {
   type: 'object',
   properties: {
     id: { type: 'string', example: 'RET-R01' }, projectId: str, title: str, description: str, liveStatus: statusEnum,
-    resourceRole: str, granularity: granularityEnum, cluster: str, type: { type: 'string', enum: ['FR', 'NFR'] },
-    relatedIds: arr(str),
+    resourceRole: str, granularity: granularityEnum,
+    cluster: { type: 'string', nullable: true, description: 'COMPUTED cluster id (cluster-1, ...); null until the network has been computed. Never the CSV group_id.' },
+    clusterLabel: { type: 'string', nullable: true, example: 'Cluster 2 (payments, wallet)' },
+    type: { type: 'string', enum: ['FR', 'NFR'] },
+    relatedIds: { ...arr(str), description: 'Requirements linked to this one in the computed (Pathfinder) network' },
     statusHistory: arr({ type: 'object', properties: { status: statusEnum, timestamp: str, signal: str, signalId: str } }),
   },
 };
 const ledgerEntry = {
   type: 'object',
-  description: 'PLACEHOLDER ledger entry (isPlaceholder: true): not a real blockchain transaction yet.',
+  description: 'PLACEHOLDER ledger entry (onChain: false): not a real blockchain transaction yet. txHash = sha256 of a canonical JSON of the entry fields plus previousBlockHash, so the chain can be checked with GET /ledger/verify.',
   properties: {
-    txHash: str, eventType: str, requirementId: str, requirementTitle: str, relatedRequirementId: str,
-    previousStatus: str, newStatus: str, triggeringSignal: str, actor: str, timestamp: str,
-    blockNumber: { type: 'integer' }, previousBlockHash: str, isPlaceholder: { type: 'boolean' },
+    txHash: str,
+    eventType: { type: 'string', description: 'Display string kept for the frontend: Status Change, Requirement Created, Manual Link Added, Manual Link Removed or Network Updated' },
+    eventCode: { type: 'string', enum: ['STATUS_CHANGE', 'REQUIREMENT_CREATED', 'MANUAL_LINK', 'NETWORK_UPDATE'] },
+    details: { type: 'object', description: 'NETWORK_UPDATE only (display eventType "Network Updated"): the link ids this update added and removed', properties: { added: arr(str), removed: arr(str) } },
+    requirementId: str, requirementTitle: str, relatedRequirementId: str,
+    previousStatus: str, newStatus: str, triggeringSignal: { type: 'string', description: 'The signal text (or the reason for a manual link)' },
+    triggeringSignalId: { type: 'string', nullable: true }, actor: str, timestamp: str,
+    blockNumber: { type: 'integer', description: 'Sequential per project, starting at 1' }, previousBlockHash: str,
+    onChain: { type: 'boolean', example: false }, isPlaceholder: { type: 'boolean' },
   },
 };
 const networkGraph = {
   type: 'object',
   properties: {
     projectId: str,
-    nodes: arr({ type: 'object', properties: { id: str, title: str, liveStatus: statusEnum, cluster: str, type: str, resourceRole: str } }),
-    links: arr({ type: 'object', properties: { id: str, source: str, target: str, kind: { type: 'string', enum: ['auto', 'manual'] }, relationType: str, reason: str } }),
+    nodes: arr({ type: 'object', properties: { id: str, title: str, liveStatus: statusEnum, cluster: { type: 'string', nullable: true, description: 'Computed cluster id, e.g. cluster-2 (k clusters per project, numbered by size)' }, clusterLabel: { type: 'string', nullable: true }, type: str, resourceRole: str } }),
+    links: arr({
+      type: 'object',
+      properties: {
+        id: { type: 'string', example: 'RET-R04~RET-R14~semantic' }, source: str, target: str,
+        kind: { type: 'string', enum: ['pathfinder', 'manual'] }, relationType: { type: 'string', example: 'semantic', description: 'semantic for pathfinder links' },
+        weight: { type: 'number', description: 'Cosine similarity of the two requirement texts (pathfinder links only)' }, reason: { type: 'string', description: 'manual links only' },
+      },
+    }),
+    clusters: arr({ type: 'object', properties: { id: str, label: str, size: { type: 'integer' } } }),
+    warning: { type: 'string', description: 'Present when the ai-service was unavailable: the stored links (possibly none or out of date) are returned instead' },
   },
 };
+const labelEnum = { type: 'string', enum: ['Constraint', 'Expectation', 'Completion', 'Conflict', 'None'] };
 const signal = {
   type: 'object',
   properties: {
     id: str, projectId: str, reviewStatus: { type: 'string', enum: ['pending', 'accepted', 'rejected'] }, source: str,
     author: { type: 'string', description: 'The sender role (the dataset has no names)' }, timestamp: str, text: str,
-    classification: { type: 'string', enum: ['Constraint', 'Expectation', 'Completion', 'Conflict', 'None'] },
-    confidence: { type: 'number', nullable: true }, mappedRequirementId: { type: 'string', nullable: true },
+    classification: { ...labelEnum, nullable: true, description: 'null = never classified (the AI service was down)' },
+    confidence: { type: 'integer', nullable: true, description: 'Model confidence 0-100 (null for seeded signals)' },
+    mappedRequirementId: { type: 'string', nullable: true },
+    seeded: { type: 'boolean', description: 'Loaded by the seed; its effect is already in the data' },
+    modelVersion: { type: 'string', nullable: true },
+    autoAcceptThreshold: { type: 'integer', nullable: true, description: 'Threshold (0-100) in force when the signal was ingested' },
+    autoApplyMinSimilarity: { type: 'number', nullable: true }, matchSimilarity: { type: 'number', nullable: true }, proposedStatus: { ...statusEnum, nullable: true },
+    applied: { type: 'boolean', description: 'The status rule was run and committed for this signal' },
+    reviewAction: { type: 'string', nullable: true, enum: ['accept', 'reject', 'correct'] },
+    statusNotReversed: { type: 'boolean', description: 'A PM rejected/corrected this signal AFTER its status change was applied. The status change and ledger entry were NOT reversed.' },
+  },
+};
+const matchResult = {
+  type: 'object', nullable: true,
+  properties: {
+    requirementId: { type: 'string', nullable: true, description: 'null when the best similarity is below MATCH_MIN_SIMILARITY (unmapped)' },
+    similarity: { type: 'number', nullable: true }, method: { type: 'string', enum: ['auto', 'manual'] },
+    alternatives: arr({ type: 'object', properties: { requirementId: str, similarity: { type: 'number' } } }),
+  },
+};
+const ingestResult = {
+  type: 'object',
+  properties: {
+    signal: { ...signal, nullable: true },
+    classification: { type: 'object', properties: { label: { ...labelEnum, nullable: true }, confidence: { type: 'integer', nullable: true }, modelVersion: { type: 'string', nullable: true } } },
+    match: matchResult, proposedStatus: { ...statusEnum, nullable: true }, applied: { type: 'boolean' }, reviewStatus: { type: 'string', enum: ['pending', 'accepted'] },
+    reviewReason: { type: 'string', enum: ['confident-and-mapped', 'none-confident', 'low-confidence', 'unmapped', 'low-similarity', 'proposes-drop', 'unclassified', 'concurrent-update'] },
+    autoAcceptThreshold: { type: 'integer' }, matchMinSimilarity: { type: 'number', description: 'Below this no requirement is proposed (unmapped)' },
+    autoApplyMinSimilarity: { type: 'number', description: 'A similarity-matched signal below this stays pending, with the proposed requirement shown' },
+    statusChange: { type: 'object', nullable: true, properties: { from: statusEnum, to: statusEnum } }, ledgerEntry: { ...ledgerEntry, nullable: true },
+    message: { type: 'string', nullable: true }, preview: { type: 'boolean' }, degraded: { type: 'boolean' },
+  },
+};
+const ingestBody = {
+  type: 'object', required: ['source', 'text'],
+  properties: {
+    source: { type: 'string', enum: ['Standup', 'Slack', 'Email', 'Teams', 'Jira Comment'] }, text: str,
+    authorRole: { type: 'string', description: "Default: the logged-in user's job title" }, timestamp: { type: 'string', description: 'Default: now' },
+    requirementId: { type: 'string', description: 'Skip automatic matching and use this requirement' },
   },
 };
 
@@ -73,7 +129,7 @@ module.exports = {
   openapi: '3.0.3',
   info: {
     title: 'InSPiD-TECH API',
-    version: '0.1.0',
+    version: '0.2.0',
     description: 'Shared backend. Responses are always { success, data, error }. Log in at POST /auth/login, then click Authorize and paste the token.',
   },
   servers: [{ url: '/api/v1' }],
@@ -107,23 +163,66 @@ module.exports = {
 
     '/projects/{projectId}/signals': {
       get: op('signals', 'Signal feed, newest first', { data: arr(signal), query: [{ name: 'reviewStatus', in: 'query', schema: { type: 'string', enum: ['pending', 'accepted', 'rejected'] } }, { name: 'requirementId', in: 'query', schema: str }] }),
-      post: op('signals', 'Ingest a signal (classified through the AI service, lands as pending)', { body: { type: 'object', required: ['source', 'authorRole', 'text'], properties: { source: { type: 'string', enum: ['Standup', 'Slack', 'Email', 'Teams', 'Jira Comment'] }, authorRole: str, text: str, timestamp: str } }, data: signal }),
+      post: op('signals', 'Ingest a signal: classify, map to a requirement, apply the status rule if safe, log to the ledger', {
+        body: ingestBody, data: ingestResult,
+        description: 'Any project member. Flow: /classify -> (None: stop) -> map to a requirement (requirementId, else /match; below MATCH_MIN_SIMILARITY = unmapped) -> status engine -> review policy. '
+          + 'Auto-accepted ONLY if confidence >= AUTO_ACCEPT_CONFIDENCE (default 90), the label is not None, a requirement was matched (if matched by similarity rather than an explicit requirementId, similarity >= AUTO_APPLY_MIN_SIMILARITY, default 0.40) and the proposed status is not a move into Dropped; a None signal at/above the threshold is accepted with no effect. '
+          + 'Everything else is pending and changes nothing until a PM accepts it. Returns 201, or 202 (stored as unclassified/unmapped + pending, nothing applied) when the AI service is unavailable. '
+          + 'MATCH_MIN_SIMILARITY (0.30) decides whether a requirement is proposed at all; all three thresholds are optional env vars (NOT required in .env).',
+      }),
+    },
+    '/projects/{projectId}/signals/preview': {
+      post: op('signals', 'Preview the answer for a signal: nothing is saved or applied', {
+        body: ingestBody, data: ingestResult,
+        description: 'Same classification, match, proposed status and review decision as POST /signals, but nothing is written. signal is null, applied is false, wouldApply says whether it would be auto-applied and statusChange is the change it would make. Returns 502 if the AI service is down.',
+      }),
     },
     '/projects/{projectId}/signals/{signalId}': { get: op('signals', 'One signal', { params: [param('signalId', 'SC-0001')], data: signal }) },
     '/projects/{projectId}/signals/{signalId}/review': {
-      post: op('signals', 'Accept or reject a pending signal', { roles: 'PM', params: [param('signalId', 'SC-0001')], body: { type: 'object', required: ['decision'], properties: { decision: { type: 'string', enum: ['accept', 'reject'] } } } }),
+      post: op('signals', 'PM review: accept, reject or correct a signal (writes a feedback document)', {
+        roles: 'PM', params: [param('signalId', 'SC-0001')],
+        data: { type: 'object', properties: { signal, action: str, statusChange: { type: 'object', nullable: true }, ledgerEntry: { ...ledgerEntry, nullable: true }, statusNotReversed: { type: 'boolean' }, message: str } },
+        body: { type: 'object', required: ['action'], properties: { action: { type: 'string', enum: ['accept', 'reject', 'correct'] }, correctedLabel: labelEnum, correctedRequirementId: str, note: str, decision: { type: 'string', description: 'Old alias of action (accept|reject)' } } },
+        description: 'accept: applies the pending status change and ledger entry (seeded signals only get reviewStatus updated). reject: no status effect. correct: re-runs the status rule with the corrected label and/or requirement. '
+          + 'IMPORTANT - signals that were already AUTO-ACCEPTED can still be rejected or corrected, but ONLY AS FEEDBACK: the status change and ledger entry they caused are NOT reversed. The response then has statusNotReversed: true and says so in message. A compensating correction ledger entry is the planned proper fix. '
+          + '409 if the signal was already reviewed by a PM.',
+      }),
     },
 
+    '/projects/{projectId}/feedback/export': {
+      get: op('signals', 'Export PM feedback as training data (CSV: text,label,source,role)', {
+        roles: 'PM',
+        description: 'Returns text/csv in the format `python -m training.train --extra-data` expects. Only accept and correct actions, de-duplicated by text (the latest decision wins). Signals loaded by the seed are left out.',
+      }),
+    },
+
+    '/projects/{projectId}/ledger/verify': {
+      get: op('ledger', 'Recompute the ledger hash chain', {
+        data: { type: 'object', properties: { valid: { type: 'boolean' }, entries: { type: 'integer' }, brokenAt: { type: 'integer', nullable: true, description: 'blockNumber of the first bad entry' }, reason: { type: 'string', nullable: true } } },
+      }),
+    },
     '/projects/{projectId}/ledger/requirements/{reqId}': { get: op('ledger', 'Ledger entries for one requirement', { params: [param('reqId', 'RET-R01')], data: arr(ledgerEntry) }) },
 
+    '/projects/{projectId}/network/recompute': {
+      post: op('network', 'Full recompute of the requirement network', {
+        roles: 'PM',
+        data: { type: 'object', properties: { projectId: str, requirements: { type: 'integer' }, links: { type: 'integer' }, clusters: { type: 'integer' }, added: arr(str), removed: arr(str), reweighted: { type: 'integer' }, ledgerEntry: { ...ledgerEntry, nullable: true } } },
+        description: 'Re-embeds every requirement (title + description) with the ai-service, rebuilds the Pathfinder network and the k clusters, and stores only the DIFFERENCE (links added/removed). If any link was added or removed ONE NETWORK_UPDATE ledger entry lists them; if nothing changed there is no ledger entry. Manual links are never changed. 502 if the ai-service is unavailable.',
+      }),
+    },
     '/projects/{projectId}/network/manual-links': {
       get: op('network', 'PM-authored links'),
-      post: op('network', 'Add a manual link (writes a placeholder ledger entry)', { roles: 'PM', body: { type: 'object', required: ['sourceId', 'targetId', 'reason'], properties: { sourceId: str, targetId: str, reason: str } } }),
+      post: op('network', 'Add a manual link (appends a MANUAL_LINK ledger entry)', { roles: 'PM', body: { type: 'object', required: ['sourceId', 'targetId', 'reason'], properties: { sourceId: str, targetId: str, reason: str } } }),
     },
     '/projects/{projectId}/network/manual-links/{linkId}': { delete: op('network', 'Remove a manual link (writes a placeholder ledger entry)', { roles: 'PM', params: [param('linkId', 'manual-link-...')] }) },
 
     '/projects/{projectId}/live-state': { get: op('integration', 'Current requirements with status, role, granularity', { description: INTEGRATION_NOTE }) },
-    '/projects/{projectId}/network': { get: op('integration', 'Network nodes and links', { description: INTEGRATION_NOTE, data: networkGraph }) },
+    '/projects/{projectId}/network': {
+      get: op('integration', 'Requirements network: nodes, computed links and clusters', {
+        data: networkGraph,
+        description: `${INTEGRATION_NOTE} Links are computed from the requirement texts: MiniLM embeddings of title + description, cosine distance, Pathfinder PFNET(r=infinity, q=n-1). Clusters are average-linkage agglomerative clusters on the same distances, cut to k = clamp(round(sqrt(n)), 3, 8) clusters per project (chosen for usability, not tuned; never group_id). If no links are computed yet they are computed first; if the ai-service is down the stored links (possibly empty) are returned with a warning. Manual links are appended unchanged.`,
+      }),
+    },
     '/projects/{projectId}/ledger': { get: op('integration', 'Ledger entries (placeholders for now)', { description: INTEGRATION_NOTE, data: arr(ledgerEntry) }) },
     '/projects/{projectId}/schedule-baseline': { get: op('integration', 'Schedule baseline', { description: `${INTEGRATION_NOTE} TODO: real baseline from the schedule component.` }) },
   },
