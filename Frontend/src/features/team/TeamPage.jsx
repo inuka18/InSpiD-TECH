@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { X, Users } from "lucide-react";
+import { useState } from "react";
+import { X, Users, AlertCircle } from "lucide-react";
 import { PageHeader } from "../../components/common/PageHeader";
 import { EmptyState } from "../../components/common/EmptyState";
 import { Card, CardContent } from "../../components/ui/card";
@@ -24,9 +24,10 @@ function capacityColor(pct) {
 
 export function TeamPage() {
   const { activeProjectId, activeProject } = useActiveProject();
-  const { allProjects, extraTeamForProject, inviteMember, removeExtraTeamMember } = useProject();
+  const { allProjects, extraTeamForProject, inviteMember, removeMember } = useProject();
   const { role, currentUser } = useRole();
-  const { data: fetchedTeam, setData: setFetchedTeam, loading } = useTeam(activeProjectId);
+  const { data: fetchedTeam, loading, error, reload } = useTeam(activeProjectId);
+  const [actionError, setActionError] = useState("");
   const { data: tasks } = useSchedule(activeProjectId);
   const [selectedMember, setSelectedMember] = useState(null);
   const { data: profile, loading: profileLoading } = useMemberProfile(selectedMember, {
@@ -34,29 +35,28 @@ export function TeamPage() {
     extraTeamForProject,
   });
 
-  const members = useMemo(
-    () => [...fetchedTeam, ...extraTeamForProject(activeProjectId)],
-    [fetchedTeam, extraTeamForProject, activeProjectId]
-  );
+  const members = fetchedTeam;
 
-  const handleInvite = ({ name, email, jobTitle, projectIds }) => {
-    inviteMember({ name, email, jobTitle, projectIds });
+  // Invite = add an already-registered user (by email) to the selected projects. Errors reach the dialog.
+  const handleInvite = async ({ email, projectIds }) => {
+    await inviteMember({ email, projectIds });
+    reload();
   };
 
-  // Static seed members (fetchedTeam) are removed from local page state only;
-  // invited members live in the shared extraTeam store in ProjectContext and
-  // need to be removed there so the removal is visible everywhere else too.
-  const handleRemove = (id) => {
-    if (extraTeamForProject(activeProjectId).some((m) => m.id === id)) {
-      removeExtraTeamMember(id);
-    } else {
-      setFetchedTeam((prev) => prev.filter((m) => m.id !== id));
+  // Remove = take the person off THIS project (PM only; the server refuses removing yourself).
+  const handleRemove = async (id) => {
+    setActionError("");
+    try {
+      await removeMember(activeProjectId, id);
+      reload();
+    } catch (err) {
+      setActionError(err.message || "Could not remove this person.");
     }
   };
 
   const isPM = role === ROLES.PM;
   const memberTasks = selectedMember ? tasks.filter((t) => t.assigneeId === selectedMember.id) : [];
-  const isSelf = selectedMember?.name === currentUser?.name;
+  const isSelf = selectedMember?.id === currentUser?.id;
   const canSeeTasks = isPM || isSelf;
 
   return (
@@ -71,7 +71,22 @@ export function TeamPage() {
         }
       />
 
-      {!loading && members.length === 0 && (
+      {error && !loading && (
+        <div className="mb-4 flex items-start gap-2 rounded-lg border border-status-dropped-fg/30 bg-status-dropped-bg px-3 py-2 text-sm text-status-dropped-fg">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span className="flex-1">Could not load the team: {error.message}</span>
+          <button onClick={reload} className="font-medium underline">
+            Try again
+          </button>
+        </div>
+      )}
+      {actionError && (
+        <div role="alert" className="mb-4 rounded-lg border border-status-dropped-fg/30 bg-status-dropped-bg px-3 py-2 text-sm text-status-dropped-fg">
+          {actionError}
+        </div>
+      )}
+
+      {!loading && !error && members.length === 0 && (
         <EmptyState
           icon={Users}
           title="No team members yet"
@@ -137,18 +152,15 @@ export function TeamPage() {
                   <div className="mt-4 space-y-1.5">
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-muted-foreground">Workload</span>
-                      <span className="font-medium text-foreground">{member.workloadPercent}%</span>
+                      <span className="font-medium text-muted-foreground">Not connected yet</span>
                     </div>
                     <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                      <div
-                        className={cn("h-full rounded-full transition-all", capacityColor(member.workloadPercent))}
-                        style={{ width: `${Math.min(member.workloadPercent, 100)}%` }}
-                      />
+                      <div className={cn("h-full rounded-full", capacityColor(0))} style={{ width: "0%" }} />
                     </div>
                   </div>
 
                   <div className="mt-3 flex items-center justify-between border-t border-border pt-3 text-xs text-muted-foreground">
-                    <span>{member.assignedTasksCount} assigned tasks</span>
+                    <span>Tasks: schedule not connected</span>
                     {member.email && <span className="truncate">{member.email}</span>}
                   </div>
                 </CardContent>

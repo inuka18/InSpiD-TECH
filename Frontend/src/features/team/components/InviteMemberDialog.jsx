@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { UserPlus, Check } from "lucide-react";
+import { UserPlus, Check, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -26,10 +26,15 @@ export function InviteMemberDialog({ projects, defaultProjectId, onInvite, trigg
     projectIds: defaultProjectId ? [defaultProjectId] : [],
   });
   const [form, setForm] = useState(emptyForm);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
   const handleOpenChange = (next) => {
     setOpen(next);
-    if (next) setForm(emptyForm());
+    if (next) {
+      setForm(emptyForm());
+      setError("");
+    }
   };
 
   const set = (key) => (e) => setForm((prev) => ({ ...prev, [key]: e.target.value }));
@@ -42,16 +47,24 @@ export function InviteMemberDialog({ projects, defaultProjectId, onInvite, trigg
         : [...prev.projectIds, id],
     }));
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.name.trim() || form.projectIds.length === 0) return;
-    onInvite({
-      name: form.name,
-      email: form.email,
-      jobTitle: form.jobTitle || "Team Member",
-      projectIds: form.projectIds,
-    });
-    setOpen(false);
+    if (!form.email.trim() || form.projectIds.length === 0) return;
+    setSubmitting(true);
+    setError("");
+    try {
+      await onInvite({
+        name: form.name,
+        email: form.email.trim(),
+        jobTitle: form.jobTitle || "Team Member",
+        projectIds: form.projectIds,
+      });
+      setOpen(false);
+    } catch (err) {
+      setError(err.message || "Could not add this person.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -67,27 +80,22 @@ export function InviteMemberDialog({ projects, defaultProjectId, onInvite, trigg
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Invite a team member</DialogTitle>
-          <DialogDescription>They'll be added to the project(s) you select below.</DialogDescription>
+          <DialogDescription>
+            Add someone who already has an account, by email, to the project(s) you select below. Their name and job title come from their account.
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="inv-name">Full name</Label>
-            <Input id="inv-name" placeholder="e.g. Sahan Perera" value={form.name} onChange={set("name")} required />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="inv-email">Email</Label>
+            <Label htmlFor="inv-email">Email of an existing account</Label>
             <Input
               id="inv-email"
               type="email"
-              placeholder="sahan.perera@inspid-tech.dev"
+              placeholder="developer.hms@inspid.test"
               value={form.email}
               onChange={set("email")}
+              required
             />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="inv-role">Job title</Label>
-            <Input id="inv-role" placeholder="e.g. Backend Developer" value={form.jobTitle} onChange={set("jobTitle")} />
           </div>
 
           <div className="space-y-1.5">
@@ -125,14 +133,21 @@ export function InviteMemberDialog({ projects, defaultProjectId, onInvite, trigg
             )}
           </div>
 
+          {error && (
+            <p role="alert" className="rounded-lg border border-status-dropped-fg/30 bg-status-dropped-bg px-3 py-2 text-sm text-status-dropped-fg">
+              {error}
+            </p>
+          )}
+
           <div className="flex justify-end gap-2 pt-2">
             <DialogClose asChild>
               <Button type="button" variant="outline">
                 Cancel
               </Button>
             </DialogClose>
-            <Button type="submit" disabled={form.projectIds.length === 0}>
-              Send invite
+            <Button type="submit" disabled={form.projectIds.length === 0 || !form.email.trim() || submitting}>
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Add to project
             </Button>
           </div>
         </form>

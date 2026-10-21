@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { fetchSignals } from "../services/signalsService";
 
 export function useSignals(projectId) {
@@ -6,9 +6,10 @@ export function useSignals(projectId) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
+  const reload = useCallback(() => {
     let cancelled = false;
     setLoading(true);
+    setError(null);
     fetchSignals(projectId)
       .then((res) => {
         if (!cancelled) setData(res);
@@ -24,5 +25,7 @@ export function useSignals(projectId) {
     };
   }, [projectId]);
 
-  return { data, setData, loading, error };
+  useEffect(() => reload(), [reload]);
+
+  return { data, setData, loading, error, reload };
 }

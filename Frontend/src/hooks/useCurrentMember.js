@@ -1,18 +1,16 @@
 import { useMemo } from "react";
-import { mockTeam } from "../data/mockTeam";
 import { useProject } from "../context/ProjectContext";
 import { useRole } from "../context/RoleContext";
 
-// Resolves the current persona's own team row for a given project: the
-// thing every "is this MY task / MY action item" role check needs, since
-// team rows (not RoleContext personas) are the unit of project membership.
+// Resolves the signed-in user's own team row for a given project: the thing every "is this MY task / MY action
+// item" role check needs, since team rows (not the login) are the unit of project membership.
+// Team rows come from the API and are matched by user id.
 export function useCurrentMember(projectId) {
   const { currentUser } = useRole();
-  const { extraTeamForProject } = useProject();
+  const { teamRows } = useProject();
 
   return useMemo(() => {
     if (!currentUser || !projectId) return null;
-    const rows = [...mockTeam, ...extraTeamForProject(projectId)];
-    return rows.find((t) => t.projectId === projectId && t.name === currentUser.name) ?? null;
-  }, [currentUser, projectId, extraTeamForProject]);
+    return teamRows.find((t) => t.projectId === projectId && t.id === currentUser.id) ?? null;
+  }, [currentUser, projectId, teamRows]);
 }

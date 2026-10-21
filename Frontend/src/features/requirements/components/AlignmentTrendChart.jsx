@@ -91,7 +91,7 @@ export function AlignmentTrendChart({ history, selectedDate, onSelectPoint }) {
                   onClick={isDip ? () => onSelectPoint(d) : undefined}
                 >
                   <title>
-                    {shortDate(d.date)}: {d.alignmentScore}%{isDip ? " · signal-linked drop, click for detail" : ""}
+                    {shortDate(d.date)}: {d.alignmentScore}%{isDip ? " · signal-linked change, click for detail" : ""}
                   </title>
                 </circle>
                 {showLabel && (
@@ -120,7 +120,7 @@ export function AlignmentTrendChart({ history, selectedDate, onSelectPoint }) {
         </span>
         <span className="flex items-center gap-1.5">
           <span className="h-3 w-3 rounded-full border border-dashed border-muted-foreground" />
-          Signal-linked drop
+          Signal-linked change
         </span>
       </div>
     </div>

@@ -17,7 +17,7 @@ const STATUS_BORDER = {
 };
 
 function RequirementNodeImpl({ data, selected }) {
-  const { requirement } = data;
+  const { requirement, clusterColor } = data;
   return (
     <div
       className={cn(
@@ -32,6 +32,9 @@ function RequirementNodeImpl({ data, selected }) {
         <span className="font-mono text-[10px] font-semibold text-muted-foreground">
           {requirement.id}
         </span>
+        {clusterColor && (
+          <span className="ml-auto h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: clusterColor }} title="Cluster colour" />
+        )}
       </div>
       <p className="mt-1 line-clamp-2 text-xs font-medium leading-snug text-foreground">
         {requirement.title}

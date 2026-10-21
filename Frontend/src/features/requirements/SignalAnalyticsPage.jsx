@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Radio, Sparkles, Clock3, XCircle, Gauge } from "lucide-react";
+import { Radio, Sparkles, Clock3, XCircle, Gauge, AlertCircle } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../../components/ui/card";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "../../components/ui/select";
 import { Skeleton } from "../../components/ui/skeleton";
@@ -9,12 +9,14 @@ import { ConfidenceTrendChart } from "./components/ConfidenceTrendChart";
 import { SourceBreakdownChart } from "./components/SourceBreakdownChart";
 import { useSignals } from "../../hooks/useSignals";
 import { useActiveProject } from "../../hooks/useActiveProject";
-import { TODAY } from "../../data/mockSchedulePhases";
 import { cn } from "../../lib/utils";
 
+// "This Sprint" needs sprint dates from the schedule component, which is not connected yet; it is only offered
+// when the project has them.
 const RANGE_OPTIONS = [
   { key: "7d", label: "Last 7 Days" },
   { key: "30d", label: "Last 30 Days" },
+  { key: "90d", label: "Last 90 Days" },
   { key: "sprint", label: "This Sprint" },
 ];
 
@@ -43,10 +45,12 @@ function shortDateFromKey(key) {
   return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
 }
 
-function getRangeBounds(rangeKey, activeProject) {
-  const today = isoDate(TODAY);
+// `today` is the day of the project's newest signal (or the real today if there are none), so the ranges follow the
+// data instead of a fixed demo date.
+function getRangeBounds(rangeKey, activeProject, today) {
   if (rangeKey === "7d") return { from: addDaysToKey(today, -6), to: today, granularity: "day" };
-  if (rangeKey === "sprint" && activeProject?.activeSprint) {
+  if (rangeKey === "90d") return { from: addDaysToKey(today, -89), to: today, granularity: "week" };
+  if (rangeKey === "sprint" && activeProject?.activeSprint?.startDate && activeProject?.activeSprint?.endDate) {
     const sprintStart = isoDate(activeProject.activeSprint.startDate);
     const sprintEnd = isoDate(activeProject.activeSprint.endDate);
     return { from: sprintStart, to: sprintEnd < today ? sprintEnd : today, granularity: "day" };
@@ -85,11 +89,11 @@ function buildBuckets(signals, { from, to, granularity }) {
     });
     const counts = { Constraint: 0, Expectation: 0, Completion: 0, Conflict: 0, None: 0 };
     inBucket.forEach((s) => {
-      counts[s.classification] = (counts[s.classification] ?? 0) + 1;
+      if (s.classification) counts[s.classification] = (counts[s.classification] ?? 0) + 1; // unclassified signals are not counted
     });
-    const avgConfidence = inBucket.length
-      ? Math.round(inBucket.reduce((sum, s) => sum + s.confidence, 0) / inBucket.length)
-      : null;
+    // Dataset (seeded) signals have no model confidence: they are left out of the average.
+    const scored = inBucket.filter((s) => s.confidence != null);
+    const avgConfidence = scored.length ? Math.round(scored.reduce((sum, s) => sum + s.confidence, 0) / scored.length) : null;
     return { ...shell, signals: inBucket, counts, total: inBucket.length, avgConfidence };
   });
 }
@@ -112,13 +116,22 @@ function KpiTile({ label, value, icon: Icon, highlight }) {
 
 export function SignalAnalyticsPage() {
   const { activeProjectId, activeProject } = useActiveProject();
-  const { data: signals, loading } = useSignals(activeProjectId);
+  const { data: signals, loading, error, reload } = useSignals(activeProjectId);
   const navigate = useNavigate();
   const [rangeKey, setRangeKey] = useState("30d");
 
+  const today = useMemo(() => {
+    if (!signals.length) return isoDate(new Date());
+    return isoDate(Math.max(...signals.map((s) => new Date(s.timestamp).getTime())));
+  }, [signals]);
+  const rangeOptions = useMemo(
+    () => RANGE_OPTIONS.filter((r) => r.key !== "sprint" || (activeProject?.activeSprint?.startDate && activeProject?.activeSprint?.endDate)),
+    [activeProject]
+  );
+
   const { from, to, granularity } = useMemo(
-    () => getRangeBounds(rangeKey, activeProject),
-    [rangeKey, activeProject]
+    () => getRangeBounds(rangeKey, activeProject, today),
+    [rangeKey, activeProject, today]
   );
 
   const inRange = useMemo(
@@ -130,10 +143,11 @@ export function SignalAnalyticsPage() {
 
   const kpis = useMemo(() => {
     const total = inRange.length;
-    const autoApplied = inRange.filter((s) => s.reviewStatus === "accepted" && s.confidence >= 85).length;
+    const autoApplied = inRange.filter((s) => s.applied && !s.reviewAction).length; // applied without a PM decision
     const pending = inRange.filter((s) => s.reviewStatus === "pending").length;
     const rejected = inRange.filter((s) => s.reviewStatus === "rejected").length;
-    const avgConfidence = total ? Math.round(inRange.reduce((sum, s) => sum + s.confidence, 0) / total) : 0;
+    const scored = inRange.filter((s) => s.confidence != null);
+    const avgConfidence = scored.length ? Math.round(scored.reduce((sum, s) => sum + s.confidence, 0) / scored.length) : null;
     return { total, autoApplied, pending, rejected, avgConfidence };
   }, [inRange]);
 
@@ -143,6 +157,19 @@ export function SignalAnalyticsPage() {
   );
 
   const rangeLabel = RANGE_OPTIONS.find((r) => r.key === rangeKey)?.label ?? "";
+
+  if (error && !loading) {
+    return (
+      <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border py-14 text-center">
+        <AlertCircle className="h-6 w-6 text-status-dropped-fg" />
+        <p className="text-sm font-medium text-foreground">Could not load the signals for the analytics.</p>
+        <p className="max-w-md text-sm text-muted-foreground">{error.message}</p>
+        <button onClick={reload} className="text-sm font-medium text-primary hover:underline">
+          Try again
+        </button>
+      </div>
+    );
+  }
 
   const goToSignalFeed = (params) => {
     const search = new URLSearchParams({ tab: "signals", ...params });
@@ -168,7 +195,7 @@ export function SignalAnalyticsPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {RANGE_OPTIONS.map((opt) => (
+            {rangeOptions.map((opt) => (
               <SelectItem key={opt.key} value={opt.key}>
                 {opt.label}
               </SelectItem>
@@ -185,7 +212,7 @@ export function SignalAnalyticsPage() {
               { label: "Auto-Applied", value: kpis.autoApplied, icon: Sparkles, highlight: "text-status-confirmed-fg" },
               { label: "Pending Review", value: kpis.pending, icon: Clock3, highlight: "text-status-atrisk-fg" },
               { label: "Rejected", value: kpis.rejected, icon: XCircle, highlight: "text-status-dropped-fg" },
-              { label: "Average Confidence", value: `${kpis.avgConfidence}%`, icon: Gauge },
+              { label: "Average Confidence", value: kpis.avgConfidence == null ? "–" : `${kpis.avgConfidence}%`, icon: Gauge },
             ].map((kpi) => <KpiTile key={kpi.label} {...kpi} />)}
       </div>
 

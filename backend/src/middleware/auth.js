@@ -17,7 +17,7 @@ async function requireAuth(req, res, next) {
     }
     const user = await User.findById(payload.sub).lean();
     if (!user) throw new AppError(401, 'INVALID_TOKEN', 'User no longer exists');
-    req.user = { id: String(user._id), email: user.email, role: user.role, projectIds: user.projectIds || [] };
+    req.user = { id: String(user._id), email: user.email, role: user.role, jobTitle: user.jobTitle || '', projectIds: user.projectIds || [] };
     next();
   } catch (err) {
     next(err);

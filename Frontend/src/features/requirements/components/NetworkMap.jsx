@@ -2,22 +2,30 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactFlow, {
   Background,
   BackgroundVariant,
-  Controls,
   Panel,
+  ReactFlowProvider,
   useEdgesState,
   useNodesState,
+  useReactFlow,
 } from "reactflow";
 import "reactflow/dist/style.css";
-import { ArrowUpRight, Link2, X, MousePointerClick } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, Link2, X, MousePointerClick } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { RequirementNode } from "./RequirementNode";
 import { ClusterBackgroundNode } from "./ClusterBackgroundNode";
 import { ManualLinkEdge } from "./ManualLinkEdge";
+import { PathfinderEdge } from "./PathfinderEdge";
+import { NetworkMapContext } from "./networkMapContext";
+import { LinkDetailsPanel } from "./LinkDetailsPanel";
+import { RequirementDetailPanel } from "./RequirementDetailPanel";
+import { MapToolbar, MAX_ZOOM, MIN_ZOOM } from "./MapToolbar";
 import { ManualLinkDialog } from "./ManualLinkDialog";
+import { BaselineStrip } from "./BaselineStrip";
 import { RestrictedButton } from "./RestrictedButton";
 import { StatusBadge } from "./StatusBadge";
 import { buildNetworkLayout } from "../../../lib/networkLayout";
-import { CLUSTERS } from "../../../data/mockRequirements";
+import { clusterMeta } from "../../../lib/clusters";
+import { manualToDetail } from "../../../lib/networkStats";
 import { cn } from "../../../lib/utils";
 
 const nodeTypes = {
@@ -26,6 +34,7 @@ const nodeTypes = {
 };
 const edgeTypes = {
   manual: ManualLinkEdge,
+  semantic: PathfinderEdge,
 };
 
 const STATUS_LEGEND = [
@@ -35,7 +44,9 @@ const STATUS_LEGEND = [
   { status: "Dropped", swatch: "bg-status-dropped-fg" },
 ];
 
-export function NetworkMap({ requirements, onOpenRequirement, isPM, manualLinks, onCreateManualLink, onRemoveManualLink }) {
+// `requirements` are the network nodes from the API, `links` its computed (pathfinder) links with weights.
+// `alignment` is the GET /alignment answer (null = no baseline yet); onFreezeBaseline(name) is PM only.
+function NetworkMapInner({ projectId, signals = [], requirements, links = [], warning, onOpenRequirement, isPM, manualLinks, onCreateManualLink, onRemoveManualLink, alignment = null, alignmentLoading = false, onFreezeBaseline }) {
   const wrapperRef = useRef(null);
   const [popover, setPopover] = useState(null);
   const [linkMode, setLinkMode] = useState(false);
@@ -43,6 +54,107 @@ export function NetworkMap({ requirements, onOpenRequirement, isPM, manualLinks,
   const [dialogPair, setDialogPair] = useState(null); // { source, target }
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState(null);
+  // The open side panel, shown on this page (the map is never unmounted, so zoom and pan are kept):
+  //   { type: "requirement", id, backTo? }  or  { type: "link", link }
+  const [panel, setPanel] = useState(null);
+  // What to focus when a panel closes: the node or link that was clicked. { kind: "node" | "edge", id }
+  const focusTarget = useRef(null);
+  const panelRef = useRef(null); // latest panel, readable from the close-focus handler
+  useEffect(() => {
+    panelRef.current = panel;
+  }, [panel]);
+
+  // ---- zoom and fullscreen -----------------------------------------------------------------------------
+  const { fitView, zoomIn, zoomOut } = useReactFlow();
+  // Has the user moved or zoomed the map? Only then is fit-to-screen NOT re-applied automatically on resize.
+  const userMoved = useRef(false);
+  const [expanded, setExpanded] = useState(false); // the wrapper fills the viewport (CSS), with or without the Fullscreen API
+  const nativeFullscreen = useRef(false); // true while WE own a real browser fullscreen
+
+  const fit = useCallback(() => {
+    userMoved.current = false; // after "fit" the view is the fitted one again
+    fitView({ padding: 0.15, duration: 200 });
+  }, [fitView]);
+
+  const enterFullscreen = useCallback(async () => {
+    setExpanded(true); // CSS expansion always happens; it is the whole feature when the Fullscreen API is unavailable
+    const root = document.documentElement;
+    if (!root.requestFullscreen) return;
+    try {
+      // The Fullscreen API goes on <html>, not on the map element: the panels, dialogs and toasts are portals on <body>,
+      // so a fullscreen on the map element alone would hide them.
+      await root.requestFullscreen({ navigationUI: "hide" });
+      nativeFullscreen.current = true;
+      // Keyboard Lock (Chrome, Edge): the browser then lets Esc reach the page, so Esc can close a panel first.
+      // Without it (Firefox, Safari) the browser itself leaves fullscreen on Esc.
+      try {
+        await navigator.keyboard?.lock?.(["Escape"]);
+      } catch {
+        /* not supported or refused: fine */
+      }
+    } catch {
+      nativeFullscreen.current = false; // denied (iframe, some phones): stay in the CSS-only expanded mode
+    }
+  }, []);
+
+  const exitFullscreen = useCallback(async () => {
+    setExpanded(false);
+    nativeFullscreen.current = false;
+    try {
+      navigator.keyboard?.unlock?.();
+    } catch {
+      /* ignore */
+    }
+    if (document.fullscreenElement) {
+      try {
+        await document.exitFullscreen();
+      } catch {
+        /* ignore */
+      }
+    }
+  }, []);
+
+  const toggleFullscreen = useCallback(() => (expanded ? exitFullscreen() : enterFullscreen()), [expanded, enterFullscreen, exitFullscreen]);
+
+  // The browser's own exit (its fullscreen control, or Esc without Keyboard Lock) must keep our state correct.
+  useEffect(() => {
+    const onChange = () => {
+      if (!document.fullscreenElement && nativeFullscreen.current) {
+        nativeFullscreen.current = false;
+        setExpanded(false);
+        try {
+          navigator.keyboard?.unlock?.();
+        } catch {
+          /* ignore */
+        }
+      }
+    };
+    document.addEventListener("fullscreenchange", onChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onChange);
+      if (nativeFullscreen.current && document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+    };
+  }, []);
+
+  // Esc also leaves the expanded view when focus is NOT inside the map (for example on the page body after a dialog closed);
+  // with Keyboard Lock the browser no longer does this itself. Dialogs and panels still close first.
+  useEffect(() => {
+    if (!expanded) return undefined;
+    const onKey = (e) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      if (wrapperRef.current?.contains(e.target)) return; // the map's own handler deals with it
+      if (document.querySelector('[role="dialog"]')) return;
+      exitFullscreen();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [expanded, exitFullscreen]);
+
+  // The container changed size: re-fit, but only if the user has not moved or zoomed the map themselves.
+  useEffect(() => {
+    const timers = [120, 450].map((ms) => setTimeout(() => { if (!userMoved.current) fitView({ padding: 0.15, duration: 200 }); }, ms));
+    return () => timers.forEach(clearTimeout);
+  }, [expanded, fitView]);
 
   useEffect(() => {
     if (!toast) return;
@@ -53,17 +165,16 @@ export function NetworkMap({ requirements, onOpenRequirement, isPM, manualLinks,
   // The automatic layout (nodes + Pathfinder-style edges), entirely
   // unchanged from before this feature existed, still memoized on
   // `requirements` alone, so nothing about it reacts to manual links.
-  const layout = useMemo(() => buildNetworkLayout(requirements, CLUSTERS), [requirements]);
+  const layout = useMemo(() => buildNetworkLayout(requirements, links), [requirements, links]);
 
   const requirementById = useMemo(() => new Map(requirements.map((r) => [r.id, r])), [requirements]);
 
   const isAlreadyLinked = useCallback(
     (aId, bId) => {
-      const a = requirementById.get(aId);
-      if (a?.relatedIds?.includes(bId)) return true;
+      if (links.some((l) => l.kind === "pathfinder" && ((l.source === aId && l.target === bId) || (l.source === bId && l.target === aId)))) return true;
       return manualLinks.some((l) => (l.sourceId === aId && l.targetId === bId) || (l.sourceId === bId && l.targetId === aId));
     },
-    [requirementById, manualLinks]
+    [links, manualLinks]
   );
 
   const handleRemoveLinkRequest = useCallback(
@@ -105,10 +216,10 @@ export function NetworkMap({ requirements, onOpenRequirement, isPM, manualLinks,
   }, [layout.edges, manualEdges, setEdges]);
 
   const clusterCount = useMemo(
-    () => new Set(requirements.map((r) => r.cluster)).size,
+    () => new Set(requirements.map((r) => clusterMeta(r).id)).size,
     [requirements]
   );
-  const alignmentScore = 91; // Illustrative, would be computed by the ML alignment model.
+  const legendClusters = layout.clusterBoxes;
 
   const cancelLinking = useCallback(() => {
     setPendingSourceId(null);
@@ -139,7 +250,8 @@ export function NetworkMap({ requirements, onOpenRequirement, isPM, manualLinks,
       const bounds = wrapperRef.current?.getBoundingClientRect();
       if (!bounds) return;
       const x = Math.min(event.clientX - bounds.left, bounds.width - 260);
-      const y = Math.min(event.clientY - bounds.top, bounds.height - 160);
+      const y = Math.min(event.clientY - bounds.top, bounds.height - 200);
+      focusTarget.current = { kind: "node", id: node.id };
       setPopover({ requirement: node.data.requirement, x, y });
     },
     [linkMode, pendingSourceId, isAlreadyLinked, requirementById, cancelLinking]
@@ -166,11 +278,120 @@ export function NetworkMap({ requirements, onOpenRequirement, isPM, manualLinks,
     setPopover(null);
   };
 
+  // ---- side panels (they open on this page, so the map keeps its zoom and pan)
+  const openLink = useCallback((link, edgeId) => {
+    focusTarget.current = { kind: "edge", id: edgeId };
+    setPopover(null);
+    setPanel({ type: "link", link });
+  }, []);
+
+  const openRequirementPanel = useCallback((id) => {
+    setPopover(null);
+    setPanel({ type: "requirement", id });
+  }, []);
+
+  // Switching between a link and one of its requirements stays inside the panels; "back" returns to the link.
+  const switchToRequirement = useCallback((id) => {
+    setPanel((p) => ({ type: "requirement", id, backTo: p?.type === "link" ? p.link : p?.backTo }));
+  }, []);
+
+  // When the last panel closes, focus goes back to the node or link that was clicked.
+  const restoreFocus = useCallback(() => {
+    const t = focusTarget.current;
+    if (!t || !wrapperRef.current) return;
+    const selector =
+      t.kind === "node" ? `.react-flow__node[data-id="${CSS.escape(t.id)}"]` : `.react-flow__edge[data-testid="rf__edge-${CSS.escape(t.id)}"]`;
+    wrapperRef.current.querySelector(selector)?.focus({ preventScroll: true });
+  }, []);
+
+  const handleCloseAutoFocus = useCallback(
+    (e) => {
+      e.preventDefault();
+      if (!panelRef.current) restoreFocus(); // not when we are only switching to the other panel
+    },
+    [restoreFocus]
+  );
+
+  const mapContext = useMemo(() => ({ linkMode, openLink }), [linkMode, openLink]);
+
+  // Keyboard: Enter/Space on a focused node or link does what a click does; Esc closes the small node popover.
+  const handleKeyDown = (e) => {
+    // Esc closes things in this order: the node popover, then an open panel / dialog (they close themselves), and only
+    // then leaves the expanded / fullscreen view.
+    if (e.key === "Escape" && popover) {
+      setPopover(null);
+      // React Flow blurs a selected node on Esc; put focus back on it once that has happened.
+      setTimeout(restoreFocus, 0);
+      return;
+    }
+    const dialogOpen = Boolean(panelRef.current || dialogPair || document.querySelector('[role="dialog"]'));
+    if (e.key === "Escape") {
+      if (expanded && !dialogOpen) exitFullscreen();
+      return;
+    }
+    // Shortcuts while the map has focus and nothing modal is open: + - 0 F
+    const typing = ["INPUT", "TEXTAREA", "SELECT"].includes(e.target.tagName) || e.target.isContentEditable;
+    if (!typing && !dialogOpen && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (e.key === "+" || e.key === "=") {
+        e.preventDefault();
+        userMoved.current = true;
+        zoomIn({ duration: 150 });
+        return;
+      }
+      if (e.key === "-" || e.key === "_") {
+        e.preventDefault();
+        userMoved.current = true;
+        zoomOut({ duration: 150 });
+        return;
+      }
+      if (e.key === "0") {
+        e.preventDefault();
+        fit();
+        return;
+      }
+      if (e.key === "f" || e.key === "F") {
+        e.preventDefault();
+        toggleFullscreen();
+        return;
+      }
+    }
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const edgeEl = e.target.closest?.(".react-flow__edge");
+    const nodeEl = e.target.closest?.(".react-flow__node");
+    if (edgeEl) {
+      const id = edgeEl.getAttribute("data-testid")?.replace(/^rf__edge-/, "");
+      const edge = edges.find((x) => x.id === id);
+      e.preventDefault();
+      if (linkMode || !edge?.data?.link) return; // link mode: edges do nothing
+      openLink(edge.type === "manual" ? manualToDetail(edge.data.link) : edge.data.link, id);
+    } else if (nodeEl) {
+      const node = nodes.find((n) => n.id === nodeEl.getAttribute("data-id"));
+      if (!node) return;
+      e.preventDefault();
+      const r = nodeEl.getBoundingClientRect();
+      handleNodeClick({ clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 }, node);
+    }
+  };
+
+  const panelLink = panel?.type === "link" ? panel.link : null;
+  const backTo = panel?.type === "requirement" ? panel.backTo : null;
+
   return (
+    <NetworkMapContext.Provider value={mapContext}>
     <div
       ref={wrapperRef}
-      className="relative h-[calc(100vh-14rem)] min-h-[520px] w-full overflow-hidden rounded-xl border border-border bg-card"
+      tabIndex={-1}
+      onKeyDown={handleKeyDown}
+      data-fullscreen={expanded ? "true" : "false"}
+      className={cn(
+        "flex flex-col overflow-hidden bg-card outline-none",
+        // z-40: above the app header (z-30), below sheets / dialogs / tooltips / toasts (z-50) that portal onto <body>.
+        expanded ? "fixed inset-0 z-40 h-dvh w-screen" : "relative h-[calc(100dvh-20.5rem)] min-h-[380px] w-full rounded-xl border border-border"
+      )}
     >
+      {/* The strip is a normal row above the map, so it never covers nodes; the bottom-right toolbar and the map height stay as they were. */}
+      <BaselineStrip alignment={alignment} loading={alignmentLoading} isPM={isPM} onFreeze={onFreezeBaseline} />
+      <div className="relative min-h-0 flex-1">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -182,24 +403,28 @@ export function NetworkMap({ requirements, onOpenRequirement, isPM, manualLinks,
         onPaneClick={() => {
           setPopover(null);
           cancelLinking();
+          wrapperRef.current?.focus({ preventScroll: true }); // so the +, -, 0 and F shortcuts work after clicking the map
         }}
         onMove={() => setPopover(null)}
+        onMoveStart={(event) => {
+          if (event) userMoved.current = true; // a drag, wheel or pinch by the user (programmatic fits pass no event)
+        }}
         fitView
         fitViewOptions={{ padding: 0.15 }}
-        minZoom={0.3}
-        maxZoom={1.6}
+        minZoom={MIN_ZOOM}
+        maxZoom={MAX_ZOOM}
         proOptions={{ hideAttribution: true }}
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="hsl(var(--border))" />
-        <Controls showInteractive={false} />
+        <MapToolbar expanded={expanded} onToggleFullscreen={toggleFullscreen} onFit={fit} onUserZoom={() => { userMoved.current = true; }} />
 
         <Panel position="top-left">
           <div className="rounded-lg border border-border bg-card/95 px-3.5 py-2.5 text-xs shadow-sm backdrop-blur">
             <span className="font-semibold text-foreground">{requirements.length} requirements</span>
             <span className="mx-1.5 text-muted-foreground">·</span>
-            <span className="text-muted-foreground">{clusterCount} clusters detected</span>
+            <span className="text-muted-foreground">{clusterCount} cluster{clusterCount === 1 ? "" : "s"}</span>
             <span className="mx-1.5 text-muted-foreground">·</span>
-            <span className="font-semibold text-primary">Alignment score: {alignmentScore}%</span>
+            <span className="text-muted-foreground">{layout.edges.length} computed links</span>
           </div>
         </Panel>
 
@@ -247,11 +472,21 @@ export function NetworkMap({ requirements, onOpenRequirement, isPM, manualLinks,
               ))}
             </div>
             <div className="my-2 border-t border-border" />
+            <p className="mb-1.5 font-semibold text-foreground">Clusters</p>
+            <div className="flex max-h-32 flex-col gap-1.5 overflow-y-auto pr-1 scrollbar-thin">
+              {legendClusters.map((c) => (
+                <div key={c.id} className="flex items-center gap-2">
+                  <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: c.color }} />
+                  <span className="max-w-[12rem] truncate text-muted-foreground">{c.label}</span>
+                </div>
+              ))}
+            </div>
+            <div className="my-2 border-t border-border" />
             <p className="mb-1.5 font-semibold text-foreground">Connections</p>
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center gap-2">
-                <span className="h-0 w-4 border-t border-muted-foreground/60" />
-                <span className="text-muted-foreground">Automatic (detected)</span>
+                <span className="h-0 w-4 border-t-[3px] border-muted-foreground/60" />
+                <span className="text-muted-foreground">Computed from text (thicker = more similar)</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="h-0 w-4 border-t-[1.8px] border-dashed border-status-ripple-fg" />
@@ -262,6 +497,13 @@ export function NetworkMap({ requirements, onOpenRequirement, isPM, manualLinks,
           </div>
         </Panel>
       </ReactFlow>
+
+      {warning && (
+        <div className="absolute left-1/2 top-3 z-30 flex max-w-xl -translate-x-1/2 items-start gap-2 rounded-lg border border-status-atrisk-fg/30 bg-status-atrisk-bg px-3 py-2 text-xs text-status-atrisk-fg shadow-sm">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>{warning}</span>
+        </div>
+      )}
 
       {popover && (
         <div
@@ -274,14 +516,49 @@ export function NetworkMap({ requirements, onOpenRequirement, isPM, manualLinks,
             <StatusBadge status={popover.requirement.liveStatus} />
           </div>
           <button
-            onClick={() => onOpenRequirement(popover.requirement.id)}
+            onClick={() => openRequirementPanel(popover.requirement.id)}
             className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
           >
             View full detail panel
             <ArrowUpRight className="h-3 w-3" />
           </button>
+          <button
+            onClick={() => onOpenRequirement(popover.requirement.id)}
+            className="mt-1.5 block text-[11px] text-muted-foreground hover:text-foreground hover:underline"
+          >
+            Open in requirements list
+          </button>
         </div>
       )}
+
+      <RequirementDetailPanel
+        requirementId={panel?.type === "requirement" ? panel.id : null}
+        projectId={projectId}
+        requirements={requirements}
+        open={panel?.type === "requirement"}
+        onOpenChange={(open) => !open && setPanel(null)}
+        onSelectRequirement={switchToRequirement}
+        onBack={backTo ? () => setPanel({ type: "link", link: backTo }) : undefined}
+        backLabel={backTo ? `Back to link ${backTo.source ?? backTo.sourceId} ↔ ${backTo.target ?? backTo.targetId}` : undefined}
+        onCloseAutoFocus={handleCloseAutoFocus}
+      />
+
+      <LinkDetailsPanel
+        link={panelLink}
+        open={panel?.type === "link"}
+        onOpenChange={(open) => !open && setPanel(null)}
+        onCloseAutoFocus={handleCloseAutoFocus}
+        projectId={projectId}
+        nodes={requirements}
+        links={links}
+        signals={signals}
+        isPM={isPM}
+        onSelectRequirement={switchToRequirement}
+        onRemoveManualLink={async (raw) => {
+          await handleRemoveLinkRequest(raw);
+          setPanel(null);
+        }}
+      />
 
       <ManualLinkDialog
         open={Boolean(dialogPair)}
@@ -293,13 +570,24 @@ export function NetworkMap({ requirements, onOpenRequirement, isPM, manualLinks,
       />
 
       {toast && (
-        <div className="absolute bottom-4 right-4 z-30 flex max-w-sm items-start gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground shadow-2xl animate-slide-up">
+        <div className="absolute bottom-16 right-4 z-30 flex max-w-sm items-start gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground shadow-2xl animate-slide-up">
           <span className="flex-1">{toast}</span>
           <button onClick={() => setToast(null)} className="shrink-0 text-muted-foreground hover:text-foreground">
             <X className="h-3.5 w-3.5" />
           </button>
         </div>
       )}
+      </div>
     </div>
+    </NetworkMapContext.Provider>
+  );
+}
+
+// React Flow's hooks (zoom, fit) need a provider above the map, so the keyboard shortcuts and the toolbar can use them.
+export function NetworkMap(props) {
+  return (
+    <ReactFlowProvider>
+      <NetworkMapInner {...props} />
+    </ReactFlowProvider>
   );
 }

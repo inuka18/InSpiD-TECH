@@ -1,71 +1,207 @@
 """InSPiD-TECH AI service.
 
-Every endpoint below returns PLACEHOLDER values. The real models arrive later:
   - /classify   -> signal classifier (Constraint / Expectation / Completion / Conflict / None)
-  - /embed      -> sentence-transformers embeddings
-  - /similarity -> cosine similarity on those embeddings
+  - /embed      -> all-MiniLM-L6-v2 vectors (normalized)
+  - /similarity -> cosine similarity of two texts
+  - /match      -> rank candidate texts by similarity to a text
 The backend only talks to this service through backend/src/shared/aiClient.js.
 """
-from typing import List
+import os
+import threading
+from pathlib import Path
+from typing import List, Optional
 
-from fastapi import FastAPI
+from contextlib import asynccontextmanager
+
+import numpy as np
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-app = FastAPI(title="InSPiD-TECH AI service", version="0.1.0")
+from app.embedder import Embedder
+from app.signal_model import EMBED_MODEL_NAME, LABELS, load_model, read_current
 
-LABELS = ["Constraint", "Expectation", "Completion", "Conflict", "None"]
-EMBED_DIM = 384  # all-MiniLM-L6-v2 size, the likely model
+embedder = Embedder()
+
+
+@asynccontextmanager
+async def lifespan(_app):
+    embedder.load()  # once, at startup (the weights come from the ml_cache volume after the first download)
+    yield
+
+
+app = FastAPI(title="InSPiD-TECH AI service", version="0.3.0", lifespan=lifespan)
+MODELS_DIR = Path(os.environ.get("MODELS_DIR", "/app/models"))
+
+
+class ModelRegistry:
+    """Holds the active classifier and reloads it when current.json changes (mtime check)."""
+
+    def __init__(self, models_dir: Path):
+        self.dir = models_dir
+        self.lock = threading.Lock()
+        self.mtime = None
+        self.version: Optional[str] = None
+        self.model = None
+        self.error = "No model has been loaded yet."
+
+    def get(self):
+        cur = self.dir / "current.json"
+        try:
+            mtime = cur.stat().st_mtime_ns
+        except FileNotFoundError:
+            with self.lock:
+                self.model, self.version, self.mtime = None, None, None
+                self.error = f"No trained model: {cur} does not exist. Run the training script (see ai-service/training/README.md)."
+            return None, None, self.error
+        with self.lock:
+            if mtime != self.mtime:
+                try:
+                    version = read_current(self.dir)
+                    self.model, self.version = load_model(self.dir, version), version
+                    self.error = None
+                except Exception as exc:  # bad json, missing model file, unpickle error
+                    self.model, self.version = None, None
+                    self.error = f"Could not load the active model from {cur}: {exc}"
+                self.mtime = mtime
+            return self.model, self.version, self.error
+
+
+registry = ModelRegistry(MODELS_DIR)
 
 
 class ClassifyIn(BaseModel):
     text: str = Field(min_length=1)
+    source: Optional[str] = None  # accepted for the API contract; the model is text-only
+    role: Optional[str] = None  # accepted for the API contract; the model is text-only
 
 
 class ClassifyOut(BaseModel):
     label: str
     confidence: float
     scores: dict
-    placeholder: bool = True
+    model_version: str
+
+
+class ClassifyBatchIn(BaseModel):
+    texts: List[str] = Field(min_length=1, max_length=300)
+
+
+class ClassifyItem(BaseModel):
+    label: str
+    confidence: float
+    scores: dict
+    model_version: str
 
 
 class EmbedIn(BaseModel):
-    texts: List[str] = Field(min_length=1)
+    texts: List[str] = Field(min_length=1, max_length=512)
 
 
 class EmbedOut(BaseModel):
-    embeddings: List[List[float]]
-    dim: int
-    placeholder: bool = True
+    vectors: List[List[float]]
+    model: str
 
 
 class SimilarityIn(BaseModel):
-    text_a: str
-    text_b: str
+    a: str = Field(min_length=1)
+    b: str = Field(min_length=1)
 
 
 class SimilarityOut(BaseModel):
-    score: float
-    placeholder: bool = True
+    similarity: float
+
+
+class Candidate(BaseModel):
+    id: str
+    text: str = Field(min_length=1)
+
+
+class MatchIn(BaseModel):
+    text: str = Field(min_length=1)
+    candidates: List[Candidate] = Field(min_length=1, max_length=2000)
+    top_k: int = Field(default=5, ge=1, le=50)
+
+
+class MatchBatchIn(BaseModel):
+    texts: List[str] = Field(min_length=1, max_length=300)
+    candidates: List[Candidate] = Field(min_length=1, max_length=2000)
+    top_k: int = Field(default=5, ge=1, le=50)
+
+
+class MatchItem(BaseModel):
+    id: str
+    similarity: float
+
+
+def need_embedder():
+    if not embedder.ready:
+        raise HTTPException(status_code=503, detail=f"Embedding model not available: {embedder.error}")
 
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "ai-service", "placeholder": True}
+    return {"status": "ok", "service": "ai-service", "embedder_ready": embedder.ready}
 
 
 @app.post("/classify", response_model=ClassifyOut)
 def classify(body: ClassifyIn):
-    # TODO: replace with the trained classifier.
-    return ClassifyOut(label="None", confidence=0.0, scores={l: 0.0 for l in LABELS})
+    model, version, error = registry.get()
+    if model is None:
+        raise HTTPException(status_code=503, detail=error)
+    proba = model.predict_proba([body.text])[0]
+    scores = {l: round(float(p), 6) for l, p in zip(LABELS, proba)}
+    label = max(scores, key=scores.get)
+    return ClassifyOut(label=label, confidence=scores[label], scores=scores, model_version=version)
+
+
+@app.post("/classify/batch", response_model=List[ClassifyItem])
+def classify_batch(body: ClassifyBatchIn):
+    """Same model and the same predict_proba path as /classify, for many texts in one call (the cleaning and the
+    embedding steps are batched inside the model)."""
+    model, version, error = registry.get()
+    if model is None:
+        raise HTTPException(status_code=503, detail=error)
+    proba = model.predict_proba(body.texts)
+    out = []
+    for row in proba:
+        scores = {l: round(float(p), 6) for l, p in zip(LABELS, row)}
+        label = max(scores, key=scores.get)
+        out.append(ClassifyItem(label=label, confidence=scores[label], scores=scores, model_version=version))
+    return out
 
 
 @app.post("/embed", response_model=EmbedOut)
 def embed(body: EmbedIn):
-    # TODO: replace with sentence-transformers encode().
-    return EmbedOut(embeddings=[[0.0] * EMBED_DIM for _ in body.texts], dim=EMBED_DIM)
+    need_embedder()
+    return EmbedOut(vectors=embedder.encode(body.texts).tolist(), model=EMBED_MODEL_NAME)
 
 
 @app.post("/similarity", response_model=SimilarityOut)
 def similarity(body: SimilarityIn):
-    # TODO: replace with cosine similarity of real embeddings.
-    return SimilarityOut(score=0.0)
+    need_embedder()
+    va, vb = embedder.encode([body.a, body.b])
+    return SimilarityOut(similarity=round(float(np.dot(va, vb)), 6))  # vectors are normalized -> cosine
+
+
+@app.post("/match", response_model=List[MatchItem])
+def match(body: MatchIn):
+    need_embedder()
+    q = embedder.encode([body.text])[0]
+    cand = embedder.encode_cached([c.text for c in body.candidates])  # candidate vectors cached by text hash
+    sims = cand @ q
+    order = np.argsort(-sims, kind="stable")[: body.top_k]
+    return [MatchItem(id=body.candidates[i].id, similarity=round(float(sims[i]), 6)) for i in order]
+
+
+@app.post("/match/batch", response_model=List[List[MatchItem]])
+def match_batch(body: MatchBatchIn):
+    """/match for many texts at once: the candidates are sent and embedded once (cached by text hash)."""
+    need_embedder()
+    cand = embedder.encode_cached([c.text for c in body.candidates])
+    queries = embedder.encode(body.texts)  # one batched encode for all the texts
+    sims = queries @ cand.T
+    out = []
+    for row in sims:
+        order = np.argsort(-row, kind="stable")[: body.top_k]
+        out.append([MatchItem(id=body.candidates[i].id, similarity=round(float(row[i]), 6)) for i in order])
+    return out

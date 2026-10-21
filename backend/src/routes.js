@@ -13,8 +13,11 @@ const scoped = (path, router) => v1.use(`/projects/:projectId/${path}`, requireA
 scoped('team', require('./modules/team/routes'));
 scoped('requirements', require('./modules/requirements/routes'));
 scoped('signals', require('./modules/signals/routes'));
+scoped('feedback', require('./modules/feedback/routes'));
 scoped('ledger', require('./modules/ledger/routes'));
 scoped('network', require('./modules/network/routes'));
+scoped('baselines', require('./modules/network/baselineRoutes').baselineRouter);
+scoped('alignment', require('./modules/network/baselineRoutes').alignmentRouter);
 // scoped('gap-detection', require('./modules/gap-detection/routes'));      // TODO: Component 2 owner
 // scoped('schedule', require('./modules/schedule/routes'));                // TODO: Component 3 owner
 // scoped('retrospectives', require('./modules/retrospectives/routes'));    // TODO: Component 4 owner
