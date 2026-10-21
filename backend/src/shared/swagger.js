@@ -48,9 +48,9 @@ const ledgerEntry = {
   description: 'PLACEHOLDER ledger entry (onChain: false): not a real blockchain transaction yet. txHash = sha256 of a canonical JSON of the entry fields plus previousBlockHash, so the chain can be checked with GET /ledger/verify.',
   properties: {
     txHash: str,
-    eventType: { type: 'string', description: 'Display string kept for the frontend: Status Change, Requirement Created, Manual Link Added, Manual Link Removed or Network Updated' },
-    eventCode: { type: 'string', enum: ['STATUS_CHANGE', 'REQUIREMENT_CREATED', 'MANUAL_LINK', 'NETWORK_UPDATE'] },
-    details: { type: 'object', description: 'NETWORK_UPDATE only (display eventType "Network Updated"): the link ids this update added and removed', properties: { added: arr(str), removed: arr(str) } },
+    eventType: { type: 'string', description: 'Display string kept for the frontend: Status Change, Requirement Created, Manual Link Added, Manual Link Removed, Network Updated or Baseline Created' },
+    eventCode: { type: 'string', enum: ['STATUS_CHANGE', 'REQUIREMENT_CREATED', 'MANUAL_LINK', 'NETWORK_UPDATE', 'BASELINE_CREATED'] },
+    details: { type: 'object', description: 'NETWORK_UPDATE (display "Network Updated"): { added, removed } link ids. BASELINE_CREATED (display "Baseline Created"): { baselineId, name }. A NETWORK_UPDATE caused by an applied signal has that signal in triggeringSignalId.', properties: { added: arr(str), removed: arr(str), baselineId: str, name: str } },
     requirementId: str, requirementTitle: str, relatedRequirementId: str,
     previousStatus: str, newStatus: str, triggeringSignal: { type: 'string', description: 'The signal text (or the reason for a manual link)' },
     triggeringSignalId: { type: 'string', nullable: true }, actor: str, timestamp: str,
@@ -68,7 +68,10 @@ const networkGraph = {
       properties: {
         id: { type: 'string', example: 'RET-R04~RET-R14~semantic' }, source: str, target: str,
         kind: { type: 'string', enum: ['pathfinder', 'manual'] }, relationType: { type: 'string', example: 'semantic', description: 'semantic for pathfinder links' },
-        weight: { type: 'number', description: 'Cosine similarity of the two requirement texts (pathfinder links only)' }, reason: { type: 'string', description: 'manual links only' },
+        weight: { type: 'number', description: 'Combined similarity of the pair (pathfinder links only): (1 - w) * text + w * signal profile + evidence boost, capped at 1. With no applied signals it is the text cosine similarity' },
+        evidenceCount: { type: 'integer', description: 'Pathfinder links: number of signal-evidence rows (id mentions + co-references) for this pair' },
+        contributions: { type: 'object', description: 'Pathfinder links: where the weight comes from; the three parts add up to weight', properties: { text: { type: 'number' }, profile: { type: 'number' }, boost: { type: 'number' } } },
+        reason: { type: 'string', description: 'manual links only' },
       },
     }),
     clusters: arr({ type: 'object', properties: { id: str, label: str, size: { type: 'integer' } } }),
@@ -169,7 +172,8 @@ module.exports = {
         description: 'Any project member. Flow: /classify -> (None: stop) -> map to a requirement (requirementId, else /match; below MATCH_MIN_SIMILARITY = unmapped) -> status engine -> review policy. '
           + 'Auto-accepted ONLY if confidence >= AUTO_ACCEPT_CONFIDENCE (default 90), the label is not None, a requirement was matched (if matched by similarity rather than an explicit requirementId, similarity >= AUTO_APPLY_MIN_SIMILARITY, default 0.40) and the proposed status is not a move into Dropped; a None signal at/above the threshold is accepted with no effect. '
           + 'Everything else is pending and changes nothing until a PM accepts it. Returns 201, or 202 (stored as unclassified/unmapped + pending, nothing applied) when the AI service is unavailable. '
-          + 'MATCH_MIN_SIMILARITY (0.30) decides whether a requirement is proposed at all; all three thresholds are optional env vars (NOT required in .env).',
+          + 'MATCH_MIN_SIMILARITY (0.30) decides whether a requirement is proposed at all; all three thresholds are optional env vars (NOT required in .env). '
+          + 'An APPLIED signal (auto-accepted, or accepted/corrected by a PM; label not None; never rejected, pending or seeded ones) also feeds the requirement network: it can store evidence rows (an explicit requirement-id mention, or two near-equal match candidates), updates the signal profile of the matched requirement, and the network is refreshed incrementally. Only if a link was added or removed ONE NETWORK_UPDATE ledger entry is written (triggeringSignalId = this signal). If the AI service is down the signal still succeeds and the network is marked stale.',
       }),
     },
     '/projects/{projectId}/signals/preview': {
@@ -262,17 +266,69 @@ module.exports = {
         description: 'Re-embeds every requirement (title + description) with the ai-service, rebuilds the Pathfinder network and the k clusters, and stores only the DIFFERENCE (links added/removed). If any link was added or removed ONE NETWORK_UPDATE ledger entry lists them; if nothing changed there is no ledger entry. Manual links are never changed. 502 if the ai-service is unavailable.',
       }),
     },
+    '/projects/{projectId}/network/links/{linkId}/evidence': {
+      get: op('network', 'Where a computed link comes from: contributions and the supporting signals', {
+        params: [param('linkId', 'RET-R04~RET-R14~semantic')],
+        data: {
+          type: 'object',
+          properties: {
+            linkId: str, source: str, target: str, weight: { type: 'number' },
+            contributions: { type: 'object', properties: { text: { type: 'number' }, profile: { type: 'number' }, boost: { type: 'number' } } },
+            evidenceCount: { type: 'integer' }, evidenceByKind: { type: 'object', properties: { idmention: { type: 'integer' }, coref: { type: 'integer' } } },
+            signals: arr({ type: 'object', description: 'Up to 20, newest first', properties: { signalId: str, text: str, source: str, authorRole: str, timestamp: str, label: str, kind: { type: 'string', enum: ['idmention', 'coref'] }, similarityA: { type: 'number', nullable: true }, similarityB: { type: 'number', nullable: true } } }),
+          },
+        },
+        description: 'The signals that gave evidence for this pair: an explicit requirement-id mention (stronger) or a co-reference (the matcher found two requirements about equally similar). 404 if the link does not exist. The signal-profile part is not tied to single signals, so it has no entries in the list.',
+      }),
+    },
     '/projects/{projectId}/network/manual-links': {
       get: op('network', 'PM-authored links'),
       post: op('network', 'Add a manual link (appends a MANUAL_LINK ledger entry)', { roles: 'PM', body: { type: 'object', required: ['sourceId', 'targetId', 'reason'], properties: { sourceId: str, targetId: str, reason: str } } }),
     },
     '/projects/{projectId}/network/manual-links/{linkId}': { delete: op('network', 'Remove a manual link (writes a placeholder ledger entry)', { roles: 'PM', params: [param('linkId', 'manual-link-...')] }) },
 
+    '/projects/{projectId}/baselines': {
+      get: op('network', 'List the baselines of a project (oldest first)', {
+        data: arr({ type: 'object', properties: { id: str, name: str, createdAt: str, createdBy: str, initial: { type: 'boolean' }, linkCount: { type: 'integer' }, requirementCount: { type: 'integer' } } }),
+      }),
+      post: op('network', 'Freeze the CURRENT network and requirement states as a new baseline', {
+        roles: 'PM', body: { type: 'object', required: ['name'], properties: { name: { type: 'string', maxLength: 80, example: 'Sprint 3 freeze' } } },
+        description: 'Appends a BASELINE_CREATED ledger entry (an API-created entry, so npm run rechain refuses once it exists). The "Initial baseline" is created automatically, from the TEXT-ONLY network (no signal evidence or profiles), by network:build and by the first GET /network.',
+      }),
+    },
+    '/projects/{projectId}/baselines/{baselineId}': {
+      get: op('network', 'One baseline with its frozen requirements and links', {
+        params: [param('baselineId', 'BL-1a2b3c4d')],
+        data: { type: 'object', properties: { id: str, name: str, createdAt: str, createdBy: str, initial: { type: 'boolean' }, requirements: arr({ type: 'object', properties: { id: str, title: str, description: str, type: str, status: str, granularity: str, resourceRole: str } }), links: arr({ type: 'object', properties: { source: str, target: str, weight: { type: 'number' } } }) } },
+      }),
+    },
+    '/projects/{projectId}/baselines/{baselineId}/diff': {
+      get: op('network', 'What changed since a baseline', {
+        params: [param('baselineId', 'BL-1a2b3c4d')],
+        data: { type: 'object', properties: { baseline: { type: 'object', properties: { id: str, name: str, createdAt: str } }, requirements: { type: 'object', properties: { changed: arr({ type: 'object', properties: { id: str, title: str, from: statusEnum, to: statusEnum } }), added: arr(str), removed: arr(str) } }, links: { type: 'object', properties: { added: arr(str), removed: arr(str) } } } },
+        description: 'Requirements whose status differs from the baseline, and computed links added / removed against the CURRENT network (link ids like RET-R04~RET-R14~semantic).',
+      }),
+    },
+    '/projects/{projectId}/alignment': {
+      get: op('network', 'Alignment: how far the current network has drifted from a baseline', {
+        query: [{ name: 'baselineId', in: 'query', required: false, schema: { type: 'string' }, description: 'Default: the latest baseline' }],
+        data: {
+          type: 'object',
+          properties: {
+            baseline: { type: 'object', properties: { id: str, name: str, createdAt: str } },
+            current: { type: 'object', properties: { score: { type: 'integer', description: '0-100' }, band: { type: 'string', enum: ['Strong Alignment', 'Moderate Drift', 'Significant Drift'] }, connectionsAdded: { type: 'integer' }, connectionsRemoved: { type: 'integer' }, changedConnections: { type: 'integer' } } },
+            history: arr({ type: 'object', properties: { date: { type: 'string', example: '2026-10-21', description: 'Asia/Colombo day' }, alignmentScore: { type: 'integer' }, connectionsAdded: { type: 'integer' }, connectionsRemoved: { type: 'integer' }, changedConnections: { type: 'integer' }, driverSignalId: { type: 'string', nullable: true } } }),
+          },
+        },
+        description: 'score = round(100 * |B and C| / |B or C|) over the undirected COMPUTED link sets of the baseline (B) and the current network (C); manual links are excluded; two empty sets score 100. Bands: >= 80 Strong Alignment, 60-79 Moderate Drift, below 60 Significant Drift. history is daily (Asia/Colombo days) from the baseline day to the last change (max 90 days), rebuilt by replaying the NETWORK_UPDATE ledger entries after the baseline; quiet days carry the score forward. driverSignalId is the signal behind the day\'s largest change when at least 2 connections changed. 404 when the project has no baseline.',
+      }),
+    },
+
     '/projects/{projectId}/live-state': { get: op('integration', 'Current requirements with status, role, granularity', { description: INTEGRATION_NOTE }) },
     '/projects/{projectId}/network': {
       get: op('integration', 'Requirements network: nodes, computed links and clusters', {
         data: networkGraph,
-        description: `${INTEGRATION_NOTE} Links are computed from the requirement texts: MiniLM embeddings of title + description, cosine distance, Pathfinder PFNET(r=infinity, q=n-1). Clusters are average-linkage agglomerative clusters on the same distances, cut to k = clamp(round(sqrt(n)), 3, 8) clusters per project (chosen for usability, not tuned; never group_id). If no links are computed yet they are computed first; if the ai-service is down the stored links (possibly empty) are returned with a warning. Manual links are appended unchanged.`,
+        description: `${INTEGRATION_NOTE} Links are computed from the requirement texts: MiniLM embeddings of title + description, cosine distance, Pathfinder PFNET(r=infinity, q=n-1). Clusters are average-linkage agglomerative clusters on the same distances, cut to k = clamp(round(sqrt(n)), 3, 8) clusters per project (chosen for usability, not tuned; never group_id). If no links are computed yet they are computed first; if the ai-service is down the stored links (possibly empty) are returned with a warning. Manual links are appended unchanged. Applied signals refine the network incrementally (evidence, signal profiles; see POST /signals); if such an update could not run because the ai-service was down, the network is marked stale and the next GET /network or POST /network/recompute catches up.`,
       }),
     },
     '/projects/{projectId}/ledger': { get: op('integration', 'Ledger entries (placeholders for now)', { description: INTEGRATION_NOTE, data: arr(ledgerEntry) }) },

@@ -10,6 +10,7 @@ import {
   Blocks,
   Database,
   Network,
+  Flag,
 } from "lucide-react";
 import { Dialog, DialogContent } from "../../../components/ui/dialog";
 import { Badge } from "../../../components/ui/badge";
@@ -19,7 +20,7 @@ import { StatusBadge } from "./StatusBadge";
 import { NetworkUpdateSummary } from "./LedgerTable";
 import { formatDateTime, truncateHash, cn } from "../../../lib/utils";
 
-const EVENT_ICON = { "Manual Link Added": Link2, "Manual Link Removed": Unlink, "Network Updated": Network };
+const EVENT_ICON = { "Manual Link Added": Link2, "Manual Link Removed": Unlink, "Network Updated": Network, "Baseline Created": Flag };
 
 // A transaction's full drill-down: deliberately styled as a distinct
 // "verified record" rather than an ordinary detail sheet: a dark chrome
@@ -37,6 +38,7 @@ export function LedgerTransactionDetailModal({ entry, open, onOpenChange, onSele
   if (!entry) return null;
 
   const isManual = entry.eventCode === "MANUAL_LINK";
+  const isBaseline = entry.eventCode === "BASELINE_CREATED";
   const isNetwork = entry.eventCode === "NETWORK_UPDATE";
   const isCreated = entry.eventCode === "REQUIREMENT_CREATED";
   const EventIcon = EVENT_ICON[entry.eventType];
@@ -80,8 +82,8 @@ export function LedgerTransactionDetailModal({ entry, open, onOpenChange, onSele
             </button>
           </div>
           <div className="relative mt-3">
-            {isManual || isNetwork ? (
-              <Badge variant={isNetwork ? "info" : "ripple"} className="gap-1 text-[10px]">
+            {isManual || isNetwork || isBaseline ? (
+              <Badge variant={isNetwork || isBaseline ? "info" : "ripple"} className="gap-1 text-[10px]">
                 {EventIcon && <EventIcon className="h-3 w-3" />}
                 {entry.eventType}
               </Badge>
@@ -119,7 +121,7 @@ export function LedgerTransactionDetailModal({ entry, open, onOpenChange, onSele
           </dl>
 
           {/* Requirement(s) */}
-          {!isNetwork && (
+          {!isNetwork && !isBaseline && (
           <div>
             <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               {isManual ? "Requirements Linked" : "Requirement"}
@@ -149,7 +151,23 @@ export function LedgerTransactionDetailModal({ entry, open, onOpenChange, onSele
           )}
 
           {/* Status transition, or the manual / network event + who/reason */}
-          {isNetwork ? (
+          {isBaseline ? (
+            <div>
+              <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Baseline</p>
+              <div className="flex items-center gap-2">
+                <Badge variant="info" className="gap-1">
+                  <Flag className="h-3.5 w-3.5" />
+                  {entry.eventType}
+                </Badge>
+                {entry.actor && <span className="text-xs text-muted-foreground">by {entry.actor}</span>}
+              </div>
+              <div className="mt-3 rounded-lg border border-border bg-muted/20 p-3.5 text-sm">
+                <span className="font-semibold text-foreground">{entry.details?.name ?? "(unnamed)"}</span>
+                {entry.details?.baselineId && <span className="ml-2 font-mono text-xs text-muted-foreground">{entry.details.baselineId}</span>}
+                <p className="mt-1 text-xs text-muted-foreground">The requirement network and requirement statuses were frozen. Alignment is measured against the latest baseline.</p>
+              </div>
+            </div>
+          ) : isNetwork ? (
             <div>
               <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Requirement network changes</p>
               <div className="flex items-center gap-2">
@@ -159,7 +177,13 @@ export function LedgerTransactionDetailModal({ entry, open, onOpenChange, onSele
                 </Badge>
                 {entry.actor && <span className="text-xs text-muted-foreground">by {entry.actor}</span>}
               </div>
-              {entry.requirementId && (
+              {entry.triggeringSignalId && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Triggered by signal <span className="font-mono text-primary">{entry.triggeringSignalId}</span>
+                  {entry.requirementId ? <> applied to <span className="font-mono text-primary">{entry.requirementId}</span></> : null}.
+                </p>
+              )}
+              {!entry.triggeringSignalId && entry.requirementId && (
                 <p className="mt-2 text-xs text-muted-foreground">
                   Triggered by a change to <span className="font-mono text-primary">{entry.requirementId}</span>
                   {entry.requirementTitle ? ` (${entry.requirementTitle})` : ""}.
@@ -198,7 +222,7 @@ export function LedgerTransactionDetailModal({ entry, open, onOpenChange, onSele
           )}
 
           {/* Triggering signal (Status Change) / reason (Manual Link) */}
-          {!isNetwork && (
+          {!isNetwork && !isBaseline && (
           <div>
             <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               {isManual ? "Reason" : isCreated ? "Source" : "Triggering Signal"}

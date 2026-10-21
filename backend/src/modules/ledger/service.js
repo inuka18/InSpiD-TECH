@@ -11,7 +11,7 @@ const codeOf = (e) => {
   const legacy = LEGACY_EVENT_TYPES[e.eventType];
   return { eventType: legacy ? legacy.eventType : e.eventType, linkAction: legacy?.linkAction ?? e.linkAction ?? null };
 };
-const DISPLAY = { STATUS_CHANGE: 'Status Change', REQUIREMENT_CREATED: 'Requirement Created', NETWORK_UPDATE: 'Network Updated' };
+const DISPLAY = { STATUS_CHANGE: 'Status Change', REQUIREMENT_CREATED: 'Requirement Created', NETWORK_UPDATE: 'Network Updated', BASELINE_CREATED: 'Baseline Created' };
 // The frontend branches on these strings, so `eventType` in the API keeps them; `eventCode` carries the code.
 const displayType = (e) => {
   const { eventType, linkAction } = codeOf(e);
@@ -54,6 +54,17 @@ function networkDetails(e) {
   }
 }
 
+// BASELINE_CREATED keeps { baselineId, name } in triggeringSignal as JSON (covered by the hash), like NETWORK_UPDATE.
+function baselineDetails(e) {
+  if (codeOf(e).eventType !== 'BASELINE_CREATED') return undefined;
+  try {
+    const d = JSON.parse(e.triggeringSignal);
+    return { baselineId: d.baselineId ?? null, name: d.name ?? null };
+  } catch {
+    return { baselineId: null, name: null };
+  }
+}
+
 // Shape follows the frontend mockLedger rows.
 const toApi = (e) => ({
   txHash: e.txHash,
@@ -75,6 +86,7 @@ const toApi = (e) => ({
   onChain: e.onChain === true,
   isPlaceholder: e.isPlaceholder, // true until real blockchain writes replace this
   ...(codeOf(e).eventType === 'NETWORK_UPDATE' ? { details: networkDetails(e) } : {}),
+  ...(codeOf(e).eventType === 'BASELINE_CREATED' ? { details: baselineDetails(e) } : {}),
 });
 
 const listForProject = async (projectId) =>
@@ -86,7 +98,7 @@ const listForRequirement = async (projectId, reqId) =>
 /**
  * THE ONLY function that appends to the ledger. Append-only. A real blockchain provider replaces the body
  * of this function later (same input, same return shape).
- * entry: { projectId, eventType (STATUS_CHANGE | REQUIREMENT_CREATED | MANUAL_LINK), linkAction?, reqId, requirementTitle,
+ * entry: { projectId, eventType (STATUS_CHANGE | REQUIREMENT_CREATED | MANUAL_LINK | NETWORK_UPDATE | BASELINE_CREATED), linkAction?, reqId, requirementTitle,
  *          relatedReqId?, relatedRequirementTitle?, previousStatus, newStatus, triggeringSignal, triggeringSignalId, actor, timestamp? }
  */
 async function appendLedgerEntry(entry, { createdVia = 'api' } = {}) {

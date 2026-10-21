@@ -111,3 +111,38 @@ Cutoff 0.6 (highest mean ARI over all four projects, 0.214).
 - **Groups vs text:** Pathfinder on a complete graph yields about n - 1 edges, i.e. a spanning structure, so it cannot connect every group internally. Only 21.4% of the ground-truth groups are connected inside the group.
 - **Clusters:** the app's k-based clustering gives 22 clusters over 114 requirements (average size 5.2) with mean ARI 0.113 and NMI 0.409. The old cutoff version gave 52 clusters (average size 2.2) with in-sample ARI 0.214 and leave-one-project-out ARI 0.191. Compare ARI/NMI only as agreement with the key: fewer, bigger clusters can raise or lower them for reasons unrelated to usefulness, and the differences are small relative to the noise of 4 projects.
 - **Why the key may be a poor yardstick:** `group_id` is the scenario author's business grouping, not a similarity-by-wording grouping. In SYS-RET, for example, the group "Customer Accounts" contains Social account sign-in, Returns and refunds, and Wishlist. A text-based network cannot be expected to reproduce such groups, so these scores measure agreement with the key, not the usefulness of the network.
+
+## 6. Signal-informed network (replay of scenario signals)
+
+Question: does feeding the communication signals into the network (evidence rows, signal profiles, combined similarity) move the network closer to the key than the requirement texts alone? The scenario **train** and **val** signals of every project are replayed offline and in memory (nothing is written to the database): each is classified and matched with the ai-service and decided with the app's own review policy and status engine, so only signals the app would auto-apply count. For those, the same evidence extraction (id mentions, co-reference), signal profile (moving average) and combined similarity as in the app are used. "Text only" is the network of section 1-3. Test-split signals are not used.
+
+**Constants.** All constants (`backend/src/modules/network/constants.js`: profile 0.85/0.15 and weight up to 0.35, id-mention boost 0.15 per row capped at 0.30, co-reference boost 0.06 per row capped at 0.20, total boost capped at 0.35, co-reference threshold 0.40 and gap 0.10) are **a-priori choices by evidence strength (an explicit id mention is stronger evidence than an inferred co-reference). They were not tuned on `group_id` or on this evaluation, and must not be changed after reading it.**
+
+**Caveats.** (1) The classifier was trained on the scenario train split, so its confidence on train signals is optimistic and more of them pass the 90% auto-accept threshold than fresh messages would; the val-only view is the less biased one (val was used to choose the model, not to train it). (2) The scenario messages never contain requirement ids, so the id-mention path is exercised only by the app tests and the demo, not here; only profiles and co-reference can act in this replay. (3) The pipeline's match is sometimes wrong, and a wrong match puts the message into the wrong profile; that is part of what is measured.
+
+### 6a. train + val signals
+
+| Project | Signals replayed | Applied (would be auto-accepted) | Evidence rows (id mention / co-reference) | hit@1 text -> signal | hit@3 text -> signal | Edge precision text -> signal | Links vs text-only |
+|---|---|---|---|---|---|---|---|
+| SYS-HMS | 431 | 347 | 0 / 60 | 46.2% -> 50.0% | 80.8% -> 92.3% | 56.0% -> 64.0% | +7 / -7 |
+| SYS-MBA | 551 | 416 | 0 / 51 | 35.3% -> 44.1% | 58.8% -> 67.6% | 36.4% -> 39.4% | +5 / -5 |
+| SYS-RET | 499 | 403 | 0 / 26 | 54.8% -> 54.8% | 77.4% -> 77.4% | 53.3% -> 46.7% | +8 / -8 |
+| SYS-ULP | 383 | 296 | 0 / 25 | 39.1% -> 43.5% | 69.6% -> 56.5% | 45.5% -> 50.0% | +9 / -9 |
+| **Overall** | 1864 | 1462 | 0 / 162 | 43.9% -> 48.2% | 71.1% -> 73.7% | 47.3% -> 49.1% | +29 / -29 |
+
+### 6b. val signals only
+
+| Project | Signals replayed | Applied (would be auto-accepted) | Evidence rows (id mention / co-reference) | hit@1 text -> signal | hit@3 text -> signal | Edge precision text -> signal | Links vs text-only |
+|---|---|---|---|---|---|---|---|
+| SYS-HMS | 85 | 65 | 0 / 12 | 46.2% -> 46.2% | 80.8% -> 80.8% | 56.0% -> 56.0% | +0 / -0 |
+| SYS-MBA | 101 | 68 | 0 / 5 | 35.3% -> 32.4% | 58.8% -> 58.8% | 36.4% -> 36.4% | +0 / -0 |
+| SYS-RET | 97 | 79 | 0 / 6 | 54.8% -> 54.8% | 77.4% -> 77.4% | 53.3% -> 53.3% | +1 / -1 |
+| SYS-ULP | 55 | 40 | 0 / 1 | 39.1% -> 43.5% | 69.6% -> 69.6% | 45.5% -> 50.0% | +1 / -1 |
+| **Overall** | 338 | 252 | 0 / 24 | 43.9% -> 43.9% | 71.1% -> 71.1% | 47.3% -> 48.2% | +2 / -2 |
+
+### Verdict
+
+- **train + val signals:** signals help. Overall change (points): hit@1 +4.4, hit@3 +2.6, edge precision +1.8; 29 links added and 29 removed against the text-only network (110 links). Not consistent across projects: 2 of 4 improved on all three measures and 2 got worse on at least one.
+- **val signals only (the less biased view):** no clear difference (every change is under 3 points, which is inside the noise). Overall change (points): hit@1 +0.0, hit@3 +0.0, edge precision +0.9; 2 links added and 2 removed. 1 of 4 projects improved on all three measures and 1 got worse on at least one.
+- **Bottom line:** on the less biased val-only replay the signals make no clear difference to agreement with the key; the small gain in the train + val view is not consistent across projects and is probably helped by the optimistic classifier confidence on train signals, so it should not be read as proof that signals improve the network. This replay can only use profiles and co-reference (the scenario messages contain no requirement ids), which are the weak parts of the design; the id-mention path is demonstrated in docs/demo_signal_network.md instead.
+- With 4 projects and 114 requirements a change under about 3 points cannot be told from noise, and the key (`group_id`) is the author's business grouping rather than a wording-based one (see above), so even a real improvement in how well the network follows the conversations might not show up against it. This section measures agreement with the key only.

@@ -6,9 +6,11 @@ import { Skeleton } from "../../components/ui/skeleton";
 import { useNetwork } from "../../hooks/useNetwork";
 import { useManualLinks } from "../../hooks/useManualLinks";
 import { useSignals } from "../../hooks/useSignals";
+import { useAlignment } from "../../hooks/useAlignment";
 import { useActiveProject } from "../../hooks/useActiveProject";
 import { useRole, ROLES } from "../../context/RoleContext";
 import { createManualLink, deleteManualLink } from "../../services/manualLinksService";
+import { createBaseline } from "../../services/alignmentService";
 
 export function NetworkMapPage() {
   const { activeProjectId } = useActiveProject();
@@ -19,6 +21,8 @@ export function NetworkMapPage() {
   const { data: manualLinks, setData: setManualLinks, loading: linksLoading } = useManualLinks(activeProjectId);
   // Signals are only used for the per-requirement signal counts in the link details panel.
   const { data: signals } = useSignals(activeProjectId);
+  // Baseline strip: "Baseline: <name>, frozen <date> | Alignment <score>% (<band>)".
+  const { data: alignment, loading: alignmentLoading, reload: reloadAlignment } = useAlignment(activeProjectId);
   const navigate = useNavigate();
 
   const handleCreateManualLink = async ({ sourceId, targetId, reason }) => {
@@ -31,6 +35,12 @@ export function NetworkMapPage() {
     });
     setManualLinks((prev) => [...prev, link]);
     return link;
+  };
+
+  // PM only. Freezes the current network; the score returns to 100% against the new baseline.
+  const handleFreezeBaseline = async (name) => {
+    await createBaseline(activeProjectId, name);
+    reloadAlignment();
   };
 
   const handleRemoveManualLink = async (link) => {
@@ -84,6 +94,9 @@ export function NetworkMapPage() {
       manualLinks={manualLinks}
       onCreateManualLink={handleCreateManualLink}
       onRemoveManualLink={handleRemoveManualLink}
+      alignment={alignment}
+      alignmentLoading={alignmentLoading}
+      onFreezeBaseline={handleFreezeBaseline}
     />
   );
 }

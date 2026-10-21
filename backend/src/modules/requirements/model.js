@@ -4,6 +4,12 @@ const mongoose = require('mongoose');
 const STATUSES = ['Confirmed', 'At Risk', 'Modified', 'Dropped'];
 const GRANULARITIES = ['Daily Task', 'Weekly Workload', 'Sprint Commitment'];
 
+// Signal profile: moving average of the embeddings of the signals applied to a requirement (see network/profile.js).
+const signalProfileSchema = new mongoose.Schema(
+  { vector: { type: [Number], default: [] }, count: { type: Number, default: 0 }, updatedAt: { type: Date } },
+  { _id: false }
+);
+
 const requirementSchema = new mongoose.Schema(
   {
     projectId: { type: String, required: true, index: true },
@@ -16,6 +22,7 @@ const requirementSchema = new mongoose.Schema(
     clusterLabel: { type: String, default: null }, // e.g. "Cluster 2 (payments, wallet)"
     embedding: { type: [Number], select: false }, // MiniLM vector of title + description (cache for the network)
     embeddingTextHash: { type: String, default: null }, // sha1 of the text the embedding was computed from
+    signalProfile: { type: signalProfileSchema, select: false, default: undefined }, // hidden like the embedding; null until a signal is applied
     granularity: { type: String, enum: GRANULARITIES },
     initialStatus: { type: String, enum: STATUSES, default: 'Confirmed' },
     finalStatus: { type: String, enum: STATUSES }, // from the CSV, kept for evaluating the status engine

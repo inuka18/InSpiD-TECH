@@ -3,7 +3,9 @@
 // Uses the SAME pathfinder.js / clustering.js the app runs. Read-only. Needs the ai-service (/embed).
 // Writes docs/network_evaluation.md and .json (DOCS_DIR, default /docs).
 //
-// Nothing is tuned on the ground truth EXCEPT the clustering distance cutoff (see the report).
+// Nothing is tuned on the ground truth EXCEPT the old clustering distance cutoff (see the report).
+// Section 6 replays the scenario train + val signals offline and in memory (no database writes) through the evidence and
+// signal-profile code and compares the text-only network with the signal-informed one.
 const fs = require('fs');
 const path = require('path');
 const mongoose = require('mongoose');
@@ -13,6 +15,8 @@ const aiClient = require('../shared/aiClient');
 const { Project } = require('../modules/projects/model');
 const { Requirement } = require('../modules/requirements/model');
 const { NetworkGroundTruth } = require('../modules/network/model');
+const { Signal } = require('../modules/signals/model');
+const { analyseSignals, replay, signalMatrix } = require('./signalReplay');
 const { pathfinder, cosineMatrix, distanceMatrix } = require('../modules/network/pathfinder');
 const { agglomerate, agglomerateToK, targetClusterCount, DEFAULT_CUTOFF } = require('../modules/network/clustering');
 const M = require('../modules/network/metrics');
@@ -47,7 +51,8 @@ function bestCutoff(projects) {
     const sim = cosineMatrix(emb.vectors);
     const tfSim = cosineMatrix(M.tfidfVectors(reqs.map(textOf)));
     const deps = new Set(gt.filter((g) => g.relationType === 'dependency').map((g) => `${Math.min(idx.get(g.reqA), idx.get(g.reqB))}~${Math.max(idx.get(g.reqA), idx.get(g.reqB))}`));
-    data.push({ projectId: pd.projectId, n: reqs.length, groups: reqs.map((r) => r.groupId), sim, tfSim, dist: distanceMatrix(sim), deps });
+    const signals = await Signal.find({ projectId: pd.projectId, split: { $in: ['train', 'val'] } }).sort({ timestamp: 1, signalId: 1 }).lean();
+    data.push({ projectId: pd.projectId, n: reqs.length, groups: reqs.map((r) => r.groupId), sim, tfSim, dist: distanceMatrix(sim), deps, reqs, vectors: emb.vectors, signals });
   }
   if (!data.length) throw new Error('No projects with requirements found; run npm run seed first.');
 
@@ -121,8 +126,58 @@ function bestCutoff(projects) {
     },
   };
 
+  // ---- signal-informed network: replay train + val signals (and, as a second view, val only) through the app's own logic
+  const metricsOf = (p, sim) => {
+    const edges = pathfinder(distanceMatrix(sim));
+    const nn = M.hitAtK(sim, p.groups, [1, 3]);
+    return { counted: nn.counted, hit1: nn.hits[1], hit3: nn.hits[3], edges: edges.length, goodEdges: Math.round(M.edgePrecision(edges, p.groups, p.deps) * edges.length), edgeKeys: new Set(edges.map(([i, j]) => `${p.reqs[i].reqId}~${p.reqs[j].reqId}`)) };
+  };
+  const views = [{ key: 'trainVal', label: 'train + val signals', include: () => true }, { key: 'valOnly', label: 'val signals only', include: (s) => s.split === 'val' }];
+  const signalEval = { views: {} };
+  for (const v of views) signalEval.views[v.key] = { label: v.label, perProject: [] };
+  for (const p of data) {
+    const analysis = await analyseSignals(p.reqs, p.signals);
+    const text = metricsOf(p, p.sim);
+    for (const v of views) {
+      const rep = await replay({ reqs: p.reqs, signals: p.signals, analysis, include: v.include });
+      const sig = metricsOf(p, signalMatrix(p.reqs, p.vectors, rep));
+      const changed = [...sig.edgeKeys].filter((k) => !text.edgeKeys.has(k)).length;
+      signalEval.views[v.key].perProject.push({
+        projectId: p.projectId, signals: p.signals.filter(v.include).length, considered: rep.considered, applied: rep.applied, idmentionRows: rep.idmention, corefRows: rep.coref,
+        requirementsWithProfile: rep.profiles.size, linksAdded: changed, linksRemoved: [...text.edgeKeys].filter((k) => !sig.edgeKeys.has(k)).length,
+        text: { counted: text.counted, hit1: text.hit1, hit3: text.hit3, edges: text.edges, goodEdges: text.goodEdges },
+        signal: { counted: sig.counted, hit1: sig.hit1, hit3: sig.hit3, edges: sig.edges, goodEdges: sig.goodEdges },
+      });
+    }
+  }
+  const totals = (list) => {
+    const t = (f) => list.reduce((s, r) => s + f(r), 0);
+    return {
+      signals: t((r) => r.signals), applied: t((r) => r.applied), idmentionRows: t((r) => r.idmentionRows), corefRows: t((r) => r.corefRows),
+      linksAdded: t((r) => r.linksAdded), linksRemoved: t((r) => r.linksRemoved),
+      text: { counted: t((r) => r.text.counted), hit1: t((r) => r.text.hit1), hit3: t((r) => r.text.hit3), edges: t((r) => r.text.edges), goodEdges: t((r) => r.text.goodEdges) },
+      signal: { counted: t((r) => r.signal.counted), hit1: t((r) => r.signal.hit1), hit3: t((r) => r.signal.hit3), edges: t((r) => r.signal.edges), goodEdges: t((r) => r.signal.goodEdges) },
+    };
+  };
+  for (const v of views) signalEval.views[v.key].overall = totals(signalEval.views[v.key].perProject);
+  // verdict in percentage points; differences under 3 points are inside the noise of ~114 requirements
+  const verdictOf = (o) => {
+    const d = [100 * (o.signal.hit1 - o.text.hit1) / o.text.counted, 100 * (o.signal.hit3 - o.text.hit3) / o.text.counted, 100 * (o.signal.goodEdges / o.signal.edges - o.text.goodEdges / o.text.edges)];
+    const big = d.some((x) => Math.abs(x) >= 3);
+    if (!big) return { deltas: d, verdict: 'no clear difference (every change is under 3 points, which is inside the noise)' };
+    if (d.every((x) => x >= -1)) return { deltas: d, verdict: 'signals help' };
+    if (d.every((x) => x <= 1)) return { deltas: d, verdict: 'signals hurt' };
+    return { deltas: d, verdict: 'mixed (some measures up, some down)' };
+  };
+  // how many projects improved on all three measures / got worse on at least one (consistency matters more than one overall number)
+  const perProjectDirection = (list) => {
+    const d = list.map((r) => [r.signal.hit1 - r.text.hit1, r.signal.hit3 - r.text.hit3, r.signal.goodEdges / r.signal.edges - r.text.goodEdges / r.text.edges]);
+    return { improved: d.filter((x) => x.every((y) => y >= -1e-9) && x.some((y) => y > 1e-9)).length, worse: d.filter((x) => x.some((y) => y < -1e-9)).length, projects: list.length };
+  };
+  for (const v of views) Object.assign(signalEval.views[v.key], { verdict: verdictOf(signalEval.views[v.key].overall), direction: perProjectDirection(signalEval.views[v.key].perProject) });
+
   const result = { generatedAt: new Date().toISOString(), database: config.mongoDbName, embeddingModel: 'sentence-transformers/all-MiniLM-L6-v2',
-    clustering: { usedByApp: 'k-based', rule: 'k = clamp(round(sqrt(n)), 3, 8)' }, kBased: kRows, cutoffConstantKeptForComparison: DEFAULT_CUTOFF, cutoffInSample: { cutoff: inSample.cutoff, meanAri: inSample.ari, sweep: inSample.sweep }, lopo, inSampleRows, perProject: rows, overall };
+    clustering: { usedByApp: 'k-based', rule: 'k = clamp(round(sqrt(n)), 3, 8)' }, kBased: kRows, cutoffConstantKeptForComparison: DEFAULT_CUTOFF, cutoffInSample: { cutoff: inSample.cutoff, meanAri: inSample.ari, sweep: inSample.sweep }, lopo, inSampleRows, perProject: rows, overall, signalInformed: signalEval };
 
   // ---- report
   const L = ['# Requirements network evaluation', '',
@@ -178,6 +233,28 @@ function bestCutoff(projects) {
     `- **Groups vs text:** Pathfinder on a complete graph yields about n - 1 edges, i.e. a spanning structure, so it cannot connect every group internally. Only ${pct(overall.insideConnected / overall.groups)} of the ground-truth groups are connected inside the group.`,
     `- **Clusters:** the app's k-based clustering gives ${overall.clusterSummary.kBased.clusters} clusters over ${overall.nodes} requirements (average size ${overall.clusterSummary.kBased.avgSize.toFixed(1)}) with mean ARI ${f3(overall.kBased.ari)} and NMI ${f3(overall.kBased.nmi)}. The old cutoff version gave ${overall.clusterSummary.cutoffInSample.clusters} clusters (average size ${overall.clusterSummary.cutoffInSample.avgSize.toFixed(1)}) with in-sample ARI ${f3(overall.inSample.ari)} and leave-one-project-out ARI ${f3(overall.lopo.ari)}. Compare ARI/NMI only as agreement with the key: fewer, bigger clusters can raise or lower them for reasons unrelated to usefulness, and the differences are small relative to the noise of 4 projects.`,
     '- **Why the key may be a poor yardstick:** `group_id` is the scenario author\'s business grouping, not a similarity-by-wording grouping. In SYS-RET, for example, the group "Customer Accounts" contains Social account sign-in, Returns and refunds, and Wishlist. A text-based network cannot be expected to reproduce such groups, so these scores measure agreement with the key, not the usefulness of the network.', ''];
+  // ---- section 6
+  const sigTable = (key) => {
+    const v = signalEval.views[key];
+    const cell = (a, b, n) => `${pct(a / n)} -> ${pct(b / n)}`;
+    const line = (name, r) => `| ${name} | ${r.signals} | ${r.applied} | ${r.idmentionRows} / ${r.corefRows} | ${cell(r.text.hit1, r.signal.hit1, r.text.counted)} | ${cell(r.text.hit3, r.signal.hit3, r.text.counted)} | ${pct(r.text.goodEdges / r.text.edges)} -> ${pct(r.signal.goodEdges / r.signal.edges)} | +${r.linksAdded} / -${r.linksRemoved} |`;
+    return ['| Project | Signals replayed | Applied (would be auto-accepted) | Evidence rows (id mention / co-reference) | hit@1 text -> signal | hit@3 text -> signal | Edge precision text -> signal | Links vs text-only |', '|---|---|---|---|---|---|---|---|',
+      ...v.perProject.map((r) => line(r.projectId, r)), line('**Overall**', v.overall)];
+  };
+  const pp = (x) => `${x >= 0 ? '+' : ''}${x.toFixed(1)}`;
+  const tv = signalEval.views.trainVal;
+  const vo = signalEval.views.valOnly;
+  L.push('## 6. Signal-informed network (replay of scenario signals)', '',
+    'Question: does feeding the communication signals into the network (evidence rows, signal profiles, combined similarity) move the network closer to the key than the requirement texts alone? The scenario **train** and **val** signals of every project are replayed offline and in memory (nothing is written to the database): each is classified and matched with the ai-service and decided with the app\'s own review policy and status engine, so only signals the app would auto-apply count. For those, the same evidence extraction (id mentions, co-reference), signal profile (moving average) and combined similarity as in the app are used. "Text only" is the network of section 1-3. Test-split signals are not used.', '',
+    '**Constants.** All constants (`backend/src/modules/network/constants.js`: profile 0.85/0.15 and weight up to 0.35, id-mention boost 0.15 per row capped at 0.30, co-reference boost 0.06 per row capped at 0.20, total boost capped at 0.35, co-reference threshold 0.40 and gap 0.10) are **a-priori choices by evidence strength (an explicit id mention is stronger evidence than an inferred co-reference). They were not tuned on `group_id` or on this evaluation, and must not be changed after reading it.**', '',
+    '**Caveats.** (1) The classifier was trained on the scenario train split, so its confidence on train signals is optimistic and more of them pass the 90% auto-accept threshold than fresh messages would; the val-only view is the less biased one (val was used to choose the model, not to train it). (2) The scenario messages never contain requirement ids, so the id-mention path is exercised only by the app tests and the demo, not here; only profiles and co-reference can act in this replay. (3) The pipeline\'s match is sometimes wrong, and a wrong match puts the message into the wrong profile; that is part of what is measured.', '',
+    `### 6a. ${tv.label}`, '', ...sigTable('trainVal'), '',
+    `### 6b. ${vo.label}`, '', ...sigTable('valOnly'), '',
+    '### Verdict', '',
+    `- **${tv.label}:** ${tv.verdict.verdict}. Overall change (points): hit@1 ${pp(tv.verdict.deltas[0])}, hit@3 ${pp(tv.verdict.deltas[1])}, edge precision ${pp(tv.verdict.deltas[2])}; ${tv.overall.linksAdded} links added and ${tv.overall.linksRemoved} removed against the text-only network (${tv.overall.text.edges} links). Not consistent across projects: ${tv.direction.improved} of ${tv.direction.projects} improved on all three measures and ${tv.direction.worse} got worse on at least one.`,
+    `- **${vo.label} (the less biased view):** ${vo.verdict.verdict}. Overall change (points): hit@1 ${pp(vo.verdict.deltas[0])}, hit@3 ${pp(vo.verdict.deltas[1])}, edge precision ${pp(vo.verdict.deltas[2])}; ${vo.overall.linksAdded} links added and ${vo.overall.linksRemoved} removed. ${vo.direction.improved} of ${vo.direction.projects} projects improved on all three measures and ${vo.direction.worse} got worse on at least one.`,
+    `- **Bottom line:** ${vo.verdict.verdict.startsWith('no clear difference') ? 'on the less biased val-only replay the signals make no clear difference to agreement with the key' + (tv.verdict.verdict === 'signals help' ? '; the small gain in the train + val view is not consistent across projects and is probably helped by the optimistic classifier confidence on train signals, so it should not be read as proof that signals improve the network' : '') : vo.verdict.verdict}. This replay can only use profiles and co-reference (the scenario messages contain no requirement ids), which are the weak parts of the design; the id-mention path is demonstrated in docs/demo_signal_network.md instead.`,
+    '- With 4 projects and 114 requirements a change under about 3 points cannot be told from noise, and the key (`group_id`) is the author\'s business grouping rather than a wording-based one (see above), so even a real improvement in how well the network follows the conversations might not show up against it. This section measures agreement with the key only.', '');
   fs.mkdirSync(DOCS_DIR, { recursive: true });
   fs.writeFileSync(path.join(DOCS_DIR, 'network_evaluation.md'), L.join('\n'), 'utf8');
   fs.writeFileSync(path.join(DOCS_DIR, 'network_evaluation.json'), JSON.stringify(result, null, 2), 'utf8');

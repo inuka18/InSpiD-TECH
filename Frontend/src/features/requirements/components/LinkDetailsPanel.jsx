@@ -6,11 +6,82 @@ import { Button } from "../../../components/ui/button";
 import { Separator } from "../../../components/ui/separator";
 import { StatusBadge } from "./StatusBadge";
 import { useRequirement } from "../../../hooks/useRequirements";
+import { useLinkEvidence } from "../../../hooks/useLinkEvidence";
+import { ClassificationBadge } from "./ClassificationBadge";
 import { clusterMeta } from "../../../lib/clusters";
 import { linkRank, networkWeightStats, rankPhrase, sharedTerms } from "../../../lib/networkStats";
 import { formatDateTime } from "../../../lib/utils";
 
 const pct = (w) => Math.round(w * 100);
+
+// "Where this link comes from": the link strength split into its three parts (they add up to the strength).
+function Contributions({ contributions, weight }) {
+  const parts = [
+    { key: "text", label: "Requirement text", hint: "How alike the two requirement texts are (MiniLM).", value: contributions.text, bar: "bg-primary" },
+    { key: "profile", label: "Signal profile", hint: "How alike the messages applied to each requirement are (only once both have signals).", value: contributions.profile, bar: "bg-status-modified-fg" },
+    { key: "boost", label: "Co-reference and id mentions", hint: "Signals that name both requirements by id, or matched both about equally well.", value: contributions.boost, bar: "bg-status-confirmed-fg" },
+  ];
+  return (
+    <div className="space-y-2.5">
+      <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-muted" role="img" aria-label={`Link strength ${pct(weight)} percent`}>
+        {parts.map((p) => (p.value > 0 ? <div key={p.key} className={p.bar} style={{ width: `${Math.max(p.value * 100, 0.5)}%` }} /> : null))}
+      </div>
+      <ul className="space-y-1.5">
+        {parts.map((p) => (
+          <li key={p.key} className="flex items-start gap-2 text-sm">
+            <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${p.bar}`} />
+            <span className="flex-1">
+              <span className="font-medium text-foreground">{p.label}</span>
+              <span className="block text-xs text-muted-foreground">{p.hint}</span>
+            </span>
+            <span className="font-mono text-sm font-semibold text-foreground">{p.value > 0 ? `+${pct(p.value)}` : "0"}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+const KIND_LABEL = { idmention: "Names both requirements", coref: "Matched both about equally" };
+
+// "Signal evidence": the signals that gave evidence for this pair, newest first (up to 20), from the evidence endpoint.
+function SignalEvidence({ evidence, loading, error }) {
+  if (loading) return <p className="text-sm text-muted-foreground">Loading signal evidence…</p>;
+  if (error) return <p className="text-sm text-status-dropped-fg">Could not load the signal evidence: {error.message}</p>;
+  if (!evidence || evidence.signals.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        No signal has given evidence for this link yet. Its strength comes from the requirement texts
+        {evidence?.contributions?.profile > 0 ? " and the signal profiles" : ""}.
+      </p>
+    );
+  }
+  return (
+    <ul className="space-y-2.5">
+      {evidence.signals.map((s) => (
+        <li key={s.signalId} className="rounded-lg border border-border p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-mono text-xs font-medium text-primary">{s.signalId}</span>
+              <Badge variant="outline" className="text-[10px]">
+                {KIND_LABEL[s.kind] ?? s.kind}
+              </Badge>
+            </div>
+            {s.label && <ClassificationBadge classification={s.label} />}
+          </div>
+          <p className="mt-2 text-sm leading-relaxed text-foreground/90">"{s.text}"</p>
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            {s.authorRole} · {s.source} · {formatDateTime(s.timestamp)}
+            {s.similarityA != null && s.similarityB != null ? ` · match ${pct(s.similarityA)}% / ${pct(s.similarityB)}%` : ""}
+          </p>
+        </li>
+      ))}
+      {evidence.evidenceCount > evidence.signals.length && (
+        <li className="text-xs text-muted-foreground">Showing the newest {evidence.signals.length} of {evidence.evidenceCount}.</li>
+      )}
+    </ul>
+  );
+}
 
 function Endpoint({ node, signalCount, onOpen }) {
   const cluster = clusterMeta(node);
@@ -70,6 +141,7 @@ export function LinkDetailsPanel({
   const signalCount = (id) => signals.filter((s) => s.mappedRequirementId === id).length;
 
   const isManual = link?.kind === "manual";
+  const { data: evidence, loading: evidenceLoading, error: evidenceError } = useLinkEvidence(projectId, link && !isManual && open ? link.id : null);
   const rankA = link && !isManual ? rankPhrase(link.source, linkRank(link, link.source, links)) : null;
   const rankB = link && !isManual ? rankPhrase(link.target, linkRank(link, link.target, links)) : null;
   const sameCluster = a && b ? clusterMeta(a).id === clusterMeta(b).id : false;
@@ -148,11 +220,11 @@ export function LinkDetailsPanel({
                 </section>
               ) : (
                 <section className="space-y-3">
-                  <h4 className="text-sm font-semibold text-foreground">Similarity</h4>
+                  <h4 className="text-sm font-semibold text-foreground">Link strength</h4>
                   <p className="text-3xl font-bold leading-none text-foreground">{link.weight != null ? `${pct(link.weight)}%` : "–"}</p>
                   {stats && (
                     <p className="text-xs text-muted-foreground">
-                      Text similarity score (not a probability). Links in this network range from {pct(stats.min)}% to {pct(stats.max)}%.
+                      Link strength from the requirement texts and the signals (not a probability). Links in this network range from {pct(stats.min)}% to {pct(stats.max)}%.
                     </p>
                   )}
                   {stats && link.weight != null && (
@@ -203,11 +275,23 @@ export function LinkDetailsPanel({
                 <>
                   <Separator className="my-5" />
                   <section>
-                    <h4 className="mb-2 text-sm font-semibold text-foreground">Why this link exists</h4>
-                    <p className="text-sm leading-relaxed text-muted-foreground">
-                      These two requirements are semantically close (MiniLM text similarity), and Pathfinder keeps a link only when no
-                      indirect path joins them through stronger links.
+                    <h4 className="mb-2 text-sm font-semibold text-foreground">Where this link comes from</h4>
+                    {link.contributions ? (
+                      <Contributions contributions={link.contributions} weight={link.weight ?? 0} />
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No breakdown is available for this link.</p>
+                    )}
+                    <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                      Pathfinder keeps a link only when no indirect path joins the two requirements through stronger links.
                     </p>
+                  </section>
+
+                  <Separator className="my-5" />
+                  <section>
+                    <h4 className="mb-2 text-sm font-semibold text-foreground">
+                      Signal evidence{evidence ? ` (${evidence.evidenceCount})` : ""}
+                    </h4>
+                    <SignalEvidence evidence={evidence} loading={evidenceLoading} error={evidenceError} />
                   </section>
                 </>
               )}

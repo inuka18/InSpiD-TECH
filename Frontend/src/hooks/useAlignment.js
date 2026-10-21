@@ -1,15 +1,17 @@
-import { useEffect, useState } from "react";
-import { fetchAlignmentHistory } from "../services/alignmentService";
+import { useCallback, useEffect, useState } from "react";
+import { fetchAlignment } from "../services/alignmentService";
 
-export function useAlignmentHistory(projectId) {
-  const [data, setData] = useState([]);
+// data is null when the project has no baseline yet.
+export function useAlignment(projectId) {
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
+  const reload = useCallback(() => {
     let cancelled = false;
     setLoading(true);
-    fetchAlignmentHistory(projectId)
+    setError(null);
+    fetchAlignment(projectId)
       .then((res) => {
         if (!cancelled) setData(res);
       })
@@ -24,5 +26,7 @@ export function useAlignmentHistory(projectId) {
     };
   }, [projectId]);
 
-  return { data, loading, error };
+  useEffect(() => reload(), [reload]);
+
+  return { data, loading, error, reload };
 }

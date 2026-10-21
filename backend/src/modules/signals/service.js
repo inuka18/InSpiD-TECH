@@ -418,4 +418,5 @@ async function exportFeedbackCsv(projectId) {
   return `${lines.join('\n')}\n`;
 }
 
-module.exports = { list, getOne, create, preview, extract, bulk, review, exportFeedbackCsv, toApi };
+// decideAnalysis / rankedToMatch / candidatesOf / wouldAutoApply are also used by npm run network:evaluate (offline replay).
+module.exports = { list, getOne, create, preview, extract, bulk, review, exportFeedbackCsv, toApi, decideAnalysis, rankedToMatch, candidatesOf, wouldAutoApply };

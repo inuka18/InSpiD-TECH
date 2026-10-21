@@ -161,11 +161,28 @@ proposed requirement shown, reason `low-similarity`). Each signal stores the val
 5. If the ai-service is down: requirement edits still succeed; `GET /network` returns the stored links (empty if none yet) plus a `warning`; `POST /network/recompute` returns 502.
 6. Manual links (PM-authored) live in `manual_links` and are never pruned or changed by a recompute.
 
+### Signals feed the network, baselines and alignment
+
+The network is built **incrementally from communication signals**, not only from requirement text.
+`finalizeSignal()` (`modules/signals/finalize.js`) is the single place where an applied signal is finalised (preview as a dry run, create, bulk, PM review), and the network update lives there:
+
+- **When:** a signal that is *applied* (auto-accepted, or accepted/corrected by a PM), has a label other than None and is not a seeded dataset row. Never for rejected, pending, None or seeded signals, and never for a preview.
+- **Evidence** (`signal_evidence`): one row per signal and requirement pair. `idmention`: the text names requirement ids of this project (`RET-R04`; two or more ids make pairs, one id plus the matched requirement makes a pair). `coref`: the top two match candidates are both >= `COREF_MIN_SIMILARITY` (env, default 0.40) and within 0.10 of each other.
+- **Signal profile** (`requirements.signalProfile`, hidden like the embedding): moving average of the embeddings of the signals applied to the requirement, `profile = normalize(0.85 * profile + 0.15 * embedding)`.
+- **Combined similarity** of a pair: `sim = (1 - w) * textSim + w * profileSim + boost`, capped at 1. `w = 0.35 * min(1, min(count_i, count_j) / 10)` (0 if either has no profile). `boost` = 0.15 per id-mention row (cap 0.30) + 0.06 per co-reference row (cap 0.20), total cap 0.35: an explicit id mention is stronger evidence than an inferred co-reference. All constants are in `modules/network/constants.js`, chosen a priori by evidence strength and **not tuned on `group_id`**.
+- **Update:** Pathfinder is rerun on the combined matrix and diffed against the stored links; only added and removed links are written (kept links are re-weighted silently). If any link was added or removed ONE `NETWORK_UPDATE` ledger entry is appended with the signal as `triggeringSignalId`; if nothing changed there is none. Clusters are not touched (only `POST /network/recompute` recomputes them). A full recompute uses the same combined similarity.
+- **ai-service down:** the signal still succeeds. Its evidence is kept, the network is marked stale (`network_state`, with the ids of the signals whose profile update is still pending) and the next `GET /network` or `POST /network/recompute` catches up.
+- `GET /network` links carry `weight` (the combined similarity), `evidenceCount` and `contributions { text, profile, boost }`; `GET /projects/:projectId/network/links/:linkId/evidence` lists the contributions and up to 20 supporting signals, newest first.
+
+**Baselines and alignment.** A baseline (`baselines`) freezes the computed links and the requirement states. The *Initial baseline* is created automatically (by `npm run network:build` and by the first `GET /network`; idempotent, also under concurrent calls) from the **text-only** network (no evidence, no profiles). A PM can freeze a new one with `POST /projects/:projectId/baselines { name }`. Alignment is how far the current network has drifted from a baseline: `GET /projects/:projectId/alignment?baselineId=` (default: the latest) returns `score = round(100 * |B and C| / |B or C|)` over the undirected computed-link sets (manual links excluded), the band (>= 80 Strong Alignment, 60-79 Moderate Drift, below 60 Significant Drift) and a daily history (Asia/Colombo days, max 90) rebuilt by replaying the `NETWORK_UPDATE` ledger entries written after the baseline. 404 if the project has no baseline. See `docs/demo_signal_network.md` for a worked example and `docs/network_evaluation.md` (section 6) for what the signals do to the network on the scenario data (short version: no clear difference on the less biased replay).
+
+**Ledger note:** `BASELINE_CREATED` and `NETWORK_UPDATE` entries are API-created ledger entries. **`npm run rechain` refuses once any exist** (it only rewrites seed placeholders), so run the rechain, if you need it at all, before `network:build` or re-seed an empty database.
+
 `scenario_related_pairs.csv` is the **answer key**, stored in `network_ground_truth` and used only by `npm run network:evaluate`; it is never returned as links. Re-running `npm run seed` moves the old pair rows out of `requirement_links` into it.
 
 ```
 npm run network:build       # compute links + clusters for EVERY project (needs the ai-service); run it once after `npm run seed`
-npm run network:evaluate    # writes docs/network_evaluation.md/.json (read-only)
+npm run network:evaluate    # writes docs/network_evaluation.md/.json (read-only; section 6 replays the scenario signals in memory)
 POST /api/v1/projects/:projectId/network/recompute    # PM only: full recompute
 ```
 
@@ -178,13 +195,13 @@ The `ledger_entries` are **placeholders, not blockchain transactions** (`onChain
 All appends go through one function, `appendLedgerEntry()` in `modules/ledger/service.js`, which a real blockchain provider replaces later.
 Each entry has a sequential `blockNumber` per project, `previousBlockHash`, and
 `txHash = sha256(canonical JSON of the entry fields + previousBlockHash)`. Event types are stored as `STATUS_CHANGE`,
-`REQUIREMENT_CREATED`, `MANUAL_LINK` (+ `linkAction`); the API keeps the old display string in `eventType` (the frontend uses it)
+`REQUIREMENT_CREATED`, `MANUAL_LINK` (+ `linkAction`), `NETWORK_UPDATE` and `BASELINE_CREATED` (display "Baseline Created", `details: { baselineId, name }`); the API keeps the old display string in `eventType` (the frontend uses it)
 and adds `eventCode`.
 
 - `GET /api/v1/projects/:projectId/ledger/verify` recomputes the chain: `{ valid, entries, brokenAt }`.
 - The seed builds the ledger from the status changes in `scenario_status_history.csv`, and builds a valid chain on a **fresh** ledger.
 - `npm run rechain` rebuilds the chain for older seed entries (their old hashes did not include `previousBlockHash`). It only
-  rewrites seed placeholders and **refuses** (changing nothing) if any entry is on-chain, was created through the API, or is not a seed entry.
+  rewrites seed placeholders and **refuses** (changing nothing) if any entry is on-chain, was created through the API (this includes every `NETWORK_UPDATE` and `BASELINE_CREATED` entry), or is not a seed entry.
 
 ## Tests (never against the Atlas demo data)
 

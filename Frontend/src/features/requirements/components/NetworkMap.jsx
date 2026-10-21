@@ -20,6 +20,7 @@ import { LinkDetailsPanel } from "./LinkDetailsPanel";
 import { RequirementDetailPanel } from "./RequirementDetailPanel";
 import { MapToolbar, MAX_ZOOM, MIN_ZOOM } from "./MapToolbar";
 import { ManualLinkDialog } from "./ManualLinkDialog";
+import { BaselineStrip } from "./BaselineStrip";
 import { RestrictedButton } from "./RestrictedButton";
 import { StatusBadge } from "./StatusBadge";
 import { buildNetworkLayout } from "../../../lib/networkLayout";
@@ -44,7 +45,8 @@ const STATUS_LEGEND = [
 ];
 
 // `requirements` are the network nodes from the API, `links` its computed (pathfinder) links with weights.
-function NetworkMapInner({ projectId, signals = [], requirements, links = [], warning, onOpenRequirement, isPM, manualLinks, onCreateManualLink, onRemoveManualLink }) {
+// `alignment` is the GET /alignment answer (null = no baseline yet); onFreezeBaseline(name) is PM only.
+function NetworkMapInner({ projectId, signals = [], requirements, links = [], warning, onOpenRequirement, isPM, manualLinks, onCreateManualLink, onRemoveManualLink, alignment = null, alignmentLoading = false, onFreezeBaseline }) {
   const wrapperRef = useRef(null);
   const [popover, setPopover] = useState(null);
   const [linkMode, setLinkMode] = useState(false);
@@ -133,6 +135,20 @@ function NetworkMapInner({ projectId, signals = [], requirements, links = [], wa
       if (nativeFullscreen.current && document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
     };
   }, []);
+
+  // Esc also leaves the expanded view when focus is NOT inside the map (for example on the page body after a dialog closed);
+  // with Keyboard Lock the browser no longer does this itself. Dialogs and panels still close first.
+  useEffect(() => {
+    if (!expanded) return undefined;
+    const onKey = (e) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      if (wrapperRef.current?.contains(e.target)) return; // the map's own handler deals with it
+      if (document.querySelector('[role="dialog"]')) return;
+      exitFullscreen();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [expanded, exitFullscreen]);
 
   // The container changed size: re-fit, but only if the user has not moved or zoomed the map themselves.
   useEffect(() => {
@@ -368,11 +384,14 @@ function NetworkMapInner({ projectId, signals = [], requirements, links = [], wa
       onKeyDown={handleKeyDown}
       data-fullscreen={expanded ? "true" : "false"}
       className={cn(
-        "overflow-hidden bg-card outline-none",
+        "flex flex-col overflow-hidden bg-card outline-none",
         // z-40: above the app header (z-30), below sheets / dialogs / tooltips / toasts (z-50) that portal onto <body>.
         expanded ? "fixed inset-0 z-40 h-dvh w-screen" : "relative h-[calc(100dvh-20.5rem)] min-h-[380px] w-full rounded-xl border border-border"
       )}
     >
+      {/* The strip is a normal row above the map, so it never covers nodes; the bottom-right toolbar and the map height stay as they were. */}
+      <BaselineStrip alignment={alignment} loading={alignmentLoading} isPM={isPM} onFreeze={onFreezeBaseline} />
+      <div className="relative min-h-0 flex-1">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -558,6 +577,7 @@ function NetworkMapInner({ projectId, signals = [], requirements, links = [], wa
           </button>
         </div>
       )}
+      </div>
     </div>
     </NetworkMapContext.Provider>
   );

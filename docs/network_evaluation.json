@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-20T14:28:57.415Z",
+  "generatedAt": "2026-10-20T21:12:56.086Z",
   "database": "inspid_test",
   "embeddingModel": "sentence-transformers/all-MiniLM-L6-v2",
   "clustering": {
@@ -453,6 +453,290 @@
       "cutoffInSample": {
         "clusters": 52,
         "avgSize": 2.1923076923076925
+      }
+    }
+  },
+  "signalInformed": {
+    "views": {
+      "trainVal": {
+        "label": "train + val signals",
+        "perProject": [
+          {
+            "projectId": "SYS-HMS",
+            "signals": 431,
+            "considered": 431,
+            "applied": 347,
+            "idmentionRows": 0,
+            "corefRows": 60,
+            "requirementsWithProfile": 23,
+            "linksAdded": 7,
+            "linksRemoved": 7,
+            "text": {
+              "counted": 26,
+              "hit1": 12,
+              "hit3": 21,
+              "edges": 25,
+              "goodEdges": 14
+            },
+            "signal": {
+              "counted": 26,
+              "hit1": 13,
+              "hit3": 24,
+              "edges": 25,
+              "goodEdges": 16
+            }
+          },
+          {
+            "projectId": "SYS-MBA",
+            "signals": 551,
+            "considered": 551,
+            "applied": 416,
+            "idmentionRows": 0,
+            "corefRows": 51,
+            "requirementsWithProfile": 28,
+            "linksAdded": 5,
+            "linksRemoved": 5,
+            "text": {
+              "counted": 34,
+              "hit1": 12,
+              "hit3": 20,
+              "edges": 33,
+              "goodEdges": 12
+            },
+            "signal": {
+              "counted": 34,
+              "hit1": 15,
+              "hit3": 23,
+              "edges": 33,
+              "goodEdges": 13
+            }
+          },
+          {
+            "projectId": "SYS-RET",
+            "signals": 499,
+            "considered": 499,
+            "applied": 403,
+            "idmentionRows": 0,
+            "corefRows": 26,
+            "requirementsWithProfile": 26,
+            "linksAdded": 8,
+            "linksRemoved": 8,
+            "text": {
+              "counted": 31,
+              "hit1": 17,
+              "hit3": 24,
+              "edges": 30,
+              "goodEdges": 16
+            },
+            "signal": {
+              "counted": 31,
+              "hit1": 17,
+              "hit3": 24,
+              "edges": 30,
+              "goodEdges": 14
+            }
+          },
+          {
+            "projectId": "SYS-ULP",
+            "signals": 383,
+            "considered": 383,
+            "applied": 296,
+            "idmentionRows": 0,
+            "corefRows": 25,
+            "requirementsWithProfile": 19,
+            "linksAdded": 9,
+            "linksRemoved": 9,
+            "text": {
+              "counted": 23,
+              "hit1": 9,
+              "hit3": 16,
+              "edges": 22,
+              "goodEdges": 10
+            },
+            "signal": {
+              "counted": 23,
+              "hit1": 10,
+              "hit3": 13,
+              "edges": 22,
+              "goodEdges": 11
+            }
+          }
+        ],
+        "overall": {
+          "signals": 1864,
+          "applied": 1462,
+          "idmentionRows": 0,
+          "corefRows": 162,
+          "linksAdded": 29,
+          "linksRemoved": 29,
+          "text": {
+            "counted": 114,
+            "hit1": 50,
+            "hit3": 81,
+            "edges": 110,
+            "goodEdges": 52
+          },
+          "signal": {
+            "counted": 114,
+            "hit1": 55,
+            "hit3": 84,
+            "edges": 110,
+            "goodEdges": 54
+          }
+        },
+        "verdict": {
+          "deltas": [
+            4.385964912280702,
+            2.6315789473684212,
+            1.8181818181818188
+          ],
+          "verdict": "signals help"
+        },
+        "direction": {
+          "improved": 2,
+          "worse": 2,
+          "projects": 4
+        }
+      },
+      "valOnly": {
+        "label": "val signals only",
+        "perProject": [
+          {
+            "projectId": "SYS-HMS",
+            "signals": 85,
+            "considered": 85,
+            "applied": 65,
+            "idmentionRows": 0,
+            "corefRows": 12,
+            "requirementsWithProfile": 5,
+            "linksAdded": 0,
+            "linksRemoved": 0,
+            "text": {
+              "counted": 26,
+              "hit1": 12,
+              "hit3": 21,
+              "edges": 25,
+              "goodEdges": 14
+            },
+            "signal": {
+              "counted": 26,
+              "hit1": 12,
+              "hit3": 21,
+              "edges": 25,
+              "goodEdges": 14
+            }
+          },
+          {
+            "projectId": "SYS-MBA",
+            "signals": 101,
+            "considered": 101,
+            "applied": 68,
+            "idmentionRows": 0,
+            "corefRows": 5,
+            "requirementsWithProfile": 6,
+            "linksAdded": 0,
+            "linksRemoved": 0,
+            "text": {
+              "counted": 34,
+              "hit1": 12,
+              "hit3": 20,
+              "edges": 33,
+              "goodEdges": 12
+            },
+            "signal": {
+              "counted": 34,
+              "hit1": 11,
+              "hit3": 20,
+              "edges": 33,
+              "goodEdges": 12
+            }
+          },
+          {
+            "projectId": "SYS-RET",
+            "signals": 97,
+            "considered": 97,
+            "applied": 79,
+            "idmentionRows": 0,
+            "corefRows": 6,
+            "requirementsWithProfile": 7,
+            "linksAdded": 1,
+            "linksRemoved": 1,
+            "text": {
+              "counted": 31,
+              "hit1": 17,
+              "hit3": 24,
+              "edges": 30,
+              "goodEdges": 16
+            },
+            "signal": {
+              "counted": 31,
+              "hit1": 17,
+              "hit3": 24,
+              "edges": 30,
+              "goodEdges": 16
+            }
+          },
+          {
+            "projectId": "SYS-ULP",
+            "signals": 55,
+            "considered": 55,
+            "applied": 40,
+            "idmentionRows": 0,
+            "corefRows": 1,
+            "requirementsWithProfile": 3,
+            "linksAdded": 1,
+            "linksRemoved": 1,
+            "text": {
+              "counted": 23,
+              "hit1": 9,
+              "hit3": 16,
+              "edges": 22,
+              "goodEdges": 10
+            },
+            "signal": {
+              "counted": 23,
+              "hit1": 10,
+              "hit3": 16,
+              "edges": 22,
+              "goodEdges": 11
+            }
+          }
+        ],
+        "overall": {
+          "signals": 338,
+          "applied": 252,
+          "idmentionRows": 0,
+          "corefRows": 24,
+          "linksAdded": 2,
+          "linksRemoved": 2,
+          "text": {
+            "counted": 114,
+            "hit1": 50,
+            "hit3": 81,
+            "edges": 110,
+            "goodEdges": 52
+          },
+          "signal": {
+            "counted": 114,
+            "hit1": 50,
+            "hit3": 81,
+            "edges": 110,
+            "goodEdges": 53
+          }
+        },
+        "verdict": {
+          "deltas": [
+            0,
+            0,
+            0.9090909090909094
+          ],
+          "verdict": "no clear difference (every change is under 3 points, which is inside the noise)"
+        },
+        "direction": {
+          "improved": 1,
+          "worse": 1,
+          "projects": 4
+        }
       }
     }
   }

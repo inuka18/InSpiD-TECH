@@ -13,7 +13,7 @@ const { User } = require('../modules/auth/model');
 const { Project } = require('../modules/projects/model');
 const { Requirement, StatusHistory } = require('../modules/requirements/model');
 const { Signal } = require('../modules/signals/model');
-const { RequirementLink, NetworkGroundTruth } = require('../modules/network/model');
+const { RequirementLink, NetworkGroundTruth, Baseline, SignalEvidence, NetworkState } = require('../modules/network/model');
 const { LedgerEntry } = require('../modules/ledger/model');
 const { sha, rechainSeedEntries, verifyChain } = require('../modules/ledger/service');
 
@@ -62,7 +62,7 @@ async function main() {
   const pairs = readCsv('scenario_related_pairs.csv');
 
   await connectDb();
-  await Promise.all([User, Project, Requirement, StatusHistory, Signal, RequirementLink, NetworkGroundTruth, LedgerEntry].map((m) => m.init()));
+  await Promise.all([User, Project, Requirement, StatusHistory, Signal, RequirementLink, NetworkGroundTruth, LedgerEntry, Baseline, SignalEvidence, NetworkState].map((m) => m.init()));
   console.log(`Seeding database "${config.mongoDbName}" from ${config.scenarioDir}`);
 
   // ---- projects

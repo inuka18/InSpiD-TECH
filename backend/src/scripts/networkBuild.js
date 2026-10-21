@@ -8,6 +8,7 @@ const { connectDb } = require('../config/db');
 const { Project } = require('../modules/projects/model');
 const network = require('../modules/network/service');
 const { verifyChain } = require('../modules/ledger/service');
+const { Baseline } = require('../modules/network/model');
 
 (async () => {
   await connectDb();
@@ -18,8 +19,10 @@ const { verifyChain } = require('../modules/ledger/service');
     try {
       const r = await network.computeNetwork(p.projectId, { actor: 'network:build' });
       const v = await verifyChain(p.projectId);
+      const base = await Baseline.findOne({ projectId: p.projectId, initial: true }).lean(); // created by computeNetwork when missing (text-only)
       console.log(`  ${p.projectId}: ${r.requirements} requirements, ${r.links} links, ${r.clusters} clusters` +
         ` (+${r.added.length} / -${r.removed.length}${r.ledgerEntry ? `, ledger block ${r.ledgerEntry.blockNumber}` : ', no ledger entry'});` +
+        ` initial baseline ${base ? `${base.baselineId} (${base.links.length} links, ledger block ${base.ledgerBlock})` : 'MISSING'};` +
         ` ledger chain ${v.valid ? 'valid' : 'BROKEN at block ' + v.brokenAt}`);
     } catch (err) {
       failed += 1;

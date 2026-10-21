@@ -2,7 +2,7 @@
 const mongoose = require('mongoose');
 
 // Stored codes. Older rows (before the hash chain) hold the display strings below; the API maps both.
-const EVENT_TYPES = ['STATUS_CHANGE', 'REQUIREMENT_CREATED', 'MANUAL_LINK', 'NETWORK_UPDATE'];
+const EVENT_TYPES = ['STATUS_CHANGE', 'REQUIREMENT_CREATED', 'MANUAL_LINK', 'NETWORK_UPDATE', 'BASELINE_CREATED'];
 const LINK_ACTIONS = ['added', 'removed'];
 const LEGACY_EVENT_TYPES = {
   'Status Change': { eventType: 'STATUS_CHANGE' },

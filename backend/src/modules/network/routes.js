@@ -8,6 +8,7 @@ const { createManualLinkBody, linkParams } = require('./schema');
 const c = require('./controller');
 
 router.post('/recompute', requireRole('PM'), c.recompute); // full recompute, same diff + ledger behaviour
+router.get('/links/:linkId/evidence', validate({ params: linkParams }), c.linkEvidence); // contributions + supporting signals
 router.get('/manual-links', c.listManual);
 router.post('/manual-links', requireRole('PM'), validate({ body: createManualLinkBody }), c.addManual);
 router.delete('/manual-links/:linkId', requireRole('PM'), validate({ params: linkParams }), c.removeManual);

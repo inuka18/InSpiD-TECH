@@ -6,7 +6,9 @@
 //   1. the status effect: conditional requirement update -> status_history row -> ledger entry
 //      (dryRun: only PROJECTS the change, nothing is written)
 //   2. the signal document's `applied` / `resultingStatus` / `proposedStatus`
-//   3. the feedback document (PM review actions), when `feedback` is given
+//   3. the network: an applied, non-seeded signal gives evidence and updates the signal profile, and the requirement
+//      network is refreshed (network/service.js onSignalApplied; one NETWORK_UPDATE ledger entry only if a link changed)
+//   4. the feedback document (PM review actions), when `feedback` is given
 //
 // No multi-document transactions on standalone Mongo, so the order matters: the conditional update (liveStatus must
 // still be `from`) stops two concurrent signals from both applying, and feedback is only written after the effect.
@@ -16,6 +18,7 @@ const { Requirement, StatusHistory } = require('../requirements/model');
 const { Signal, Feedback } = require('./model');
 const { proposeStatus } = require('./statusEngine');
 const { createWithSeqId } = require('./ids');
+const network = require('../network/service');
 
 async function applyToRequirement({ projectId, reqId, signal, label, actor }) {
   const current = await Requirement.findOne({ projectId, reqId }).lean();
@@ -78,6 +81,8 @@ async function finalizeSignal({ projectId, signal, label, requirementId, actor, 
       if (signal._id) {
         await Signal.updateOne({ _id: signal._id }, { $set: { applied: true, resultingStatus: out.resultingStatus, proposedStatus: out.proposedStatus } });
       }
+      // Never fails the signal (onSignalApplied catches everything); seeded signals are skipped inside.
+      await network.onSignalApplied({ projectId, signal, requirementId, actor });
     }
   }
 

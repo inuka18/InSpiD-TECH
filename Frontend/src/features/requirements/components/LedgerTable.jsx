@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link2, ArrowRight, Unlink, Network } from "lucide-react";
+import { Link2, ArrowRight, Unlink, Network, Flag } from "lucide-react";
 import { Input } from "../../../components/ui/input";
 import { Badge } from "../../../components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../components/ui/table";
@@ -104,6 +104,7 @@ export function LedgerTable({ entries, loading, onSelectRequirement }) {
               filtered.map((entry) => {
                 const isManual = entry.eventCode === "MANUAL_LINK";
                 const isNetwork = entry.eventCode === "NETWORK_UPDATE";
+                const isBaseline = entry.eventCode === "BASELINE_CREATED";
 
                 return (
                   <TableRow key={entry.txHash} onClick={() => setSelectedEntry(entry)} className="cursor-pointer">
@@ -117,7 +118,12 @@ export function LedgerTable({ entries, loading, onSelectRequirement }) {
                       </div>
                     </TableCell>
                     <TableCell>
-                      {isNetwork ? (
+                      {isBaseline ? (
+                        <div className="flex items-center gap-1 whitespace-nowrap text-xs text-muted-foreground">
+                          <Flag className="h-3.5 w-3.5" />
+                          Requirement network
+                        </div>
+                      ) : isNetwork ? (
                         <div className="flex flex-wrap items-center gap-1 whitespace-nowrap text-xs text-muted-foreground">
                           <Network className="h-3.5 w-3.5" />
                           Requirement network
@@ -165,7 +171,15 @@ export function LedgerTable({ entries, loading, onSelectRequirement }) {
                       )}
                     </TableCell>
                     <TableCell>
-                      {isNetwork ? (
+                      {isBaseline ? (
+                        <div className="flex flex-col gap-1">
+                          <Badge variant="info" className="w-fit gap-1 text-[10px]">
+                            <Flag className="h-3 w-3" />
+                            {entry.eventType}
+                          </Badge>
+                          {entry.actor && <span className="text-[11px] text-muted-foreground">by {entry.actor}</span>}
+                        </div>
+                      ) : isNetwork ? (
                         <div className="flex flex-col gap-1">
                           <Badge variant="info" className="w-fit gap-1 text-[10px]">
                             <Network className="h-3 w-3" />
@@ -196,7 +210,11 @@ export function LedgerTable({ entries, loading, onSelectRequirement }) {
                       )}
                     </TableCell>
                     <TableCell className="max-w-sm">
-                      {isNetwork ? (
+                      {isBaseline ? (
+                        <span className="text-sm text-foreground">
+                          Baseline <span className="font-semibold">{entry.details?.name ?? "(unnamed)"}</span> frozen
+                        </span>
+                      ) : isNetwork ? (
                         <NetworkUpdateSummary details={entry.details} />
                       ) : (
                         <span className="line-clamp-2 text-sm text-muted-foreground">{entry.triggeringSignal}</span>

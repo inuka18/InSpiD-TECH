@@ -25,7 +25,8 @@ async function start() {
   const { Project } = require('../../src/modules/projects/model');
   const { Requirement } = require('../../src/modules/requirements/model');
   const { User } = require('../../src/modules/auth/model');
-  await Promise.all([Project, Requirement, User, require('../../src/modules/ledger/model').LedgerEntry].map((m) => m.init()));
+  const net = require('../../src/modules/network/model');
+  await Promise.all([Project, Requirement, User, require('../../src/modules/ledger/model').LedgerEntry, net.Baseline, net.SignalEvidence, net.NetworkState].map((m) => m.init()));
 
   const server = await new Promise((resolve) => { const s = http.createServer(app).listen(0, () => resolve(s)); });
   const base = `http://127.0.0.1:${server.address().port}/api/v1`;
@@ -52,6 +53,26 @@ async function start() {
       projectId, reqId: `T${suffix}-R${String(reqN).padStart(2, '0')}`, title: `Test requirement ${reqN}`, description: 'Something testable',
       type: 'FR', groupId: 'g', granularity: 'Weekly Workload', initialStatus: liveStatus, finalStatus: liveStatus, liveStatus, resourceRole: 'Unassigned', ...extra,
     });
+  };
+
+  // Another temporary project the PM belongs to (cleaned up in close()). Does not open a second connection.
+  const extraProjects = [];
+  const newProject = async () => {
+    const pid = `${projectId}-X${extraProjects.length + 1}`;
+    await Project.create({ projectId: pid, name: `Extra ${pid}`, domain: 'test', description: 'temporary test project' });
+    await User.updateOne({ _id: pm.user._id }, { $addToSet: { projectIds: pid } });
+    extraProjects.push(pid);
+    let n = 0;
+    return {
+      projectId: pid,
+      addRequirement: async (extra = {}) => {
+        n += 1;
+        return Requirement.create({
+          projectId: pid, reqId: `X${suffix}-R${String(n).padStart(2, '0')}`, title: `Test requirement ${n}`, description: 'Something testable',
+          type: 'FR', groupId: 'g', granularity: 'Weekly Workload', initialStatus: 'Confirmed', finalStatus: 'Confirmed', liveStatus: 'Confirmed', resourceRole: 'Unassigned', ...extra,
+        });
+      },
+    };
   };
 
   // ---- stubbed ai client (the service calls aiClient.classify / aiClient.match at call time)
@@ -125,14 +146,14 @@ async function start() {
     aiClient.classify = original.classify;
     aiClient.match = original.match;
     aiClient.embed = original.embed;
-    const models = ['Signal', 'Feedback', 'Requirement', 'StatusHistory', 'LedgerEntry', 'RequirementLink', 'ManualLink', 'NetworkGroundTruth'].map((n) => mongoose.model(n));
-    await Promise.all(models.map((m) => m.deleteMany({ projectId })));
-    await Promise.all([User.deleteMany({ _id: { $in: [pm.user._id, member.user._id, outsider.user._id] } }), Project.deleteOne({ projectId })]);
+    const models = ['Signal', 'Feedback', 'Requirement', 'StatusHistory', 'LedgerEntry', 'RequirementLink', 'ManualLink', 'NetworkGroundTruth', 'SignalEvidence', 'Baseline', 'NetworkState'].map((n) => mongoose.model(n));
+    await Promise.all(models.map((m) => m.deleteMany({ projectId: { $in: [projectId, ...extraProjects] } })));
+    await Promise.all([User.deleteMany({ _id: { $in: [pm.user._id, member.user._id, outsider.user._id] } }), Project.deleteMany({ projectId: { $in: [projectId, ...extraProjects] } })]);
     await new Promise((r) => server.close(r));
     await mongoose.disconnect();
   }
 
-  return { api, form, ai, projectId, pm, member, outsider, addRequirement, close, models: (n) => mongoose.model(n) };
+  return { api, form, ai, projectId, pm, member, outsider, addRequirement, newProject, close, models: (n) => mongoose.model(n) };
 }
 
 module.exports = { start, assertTestDb };
