@@ -26,6 +26,21 @@ for (const key of REQUIRED) {
   else if (value.includes('REPLACE_')) problems.push(`${key} still contains the placeholder "REPLACE_..."; set a real value`);
   else if (value.includes('<db_')) problems.push(`${key} still contains the placeholder "<db_...>"; put your MongoDB Atlas username/password in`);
 }
+// Optional tuning values: NOT in REQUIRED, so an existing .env keeps working. Invalid values stop startup.
+function optionalNumber(key, fallback, min, max) {
+  const raw = process.env[key];
+  if (raw === undefined || raw.trim() === '') return fallback;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < min || n > max) {
+    problems.push(`${key} must be a number between ${min} and ${max} (or leave it unset)`);
+    return fallback;
+  }
+  return n;
+}
+const autoAcceptConfidence = optionalNumber('AUTO_ACCEPT_CONFIDENCE', 90, 0, 100); // 0-100, signals at/above are auto-accepted
+const matchMinSimilarity = optionalNumber('MATCH_MIN_SIMILARITY', 0.3, -1, 1); // below this no requirement is proposed (unmapped)
+const autoApplyMinSimilarity = optionalNumber('AUTO_APPLY_MIN_SIMILARITY', 0.4, -1, 1); // a similarity-matched signal below this stays pending
+
 if (problems.length) {
   // Only variable names are printed, never values.
   console.error('\nCannot start: the root .env file is not ready.');
@@ -45,6 +60,9 @@ module.exports = Object.freeze({
   neo4j: { uri: process.env.NEO4J_URI, user: process.env.NEO4J_USER, password: process.env.NEO4J_PASSWORD },
   aiServiceUrl: process.env.AI_SERVICE_URL.replace(/\/$/, ''),
   blockchainRpcUrl: process.env.BLOCKCHAIN_RPC_URL,
+  autoAcceptConfidence,
+  matchMinSimilarity,
+  autoApplyMinSimilarity,
   seed: { pmPassword: process.env.SEED_PM_PASSWORD, memberPassword: process.env.SEED_MEMBER_PASSWORD },
   scenarioDir: process.env.SCENARIO_DIR || path.resolve(__dirname, '../../../data/scenario'),
 });

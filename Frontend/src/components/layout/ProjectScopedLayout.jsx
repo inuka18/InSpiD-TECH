@@ -1,5 +1,5 @@
 import { Link, Navigate, Outlet, useParams } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { useProject } from "../../context/ProjectContext";
 
 // Wraps every /projects/:projectId/* route. Resolves the active project
@@ -10,8 +10,25 @@ import { useProject } from "../../context/ProjectContext";
 // the Projects list.
 export function ProjectScopedLayout() {
   const { projectId } = useParams();
-  const { projects } = useProject();
+  const { projects, loading, error } = useProject();
   const project = projects.find((p) => p.id === projectId) ?? null;
+
+  // The project list comes from the API: do not treat an id as unknown until it has loaded.
+  if (loading) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center text-muted-foreground">
+        <Loader2 className="h-6 w-6 animate-spin" aria-label="Loading project" />
+      </div>
+    );
+  }
+
+  if (!project && error) {
+    return (
+      <div className="rounded-xl border border-dashed border-border py-16 text-center text-sm text-muted-foreground">
+        Could not load your projects: {error.message}
+      </div>
+    );
+  }
 
   if (!project) {
     return <Navigate to="/projects" replace />;

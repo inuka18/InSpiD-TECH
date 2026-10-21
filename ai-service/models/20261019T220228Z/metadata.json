@@ -1,0 +1,359 @@
+{
+  "version": "20261019T220228Z",
+  "trained_at": "2026-10-19T22:02:28.511281+00:00",
+  "model_type": "tfidf_lr",
+  "variant": "A_scenario",
+  "uses_weak_jira": false,
+  "hyperparameters": {
+    "C": 3,
+    "class_weight": "balanced"
+  },
+  "embedding_model": null,
+  "spacy_model": "en_core_web_sm",
+  "extra_data_file": null,
+  "training_rows": {
+    "scenario_train": 1526,
+    "extra_data": 0,
+    "weak_jira": 0,
+    "weak_jira_weight": null
+  },
+  "selection": "Best val batch-A macro F1 is 0.860. Candidates within 0.02 of it: A_scenario. The simplest of those was kept: A_scenario.",
+  "metrics": {
+    "val_batch_A": {
+      "n": 82,
+      "macro_f1": 0.8596514596514597,
+      "accuracy": 0.8414634146341463,
+      "per_class": {
+        "Constraint": {
+          "precision": 0.8125,
+          "recall": 0.7647058823529411,
+          "f1": 0.7878787878787878,
+          "support": 17
+        },
+        "Expectation": {
+          "precision": 0.9047619047619048,
+          "recall": 0.7916666666666666,
+          "f1": 0.8444444444444444,
+          "support": 24
+        },
+        "Completion": {
+          "precision": 0.8571428571428571,
+          "recall": 1.0,
+          "f1": 0.9230769230769231,
+          "support": 18
+        },
+        "Conflict": {
+          "precision": 0.7222222222222222,
+          "recall": 0.7647058823529411,
+          "f1": 0.7428571428571429,
+          "support": 17
+        },
+        "None": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "support": 6
+        }
+      },
+      "confusion_matrix": {
+        "labels": [
+          "Constraint",
+          "Expectation",
+          "Completion",
+          "Conflict",
+          "None"
+        ],
+        "rows_true_cols_pred": [
+          [
+            13,
+            1,
+            0,
+            3,
+            0
+          ],
+          [
+            2,
+            19,
+            1,
+            2,
+            0
+          ],
+          [
+            0,
+            0,
+            18,
+            0,
+            0
+          ],
+          [
+            1,
+            1,
+            2,
+            13,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            6
+          ]
+        ]
+      }
+    },
+    "val_all": {
+      "n": 338,
+      "macro_f1": 0.966884000074802,
+      "accuracy": 0.9615384615384616,
+      "per_class": {
+        "Constraint": {
+          "precision": 0.96,
+          "recall": 0.9473684210526315,
+          "f1": 0.9536423841059603,
+          "support": 76
+        },
+        "Expectation": {
+          "precision": 0.9759036144578314,
+          "recall": 0.9418604651162791,
+          "f1": 0.9585798816568047,
+          "support": 86
+        },
+        "Completion": {
+          "precision": 0.9464285714285714,
+          "recall": 1.0,
+          "f1": 0.9724770642201835,
+          "support": 53
+        },
+        "Conflict": {
+          "precision": 0.9444444444444444,
+          "recall": 0.9550561797752809,
+          "f1": 0.9497206703910615,
+          "support": 89
+        },
+        "None": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "support": 34
+        }
+      },
+      "confusion_matrix": {
+        "labels": [
+          "Constraint",
+          "Expectation",
+          "Completion",
+          "Conflict",
+          "None"
+        ],
+        "rows_true_cols_pred": [
+          [
+            72,
+            1,
+            0,
+            3,
+            0
+          ],
+          [
+            2,
+            81,
+            1,
+            2,
+            0
+          ],
+          [
+            0,
+            0,
+            53,
+            0,
+            0
+          ],
+          [
+            1,
+            1,
+            2,
+            85,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            34
+          ]
+        ]
+      }
+    },
+    "test_batch_A": {
+      "n": 106,
+      "macro_f1": 0.873960113960114,
+      "accuracy": 0.8490566037735849,
+      "per_class": {
+        "Constraint": {
+          "precision": 0.6875,
+          "recall": 0.9565217391304348,
+          "f1": 0.8,
+          "support": 23
+        },
+        "Expectation": {
+          "precision": 0.8846153846153846,
+          "recall": 0.8214285714285714,
+          "f1": 0.8518518518518519,
+          "support": 28
+        },
+        "Completion": {
+          "precision": 0.85,
+          "recall": 0.8947368421052632,
+          "f1": 0.8717948717948718,
+          "support": 19
+        },
+        "Conflict": {
+          "precision": 1.0,
+          "recall": 0.7333333333333333,
+          "f1": 0.8461538461538461,
+          "support": 30
+        },
+        "None": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "support": 6
+        }
+      },
+      "confusion_matrix": {
+        "labels": [
+          "Constraint",
+          "Expectation",
+          "Completion",
+          "Conflict",
+          "None"
+        ],
+        "rows_true_cols_pred": [
+          [
+            22,
+            0,
+            1,
+            0,
+            0
+          ],
+          [
+            4,
+            23,
+            1,
+            0,
+            0
+          ],
+          [
+            2,
+            0,
+            17,
+            0,
+            0
+          ],
+          [
+            4,
+            3,
+            1,
+            22,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            6
+          ]
+        ]
+      },
+      "macro_f1_ci95_bootstrap": [
+        0.8102775803523345,
+        0.9276326270510669
+      ]
+    },
+    "test_all": {
+      "n": 434,
+      "macro_f1": 0.9679795377258535,
+      "accuracy": 0.9631336405529954,
+      "per_class": {
+        "Constraint": {
+          "precision": 0.900990099009901,
+          "recall": 0.9891304347826086,
+          "f1": 0.9430051813471503,
+          "support": 92
+        },
+        "Expectation": {
+          "precision": 0.9727272727272728,
+          "recall": 0.9553571428571429,
+          "f1": 0.963963963963964,
+          "support": 112
+        },
+        "Completion": {
+          "precision": 0.9594594594594594,
+          "recall": 0.9726027397260274,
+          "f1": 0.9659863945578231,
+          "support": 73
+        },
+        "Conflict": {
+          "precision": 1.0,
+          "recall": 0.936,
+          "f1": 0.9669421487603306,
+          "support": 125
+        },
+        "None": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "support": 32
+        }
+      },
+      "confusion_matrix": {
+        "labels": [
+          "Constraint",
+          "Expectation",
+          "Completion",
+          "Conflict",
+          "None"
+        ],
+        "rows_true_cols_pred": [
+          [
+            91,
+            0,
+            1,
+            0,
+            0
+          ],
+          [
+            4,
+            107,
+            1,
+            0,
+            0
+          ],
+          [
+            2,
+            0,
+            71,
+            0,
+            0
+          ],
+          [
+            4,
+            3,
+            1,
+            117,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            32
+          ]
+        ]
+      }
+    }
+  }
+}
