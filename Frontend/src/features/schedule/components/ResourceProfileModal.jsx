@@ -1,0 +1,198 @@
+import { useEffect, useMemo, useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "../../../components/ui/dialog";
+import { Avatar, AvatarFallback } from "../../../components/ui/avatar";
+import { Badge } from "../../../components/ui/badge";
+import { Button } from "../../../components/ui/button";
+import { Input } from "../../../components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/ui/select";
+import { flattenTasks, statusBadgeVariant, statusLabel, TODAY } from "../lib/scheduleUtils";
+import { getLeaveLabel, previewLeaveImpact } from "../lib/leaveAutomation";
+import { cn } from "../../../lib/utils";
+
+const CAPACITY_VARIANT = {
+  "Over-allocated": "danger",
+  "Near Capacity": "warning",
+  Balanced: "success",
+  "Under-utilized": "info",
+};
+
+function dateInputValue(date) {
+  const value = new Date(date);
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
+}
+
+export function ResourceProfileModal({ capacity, phases, capacityRecords = [], open, onOpenChange, onSelectTask, onApplyLeave }) {
+  const [leaveType, setLeaveType] = useState(capacity?.leaveType ?? "full-day");
+  const [customHours, setCustomHours] = useState(String(capacity?.leaveHours ?? 8));
+  const [leaveDate, setLeaveDate] = useState(dateInputValue(capacity?.leaveDate ?? TODAY));
+
+  const ratioPct = capacity ? Math.round((capacity.plannedHours / capacity.availableHours) * 100) : 0;
+  const myTasks = useMemo(
+    () => (capacity ? flattenTasks(phases ?? []).filter((t) => t.assigneeId === capacity.memberId) : []),
+    [capacity, phases]
+  );
+
+  useEffect(() => {
+    if (!capacity) return;
+    setLeaveType(capacity.leaveType ?? "full-day");
+    setCustomHours(String(capacity.leaveHours ?? 8));
+    setLeaveDate(dateInputValue(capacity.leaveDate ?? TODAY));
+  }, [capacity]);
+
+  const selectedLeaveDate = useMemo(() => new Date(`${leaveDate}T12:00:00`), [leaveDate]);
+
+  const leavePreview = useMemo(
+    () => (capacity ? previewLeaveImpact({ capacity, phases, capacityRecords, leaveType, customHours, leaveDate: selectedLeaveDate }) : null),
+    [capacity, phases, capacityRecords, leaveType, customHours, selectedLeaveDate]
+  );
+
+  const handleApply = () => {
+    onApplyLeave?.({ leaveType, customHours: Number(customHours), leaveDate: selectedLeaveDate });
+  };
+
+  if (!capacity) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <div className="flex items-center gap-3">
+            <Avatar className="h-11 w-11">
+              <AvatarFallback>
+                {capacity.name
+                  .split(" ")
+                  .map((p) => p[0])
+                  .join("")
+                  .toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <DialogTitle>{capacity.name}</DialogTitle>
+              <DialogDescription>{capacity.role}</DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-3 text-sm">
+            <span className="text-muted-foreground">
+              {capacity.plannedHours}h planned / {capacity.availableHours}h available
+            </span>
+            <Badge variant={CAPACITY_VARIANT[capacity.status] ?? "outline"}>{capacity.status}</Badge>
+          </div>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+            <div
+              className={cn("h-full rounded-full", ratioPct > 100 ? "bg-status-dropped-fg" : ratioPct >= 85 ? "bg-status-atrisk-fg" : "bg-status-confirmed-fg")}
+              style={{ width: `${Math.min(ratioPct, 100)}%` }}
+            />
+          </div>
+
+          <div className="rounded-lg border border-border bg-muted/20 p-3">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Leave planner</p>
+            <div className="grid gap-2 sm:grid-cols-[1fr_110px]">
+              <div>
+                <Select value={leaveType} onValueChange={setLeaveType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Leave type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="full-day">Full day</SelectItem>
+                    <SelectItem value="half-day">Half day</SelectItem>
+                    <SelectItem value="custom">Custom</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Input
+                  type="number"
+                  min="1"
+                  max="24"
+                  step="1"
+                  value={customHours}
+                  onChange={(e) => setCustomHours(e.target.value)}
+                  disabled={leaveType !== "custom"}
+                  placeholder="Hours"
+                />
+              </div>
+            </div>
+            <div className="mt-2">
+              <label htmlFor="leave-date" className="mb-1 block text-xs font-medium text-foreground">Leave date</label>
+              <Input id="leave-date" type="date" value={leaveDate} onChange={(e) => setLeaveDate(e.target.value)} />
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {leaveType === "custom"
+                ? "Custom leave uses the hours field above and is converted into task spillover automatically."
+                : "Full and half-day leave are translated into the schedule's day-based rescheduling model."}
+            </p>
+            <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+              <div className="rounded-md border border-border bg-background px-2.5 py-2">
+                <p className="font-semibold text-foreground">Leave impact</p>
+                <p>{leavePreview?.leaveHours ?? 0}h tracked, {leavePreview?.estimatedDelayDays ?? 0}d slip if no backup is available.</p>
+              </div>
+              <div className="rounded-md border border-border bg-background px-2.5 py-2">
+                <p className="font-semibold text-foreground">Backup resource</p>
+                <p>{leavePreview?.replacement ? leavePreview.replacement.name : "No same-role backup found"}</p>
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button type="button" onClick={handleApply} disabled={!onApplyLeave} className="shrink-0">
+                Apply leave + replan
+              </Button>
+              {capacity.offToday && (
+                <Badge variant="outline" className="self-center">
+                  {getLeaveLabel(capacity.leaveType ?? "full-day", capacity.leaveHours)} leave active
+                </Badge>
+              )}
+            </div>
+            {leavePreview?.affectedTasks?.length > 0 && (
+              <div className="mt-3 space-y-1">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Affected tasks</p>
+                <ul className="space-y-1 text-xs text-foreground">
+                  {leavePreview.affectedTasks.slice(0, 4).map((task) => (
+                    <li key={task.id} className="flex items-center justify-between gap-2 rounded border border-border bg-background px-2 py-1.5">
+                      <span className="truncate">{task.name}</span>
+                      <span className="shrink-0 text-muted-foreground">
+                        {leavePreview.replacement ? `Reassign to ${leavePreview.replacement.name}` : `Slip ${leavePreview.leaveDays}d`}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Scheduled Tasks ({myTasks.length})
+            </p>
+            {myTasks.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No scheduled tasks for this person.</p>
+            ) : (
+              <ul className="space-y-1.5">
+                {myTasks.map((task) => (
+                  <li key={task.id}>
+                    <button
+                      onClick={() => onSelectTask?.(task)}
+                      className="flex w-full items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-left text-sm transition-colors hover:border-primary/40 hover:bg-primary/5"
+                    >
+                      <span className="truncate text-foreground">{task.name}</span>
+                      <Badge variant={statusBadgeVariant(task)} className="shrink-0 text-[10px]">
+                        {statusLabel(task)}
+                      </Badge>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}

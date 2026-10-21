@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.env
+__pycache__/
+*.pyc
+data/raw/
+.claude/
+Frontend/Microsoft/
+.DS_Store
+*.log
+# Hardhat build output
+contracts/artifacts/
+contracts/cache/
+# Editor and OS files
+.vscode/
+Thumbs.db

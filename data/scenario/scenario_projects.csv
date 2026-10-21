@@ -1,0 +1,5 @@
+project_id,name,domain,description
+SYS-RET,Online Retail Platform,E-commerce,"Web and mobile shopping platform covering catalogue, checkout and order fulfilment."
+SYS-HMS,Hospital Management System,Healthcare,"Hospital system for appointments, clinical records, prescriptions and billing."
+SYS-MBA,Mobile Banking App,Banking,"Retail banking app for transfers, payments, card control and customer support."
+SYS-ULP,University Learning Portal,Education,"Learning portal for enrolment, coursework, grading and lecture delivery."
