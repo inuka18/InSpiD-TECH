@@ -2,6 +2,7 @@
 // Initials are derived here; workload and task counts belong to the schedule component and are 0 until it is connected.
 import { api } from "../lib/apiClient";
 import { initialsFor } from "../lib/utils";
+import { rentEaseTeam, RENT_EASE_PROJECT_ID } from "../data/mockRentEase";
 
 export function toMember(m) {
   return {
@@ -18,6 +19,7 @@ export function toMember(m) {
 }
 
 export async function fetchTeam(projectId) {
+  if (projectId === RENT_EASE_PROJECT_ID) return rentEaseTeam;
   if (projectId) return (await api(`/projects/${encodeURIComponent(projectId)}/team`)).map(toMember);
   // No project given: every project the user belongs to.
   const projects = await api("/projects");

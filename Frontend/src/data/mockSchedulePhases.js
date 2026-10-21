@@ -1,3 +1,5 @@
+import { buildRentEasePhases, RENT_EASE_PROJECT_ID } from "./mockRentEase";
+
 // Data model for Component 3: Schedule. Reuses the SAME task IDs as
 // mockSchedule.js (task-nc-01..18, task-mp-01..12). Every task here
 // corresponds to a real Kanban task and, where a mockGaps.js entry
@@ -715,7 +717,10 @@ export const mockSchedulePhases = [
   },
 ];
 
+const rentEasePhases = buildRentEasePhases();
+
 export function getPhasesForProject(projectId) {
+  if (projectId === RENT_EASE_PROJECT_ID) return rentEasePhases;
   return mockSchedulePhases.find((p) => p.projectId === projectId)?.phases ?? [];
 }
 

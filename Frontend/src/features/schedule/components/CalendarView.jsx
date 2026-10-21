@@ -8,8 +8,8 @@ import { useResourceCapacity } from "../../../hooks/useResourceCapacity";
 import { getTeamMemberById } from "../../../data/mockTeam";
 import { flattenTasks, startOfMonth, addDays, isSameDay, TODAY } from "../lib/scheduleUtils";
 import { cn } from "../../../lib/utils";
-import { useWorkCalendar, recalculateTasksForWorkCalendar } from "../context/WorkCalendarContext";
-import { useScheduleHistory } from "../context/ScheduleHistoryContext";
+import { useWorkCalendar } from "../context/WorkCalendarContext";
+
 
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -61,33 +61,15 @@ export function CalendarView({ projectId, project, onOpenDay }) {
   const navigate = useNavigate();
   const calendarToday = projectId === "proj-inspid-platform" ? new Date() : TODAY;
   const [monthAnchor, setMonthAnchor] = useState(() => project?.startDate ? new Date(project.startDate) : TODAY);
-  const { settings, setSettings } = useWorkCalendar();
-  const { pushHistory } = useScheduleHistory();
-  const [draftWorkdays, setDraftWorkdays] = useState(settings.workdays);
-  const [draftHours, setDraftHours] = useState(String(settings.hoursPerDay));
-  const [scheduleRevision, bumpScheduleRevision] = useState(0);
+  const { settings } = useWorkCalendar();
 
-  useEffect(() => {
-    setDraftWorkdays(settings.workdays);
-    setDraftHours(String(settings.hoursPerDay));
-  }, [settings]);
 
   useEffect(() => {
     setMonthAnchor(project?.startDate ? new Date(project.startDate) : TODAY);
   }, [projectId, project?.startDate]);
 
-  const applyWorkCalendar = () => {
-    const nextSettings = { ...settings, workdays: draftWorkdays, hoursPerDay: Number(draftHours) };
-    const snapshots = recalculateTasksForWorkCalendar(phases, settings, nextSettings);
-    pushHistory("Changed working days and hours", () => {
-      snapshots.forEach(({ task, start, end, durationMinutes }) => Object.assign(task, { start, end, durationMinutes }));
-      setSettings(settings);
-    });
-    setSettings(nextSettings);
-    bumpScheduleRevision((revision) => revision + 1);
-  };
 
-  const tasks = useMemo(() => flattenTasks(phases), [phases, scheduleRevision]);
+  const tasks = useMemo(() => flattenTasks(phases), [phases]);
   const leaveByDate = useMemo(() => {
     const entries = new Map();
     const addLeave = (date, name, label) => {
@@ -149,26 +131,6 @@ export function CalendarView({ projectId, project, onOpenDay }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-card p-4">
-        <div>
-          <h3 className="text-sm font-semibold text-foreground">Working calendar</h3>
-          <p className="mt-1 text-xs text-muted-foreground">Changing these settings recalculates task end dates using each task’s effort.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex gap-1" role="group" aria-label="Working days">
-            {WEEKDAY_LABELS.map((label, index) => {
-              const day = (index + 1) % 7;
-              const active = draftWorkdays.includes(day);
-              return <button key={label} type="button" aria-pressed={active} onClick={() => setDraftWorkdays((current) => active ? current.filter((value) => value !== day) : [...current, day].sort((a, b) => a - b))} className={cn("rounded-md border px-2 py-1.5 text-xs font-medium", active ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-muted-foreground")}>{label}</button>;
-            })}
-          </div>
-          <label className="flex items-center gap-2 text-xs text-muted-foreground">Hours/day
-            <input aria-label="Working hours per day" type="number" min="1" max="24" step="0.5" value={draftHours} onChange={(event) => setDraftHours(event.target.value)} className="h-9 w-20 rounded-md border border-input bg-background px-2 text-sm text-foreground" />
-          </label>
-          <Button size="sm" onClick={applyWorkCalendar} disabled={draftWorkdays.length === 0 || !Number(draftHours) || Number(draftHours) < 1 || Number(draftHours) > 24 || (draftWorkdays.length === settings.workdays.length && draftWorkdays.every((day) => settings.workdays.includes(day)) && Number(draftHours) === settings.hoursPerDay)}>Apply to schedule</Button>
-        </div>
-      </div>
-
       {/* Legend */}
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-border pb-3">
         {LEGEND_ITEMS.map((item) => (

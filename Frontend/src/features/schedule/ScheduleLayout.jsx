@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, CalendarClock, CalendarDays, CalendarRange, Route, Calendar, Users2, Undo2 } from "lucide-react";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { LayoutDashboard, CalendarClock, CalendarDays, CalendarRange, Route, Calendar, Undo2 } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { cn } from "../../lib/utils";
 import { useActiveProject } from "../../hooks/useActiveProject";
@@ -8,6 +8,7 @@ import { useRole, ROLES } from "../../context/RoleContext";
 import { CalendarView } from "./components/CalendarView";
 import { ScheduleHistoryProvider, useScheduleHistory } from "./context/ScheduleHistoryContext";
 import { WorkCalendarProvider } from "./context/WorkCalendarContext";
+import { SprintPlanner } from "./components/SprintPlanner";
 
 const SUB_NAV = [
   { to: "overview", label: "Overview", icon: LayoutDashboard },
@@ -32,23 +33,21 @@ function ScheduleLayoutInner() {
   const { role } = useRole();
   const isPM = role === ROLES.PM;
   const { pathname } = useLocation();
-  const navigate = useNavigate();
   const { undo, canUndo, lastLabel, refreshToken } = useScheduleHistory();
   const [calendarView, setCalendarView] = useState(false);
+  const [plannerOpen, setPlannerOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false);
 
-  // Docked drawers (Resources, Insights) are mutually exclusive, they'd
-  // otherwise compete for the same right-edge space, and neither they
-  // nor Calendar view should persist across a tab switch (switching tabs
-  // is meant to show that tab's real content, same as leaving Calendar
-  // view shows whichever tab is active underneath).
+  // Insights and Calendar view should not persist across a tab switch.
+  // Switching tabs shows that tab's content, just as leaving Calendar
+  // view shows whichever tab is active underneath.
   useEffect(() => {
     setInsightsOpen(false);
     setCalendarView(false);
+    setPlannerOpen(false);
   }, [pathname]);
 
   const openInsights = () => {
-    setResourcesOpen(false);
     setInsightsOpen(true);
   };
 
@@ -70,6 +69,15 @@ function ScheduleLayoutInner() {
                 Undo
               </Button>
             )}
+            {isPM && (
+              <div className="relative">
+                <Button variant={plannerOpen ? "default" : "outline"} size="sm" onClick={() => setPlannerOpen((open) => !open)} aria-expanded={plannerOpen}>
+                  <CalendarRange className="h-4 w-4" />
+                  Sprint Planner
+                </Button>
+                {plannerOpen && <SprintPlanner projectId={activeProject?.id} onClose={() => setPlannerOpen(false)} />}
+              </div>
+            )}
             <Button
               variant={calendarView ? "default" : "outline"}
               size="sm"
@@ -77,10 +85,6 @@ function ScheduleLayoutInner() {
             >
               <Calendar className="h-4 w-4" />
               Calendar
-            </Button>
-            <Button variant={pathname.endsWith("/schedule/resources") ? "default" : "outline"} size="sm" onClick={() => navigate("resources")}>
-              <Users2 className="h-4 w-4" />
-              Resources
             </Button>
           </div>
         </div>
@@ -117,7 +121,7 @@ function ScheduleLayoutInner() {
             // can read them via useScheduleView(). Insights' content is
             // page-specific (Week/Sprint each render their own), but its
             // open/close state lives here so it can stay mutually
-            // exclusive with Resources. Keying on refreshToken forces a
+            // available across tabs. Keying on refreshToken forces a
             // fresh read of the underlying (possibly just-undone) data
             // even when Undo is pressed from a different tab than the one
             // that made the mutation.

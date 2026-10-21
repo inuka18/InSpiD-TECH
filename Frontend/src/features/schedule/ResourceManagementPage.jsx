@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, BriefcaseBusiness, CalendarDays, ChevronRight, Import, Search, UserPlus, Users2, X } from "lucide-react";
+import { AlertTriangle, BriefcaseBusiness, CalendarDays, ChevronRight, Clock3, Import, Search, UserPlus, Users2, X } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
@@ -14,6 +14,7 @@ import { ResourceProfileModal } from "./components/ResourceProfileModal";
 import { applyLeavePlan, getLeaveLabel } from "./lib/leaveAutomation";
 import { useScheduleHistory } from "./context/ScheduleHistoryContext";
 import { useRole, ROLES } from "../../context/RoleContext";
+import { useActiveProject } from "../../hooks/useActiveProject";
 
 const SKILLS = {
   "Backend Developer": ["Node.js", "Express", "MongoDB", "AWS"], "Frontend Developer": ["React", "TypeScript", "JavaScript", "Accessibility"],
@@ -24,8 +25,11 @@ const badgeFor = (resource) => resource.offToday ? "outline" : resource.status =
 const statusFor = (resource) => resource.offToday ? "On Leave" : resource.status === "Under-utilized" ? "Available" : resource.status === "Balanced" ? "Optimal" : resource.status;
 const initials = (name) => name.split(" ").map((part) => part[0]).join("").toUpperCase();
 
-export function ResourceManagementPage() {
-  const { activeProject, activeProjectId } = useScheduleView();
+export function ResourceManagementPage({ project: projectOverride, embedded = false, initialView = "resources", leaveOnly = false }) {
+  const scheduleProject = useScheduleView().activeProject;
+  const contextProject = useActiveProject().activeProject;
+  const activeProject = projectOverride ?? scheduleProject ?? contextProject;
+  const activeProjectId = activeProject?.id;
   const { role } = useRole();
   const isPM = role === ROLES.PM;
   const { data: capacity, loading } = useResourceCapacity(activeProjectId);
@@ -35,7 +39,7 @@ export function ResourceManagementPage() {
   const [selected, setSelected] = useState(null);
   const [cards, setCards] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
-  const [view, setView] = useState("resources");
+  const [view, setView] = useState(initialView);
   const [selectedLeave, setSelectedLeave] = useState(null);
   const [, bump] = useState(0);
   const { pushHistory } = useScheduleHistory();
@@ -74,14 +78,16 @@ export function ResourceManagementPage() {
   };
 
   return <div className="space-y-5">
-    <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-2xl font-bold tracking-tight">Resource Management</h2><p className="mt-1 text-sm text-muted-foreground">Manage project resources, skills, availability and workload{activeProject ? ` for ${activeProject.name}` : ""}.</p></div><div className="flex gap-2"><Button variant="outline" onClick={() => setAddOpen(true)}><Import className="h-4 w-4" />Import resources</Button><Button onClick={() => setAddOpen(true)}><UserPlus className="h-4 w-4" />Add resource</Button></div></div>
-    <div className="flex gap-2 border-b border-border"><Button variant={view === "resources" ? "default" : "ghost"} onClick={() => setView("resources")}>Resources</Button><Button variant={view === "leave" ? "default" : "ghost"} onClick={() => setView("leave")}>Leave Planner</Button></div>
-    {view === "resources" ? <>
+    {embedded && !leaveOnly && <div><h2 className="text-xl font-semibold">Resources</h2><p className="mt-1 text-sm text-muted-foreground">Capacity, workload and leave planning for this project team.</p></div>}
+    {!embedded && <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-2xl font-bold tracking-tight">Resource Management</h2><p className="mt-1 text-sm text-muted-foreground">Manage project resources, skills, availability and workload{activeProject ? ` for ${activeProject.name}` : ""}.</p></div><div className="flex gap-2"><Button variant="outline" onClick={() => setAddOpen(true)}><Import className="h-4 w-4" />Import resources</Button><Button onClick={() => setAddOpen(true)}><UserPlus className="h-4 w-4" />Add resource</Button></div></div>}
+    {!embedded && <div className="flex gap-2 border-b border-border"><Button variant={view === "resources" ? "default" : "ghost"} onClick={() => setView("resources")}>Resources</Button><Button variant={view === "leave" ? "default" : "ghost"} onClick={() => setView("leave")}>Leave Planner</Button></div>}
+    {((embedded && !leaveOnly) || (!embedded && view === "resources")) ? <>
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">{metrics.map(([label, value, Icon]) => <Card key={label}><CardContent className="flex items-center justify-between p-4"><div><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-2xl font-bold">{value}</p></div><Icon className="h-5 w-5 text-primary" /></CardContent></Card>)}</div>
     <Card><CardContent className="flex flex-wrap gap-2 p-3"><div className="relative min-w-52 flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={query} onChange={(event) => setQuery(event.target.value)} className="pl-9" placeholder="Search resources, roles or skills..." /></div><select value={status} onChange={(event) => setStatus(event.target.value)} className="h-9 rounded-lg border border-input bg-background px-3 text-sm"><option value="all">All availability</option><option>Available</option><option>Optimal</option><option>Near Capacity</option><option>Over-allocated</option><option>On Leave</option></select><Button variant="outline" size="sm" onClick={() => { setQuery(""); setStatus("all"); }}>Reset filters</Button><Button variant="outline" size="sm" onClick={() => setCards((value) => !value)}>{cards ? "Table" : "Cards"}</Button></CardContent></Card>
     {loading ? <Skeleton className="h-96 w-full" /> : cards ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{filtered.map((resource) => <ResourceCard key={resource.id} resource={resource} onView={() => setSelected(resource)} />)}</div> : <ResourceTable resources={filtered} onView={setSelected} />}
     <div className="grid gap-4 xl:grid-cols-2"><Utilization resources={resources} average={average} /><Conflicts resources={resources} /></div>
-    </> : <LeavePlanner resources={resources} loading={loading} onPlan={setSelectedLeave} />}
+    </> : null}
+    {((embedded && leaveOnly) || (!embedded && view === "leave")) && <LeavePlanner resources={resources} loading={loading} onPlan={setSelectedLeave} />}
     {selected && <ResourceDrawer resource={selected} onClose={() => setSelected(null)} />}
     {addOpen && <AddResourceModal onClose={() => setAddOpen(false)} />}
     <ResourceProfileModal capacity={selectedLeave} phases={phases} capacityRecords={capacity} open={Boolean(selectedLeave)} onOpenChange={(open) => !open && setSelectedLeave(null)} onApplyLeave={isPM ? applyLeave : undefined} />
@@ -89,10 +95,66 @@ export function ResourceManagementPage() {
 }
 
 function LeavePlanner({ resources, loading, onPlan }) {
-  const onLeave = resources.filter((resource) => resource.leaveDate || resource.offToday).sort((a, b) => new Date(a.leaveDate ?? 0) - new Date(b.leaveDate ?? 0));
-  return <div className="space-y-4"><Card><CardHeader><CardTitle className="text-base">Leave Planner</CardTitle><CardDescription>Plan team leave, review existing leave, and check schedule impact before applying it.</CardDescription></CardHeader><CardContent><div className="grid gap-3 sm:grid-cols-3"><div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Project resources</p><p className="mt-1 text-2xl font-bold">{resources.length}</p></div><div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">On leave today</p><p className="mt-1 text-2xl font-bold">{resources.filter((resource) => resource.offToday).length}</p></div><div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Scheduled leave</p><p className="mt-1 text-2xl font-bold">{onLeave.length}</p></div></div></CardContent></Card>
-    <Card><CardHeader><CardTitle className="text-base">Team leave schedule</CardTitle><CardDescription>Choose a resource to enter or update leave dates and preview task reassignment.</CardDescription></CardHeader><CardContent>{loading ? <Skeleton className="h-40 w-full" /> : resources.length === 0 ? <p className="py-8 text-center text-sm text-muted-foreground">No resources are configured for this project.</p> : <div className="divide-y divide-border">{resources.map((resource) => <div key={resource.id} className="flex flex-wrap items-center justify-between gap-3 py-3"><div><p className="font-medium">{resource.name}</p><p className="text-xs text-muted-foreground">{resource.role}{resource.leaveDate ? ` · ${getLeaveLabel(resource.leaveType, resource.leaveHours)} · ${formatShortDate(resource.leaveDate)}` : " · No leave scheduled"}</p></div><Button variant={resource.leaveDate ? "outline" : "default"} size="sm" onClick={() => onPlan(resource)}>{resource.leaveDate ? "Edit leave" : "Plan leave"}</Button></div>)}</div>}</CardContent></Card>
-  </div>;
+  const scheduled = resources.filter((resource) => resource.leaveDate);
+  const onLeaveToday = resources.filter((resource) => resource.offToday).length;
+  const orderedResources = [...resources].sort((a, b) => {
+    if (a.offToday !== b.offToday) return a.offToday ? -1 : 1;
+    if (Boolean(a.leaveDate) !== Boolean(b.leaveDate)) return a.leaveDate ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h3 className="text-lg font-semibold tracking-tight">Leave planner</h3>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">Schedule team time off and review how it affects assigned work.</p>
+        </div>
+        <div className="flex flex-wrap gap-2 text-xs">
+          {["Full day", "Half day", "Custom hours"].map((type) => <span key={type} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1.5 text-muted-foreground"><Clock3 className="h-3 w-3" />{type}</span>)}
+        </div>
+      </div>
+
+      <div className="grid overflow-hidden rounded-xl border border-border bg-card sm:grid-cols-3 sm:divide-x sm:divide-border">
+        {[
+          ["Team members", resources.length],
+          ["On leave today", onLeaveToday],
+          ["Leave entries", scheduled.length],
+        ].map(([label, value], index) => (
+          <div key={label} className={`flex items-center justify-between px-4 py-3 ${index < 2 ? "border-b border-border sm:border-b-0" : ""}`}>
+            <span className="text-sm text-muted-foreground">{label}</span>
+            <span className="text-lg font-semibold tabular-nums">{loading ? "..." : value}</span>
+          </div>
+        ))}
+      </div>
+
+      <Card className="overflow-hidden shadow-none">
+        <CardHeader className="border-b border-border bg-muted/20 py-4">
+          <CardTitle className="text-sm">Team leave schedule</CardTitle>
+          <CardDescription>Choose a team member to plan or update leave.</CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          {loading ? <div className="space-y-3 p-4">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}</div>
+            : orderedResources.length === 0 ? <p className="px-5 py-12 text-center text-sm text-muted-foreground">No team members are available for leave planning.</p>
+              : <div className="divide-y divide-border">{orderedResources.map((resource) => {
+                const hasLeave = Boolean(resource.leaveDate);
+                return <div key={resource.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3.5 transition-colors hover:bg-muted/20 sm:px-5">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <Avatar className="h-10 w-10 border border-border text-xs"><AvatarFallback>{initials(resource.name)}</AvatarFallback></Avatar>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2"><p className="truncate text-sm font-medium">{resource.name}</p>
+                        {resource.offToday ? <Badge variant="warning" className="text-[10px]">On leave today</Badge> : hasLeave ? <Badge variant="outline" className="text-[10px]">Scheduled</Badge> : <Badge variant="secondary" className="text-[10px]">Available</Badge>}
+                      </div>
+                      <p className="mt-0.5 text-xs text-muted-foreground">{resource.role}{hasLeave ? ` · ${getLeaveLabel(resource.leaveType, resource.leaveHours)} · ${formatShortDate(resource.leaveDate)}` : " · No leave scheduled"}</p>
+                    </div>
+                  </div>
+                  <Button variant={hasLeave ? "outline" : "default"} size="sm" className="min-w-24" onClick={() => onPlan(resource)}>{hasLeave ? "Edit leave" : "Plan leave"}</Button>
+                </div>;
+              })}</div>}
+        </CardContent>
+      </Card>
+    </div>
+  );
 }
 
 function Utilization({ resources, average }) { return <Card><CardHeader><CardTitle className="text-base">Team utilization</CardTitle><CardDescription>Capacity signals used for task suitability and re-optimization.</CardDescription></CardHeader><CardContent className="space-y-3">{resources.map((r) => <div key={r.id}><div className="flex justify-between text-sm"><span>{r.name}</span><span className="font-semibold">{r.utilization}%</span></div><div className="mt-1.5 h-2 rounded-full bg-muted"><div className={r.utilization > 100 ? "h-full rounded-full bg-destructive" : r.utilization >= 85 ? "h-full rounded-full bg-amber-500" : "h-full rounded-full bg-primary"} style={{ width: `${Math.min(r.utilization, 100)}%` }} /></div></div>)}<p className="border-t pt-3 text-sm text-muted-foreground">Average utilization: <span className="font-semibold text-foreground">{average}%</span></p></CardContent></Card>; }

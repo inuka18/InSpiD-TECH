@@ -1,6 +1,6 @@
 import { createContext, useContext, useMemo, useState } from "react";
 
-const DEFAULT_WORK_CALENDAR = { workdays: [1, 2, 3, 4, 5], hoursPerDay: 8, startHour: 9 };
+const DEFAULT_WORK_CALENDAR = { workdays: [1, 2, 3, 4, 5], hoursPerDay: 8, startHour: 9, sprintDays: 10 };
 const WorkCalendarContext = createContext(null);
 
 export function WorkCalendarProvider({ children }) {
