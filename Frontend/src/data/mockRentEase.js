@@ -14,12 +14,12 @@ export const RENT_EASE_PROJECT = {
 };
 
 export const rentEaseTeam = [
-  { id: "re-pm", projectId: RENT_EASE_PROJECT_ID, name: "Project Manager", initials: "PM", email: "pm@rentease.demo", jobTitle: "Project Manager", appRole: "pm" },
-  { id: "re-ba", projectId: RENT_EASE_PROJECT_ID, name: "Business Analyst", initials: "BA", email: "ba@rentease.demo", jobTitle: "Business Analyst", appRole: "member" },
-  { id: "re-se1", projectId: RENT_EASE_PROJECT_ID, name: "Software Engineer 1", initials: "SE1", email: "se1@rentease.demo", jobTitle: "Backend Developer", appRole: "member" },
-  { id: "re-se2", projectId: RENT_EASE_PROJECT_ID, name: "Software Engineer 2", initials: "SE2", email: "se2@rentease.demo", jobTitle: "Frontend Developer", appRole: "member" },
-  { id: "re-qa", projectId: RENT_EASE_PROJECT_ID, name: "Quality Assurance Engineer", initials: "QA", email: "qa@rentease.demo", jobTitle: "QA Engineer", appRole: "member" },
-  { id: "re-ux", projectId: RENT_EASE_PROJECT_ID, name: "UI/UX Designer", initials: "UX", email: "ux@rentease.demo", jobTitle: "UX/UI Designer", appRole: "member" },
+  { id: "re-pm", projectId: RENT_EASE_PROJECT_ID, name: "Tharindu Bandara", initials: "TB", email: "pm@rentease.demo", jobTitle: "Project Manager", appRole: "pm" },
+  { id: "re-ba", projectId: RENT_EASE_PROJECT_ID, name: "Nadeesha Fernando", initials: "NF", email: "ba@rentease.demo", jobTitle: "Business Analyst", appRole: "member" },
+  { id: "re-se1", projectId: RENT_EASE_PROJECT_ID, name: "Chamika Rathnayake", initials: "CR", email: "se1@rentease.demo", jobTitle: "Backend Developer", appRole: "member" },
+  { id: "re-se2", projectId: RENT_EASE_PROJECT_ID, name: "Malith Perera", initials: "MP", email: "se2@rentease.demo", jobTitle: "Frontend Developer", appRole: "member" },
+  { id: "re-qa", projectId: RENT_EASE_PROJECT_ID, name: "Anjali Fonseka", initials: "AF", email: "qa@rentease.demo", jobTitle: "QA Engineer", appRole: "member" },
+  { id: "re-ux", projectId: RENT_EASE_PROJECT_ID, name: "Sanduni Rajapaksha", initials: "SR", email: "ux@rentease.demo", jobTitle: "UX/UI Designer", appRole: "member" },
 ];
 
 const SPRINTS = [

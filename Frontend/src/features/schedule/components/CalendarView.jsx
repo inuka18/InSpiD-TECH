@@ -6,9 +6,12 @@ import { Skeleton } from "../../../components/ui/skeleton";
 import { useSchedulePhases } from "../../../hooks/useSchedulePhases";
 import { useResourceCapacity } from "../../../hooks/useResourceCapacity";
 import { getTeamMemberById } from "../../../data/mockTeam";
-import { flattenTasks, startOfMonth, addDays, isSameDay, TODAY } from "../lib/scheduleUtils";
+import { flattenTasks, startOfMonth, addDays, isSameDay, TODAY, statusBarClass, statusLabel } from "../lib/scheduleUtils";
 import { cn } from "../../../lib/utils";
-import { useWorkCalendar } from "../context/WorkCalendarContext";
+import { addWorkingDays, addWorkingMinutes, endOfWorkingDays, normalizeWorkingStart, useWorkCalendar } from "../context/WorkCalendarContext";
+import { useScheduleHistory } from "../context/ScheduleHistoryContext";
+import { useRole, ROLES } from "../../../context/RoleContext";
+import { getTaskEffortMinutes } from "../lib/requirementPlanner";
 
 
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -62,6 +65,9 @@ export function CalendarView({ projectId, project, onOpenDay }) {
   const calendarToday = projectId === "proj-inspid-platform" ? new Date() : TODAY;
   const [monthAnchor, setMonthAnchor] = useState(() => project?.startDate ? new Date(project.startDate) : TODAY);
   const { settings } = useWorkCalendar();
+  const { pushHistory, refreshSchedule } = useScheduleHistory();
+  const { role } = useRole();
+  const canReschedule = role === ROLES.PM;
 
 
   useEffect(() => {
@@ -93,9 +99,8 @@ export function CalendarView({ projectId, project, onOpenDay }) {
   const anchorMonth = monthAnchor.getMonth();
   const monthLabel = monthAnchor.toLocaleDateString(undefined, { month: "long", year: "numeric" });
   const sprint = project?.activeSprint;
-  const sprintStartDate = sprint ? new Date(sprint.startDate) : null;
-  const sprintEndDate = sprintStartDate ? addDays(sprintStartDate, Number(settings.sprintDays ?? 10) - 1) : null;
-  if (sprintEndDate) sprintEndDate.setHours(23, 59, 59, 999);
+  const sprintStartDate = sprint ? addWorkingDays(new Date(sprint.startDate), 0, settings.workdays) : null;
+  const sprintEndDate = sprintStartDate ? endOfWorkingDays(sprintStartDate, Number(settings.sprintDays ?? 10), settings.workdays) : null;
 
   const tasksForDay = (day) =>
     tasks.filter((t) => {
@@ -126,6 +131,32 @@ export function CalendarView({ projectId, project, onOpenDay }) {
   const openDay = (day) => {
     onOpenDay?.();
     navigate(`/projects/${projectId}/schedule/day?date=${dateKey(day)}`);
+  };
+
+  const handleTaskDrop = (event, targetDay) => {
+    event.preventDefault();
+    const task = tasks.find((item) => item.id === event.dataTransfer.getData("text/task-id"));
+    if (!task || !canReschedule) return;
+    const originalStart = task.start;
+    const originalEnd = task.end;
+    const sourceDay = new Date(`${event.dataTransfer.getData("text/source-date")}T12:00:00`);
+    if (Number.isNaN(sourceDay.getTime()) || !settings.workdays.includes(targetDay.getDay())) return;
+    const taskStart = new Date(task.start);
+    const sourceDate = new Date(sourceDay.getFullYear(), sourceDay.getMonth(), sourceDay.getDate());
+    const startDate = new Date(taskStart.getFullYear(), taskStart.getMonth(), taskStart.getDate());
+    let workdayOffset = 0;
+    for (const cursor = new Date(startDate); cursor < sourceDate; cursor.setDate(cursor.getDate() + 1)) {
+      if (settings.workdays.includes(cursor.getDay())) workdayOffset += 1;
+    }
+    const nextStart = normalizeWorkingStart(addWorkingDays(targetDay, -workdayOffset, settings.workdays), settings);
+    if (dateKey(nextStart) === dateKey(task.start)) return;
+    task.start = nextStart.toISOString();
+    task.end = addWorkingMinutes(nextStart, getTaskEffortMinutes(task, settings), settings).toISOString();
+    pushHistory(`Rescheduled "${task.name}" from calendar`, () => {
+      task.start = originalStart;
+      task.end = originalEnd;
+    });
+    refreshSchedule();
   };
 
   if (loading) {
@@ -199,9 +230,8 @@ export function CalendarView({ projectId, project, onOpenDay }) {
           const inMonth = day.getMonth() === anchorMonth;
           const today = isSameDay(day, calendarToday);
           const weekend = !settings.workdays.includes(day.getDay());
-          // Tasks remain available to derive leave and milestone indicators,
-          // but the calendar deliberately avoids rendering a task list.
-          const dayTasks = inMonth ? tasksForDay(day) : [];
+          const isWorkingDay = settings.workdays.includes(day.getDay());
+          const dayTasks = inMonth && isWorkingDay ? tasksForDay(day) : [];
           const milestoneCount = dayTasks.filter((task) => task.milestone).length;
           const inSprint = sprint && day >= sprintStartDate && day <= sprintEndDate;
           const sprintStart = sprint && isSameDay(day, sprintStartDate);
@@ -212,11 +242,14 @@ export function CalendarView({ projectId, project, onOpenDay }) {
               key={idx}
               type="button"
               onClick={() => openDay(day)}
+              onDragOver={canReschedule && settings.workdays.includes(day.getDay()) ? (event) => event.preventDefault() : undefined}
+              onDrop={canReschedule && settings.workdays.includes(day.getDay()) ? (event) => handleTaskDrop(event, day) : undefined}
               aria-label={`Open day view for ${day.toLocaleDateString()}`}
               className={cn(
                 "min-h-[6.5rem] rounded-lg border p-2 text-left transition-all hover:border-primary/50 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
                 inMonth ? "border-border bg-background" : "border-border/50 bg-muted/20",
                 inMonth && weekend && "border-rose-100 bg-rose-50/70",
+                inMonth && !isWorkingDay && "opacity-75",
                 inMonth && inSprint && "border-t-2 border-t-violet-500",
                 today && "border-2 border-blue-400 bg-background"
               )}
@@ -248,6 +281,28 @@ export function CalendarView({ projectId, project, onOpenDay }) {
                   <span className="h-2 w-2 rounded-full bg-amber-700" />
                   {milestoneCount} milestone{milestoneCount === 1 ? "" : "s"}
                 </span>
+              )}
+              {inMonth && dayTasks.length > 0 && (
+                <div className="mt-1 space-y-1">
+                  {dayTasks.slice(0, 3).map((task) => (
+                    <div
+                      key={task.id}
+                      draggable={canReschedule}
+                      onDragStart={canReschedule ? (event) => {
+                        event.stopPropagation();
+                        event.dataTransfer.setData("text/task-id", task.id);
+                        event.dataTransfer.setData("text/source-date", dateKey(day));
+                        event.dataTransfer.effectAllowed = "move";
+                      } : undefined}
+                      onClick={(event) => event.stopPropagation()}
+                      title={`${task.name} · ${statusLabel(task)} · ${canReschedule ? "Drag to reschedule" : task.id}`}
+                      className={cn("truncate rounded px-1.5 py-0.5 text-[10px] font-medium text-white", statusBarClass(task), canReschedule && "cursor-grab active:cursor-grabbing")}
+                    >
+                      {task.name}
+                    </div>
+                  ))}
+                  {dayTasks.length > 3 && <span className="block truncate px-1 text-[9px] text-muted-foreground">+{dayTasks.length - 3} more tasks</span>}
+                </div>
               )}
             </button>
           );

@@ -1,5 +1,5 @@
 import { AlertTriangle, CircleHelp, Code2, Cpu, Server, UsersRound } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "../../../components/ui/card";
 import { cn } from "../../../lib/utils";
 
 const CAUSE_CATEGORIES = [
@@ -37,11 +37,6 @@ export function RootCausePanel({ tasks = [], label, onSelectCause }) {
           </span>
           <div className="min-w-0">
             <CardTitle className="text-base">Root Cause Analysis{label ? ` · ${label}` : ""}</CardTitle>
-            <CardDescription className="mt-1">
-              {causeTasks.length
-                ? `${causeTasks.length} task${causeTasks.length === 1 ? "" : "s"} with a recorded cause, grouped into five categories.`
-                : `No delay causes are recorded for this ${label?.toLowerCase() ?? "schedule"} yet.`}
-            </CardDescription>
           </div>
         </div>
       </CardHeader>

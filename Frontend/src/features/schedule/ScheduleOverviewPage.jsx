@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ListChecks, RotateCcw, CheckCircle2, Save, Database, CalendarDays, Users, Target, Clock3 } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../../components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Skeleton } from "../../components/ui/skeleton";
@@ -88,8 +88,8 @@ export function ScheduleOverviewPage() {
   // ── KPI row ──────────────────────────────────────────────────────────────
   const totalTasks = tasks.length;
   const criticalAtRisk = tasks.filter((t) => t.critical && isAtRisk(t));
+  const totalSlipDays = criticalAtRisk.reduce((sum, t) => sum + Math.max(0, varianceDays(t)), 0);
   // ── Buffer redistribution ─────────────────────────────────────────────────
-  const totalSlipDays    = criticalAtRisk.reduce((sum, t) => sum + Math.max(0, varianceDays(t)), 0);
   const donorTasksRaw    = tasks.filter((t) => !t.critical && !isAtRisk(t) && t.status !== "done");
   const criticalWithDonors = criticalAtRisk.map((t) => ({
     task: t,
@@ -159,7 +159,7 @@ export function ScheduleOverviewPage() {
 
   // ── Sprint burndown ───────────────────────────────────────────────────────
   if (!loading && totalTasks === 0) {
-    return <EmptyState icon={ListChecks} title="No schedule data yet" description="No phases or tasks scheduled yet." />;
+    return <EmptyState icon={ListChecks} title="No schedule data yet" />;
   }
 
   return (
@@ -201,7 +201,6 @@ export function ScheduleOverviewPage() {
           <Card className="border-primary/20">
             <CardHeader>
               <div className="flex items-center gap-2"><Database className="h-4 w-4 text-primary" /><CardTitle className="text-base">Schedule inputs</CardTitle></div>
-              <CardDescription>Detected requirement, execution, and resource gaps that may affect the schedule.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
               {openGaps.slice(0, 3).map((gap) => <div key={gap.id} className="flex items-center justify-between gap-3 rounded-lg border border-border p-3"><div className="min-w-0"><p className="truncate text-sm font-medium">{gap.title}</p><p className="mt-0.5 text-xs text-muted-foreground">{gap.type} gap · {gap.taskIds.length} linked task{gap.taskIds.length === 1 ? "" : "s"} · {gap.confidence}% confidence</p></div><Badge variant={gap.severity === "High" ? "danger" : gap.severity === "Medium" ? "warning" : "outline"}>{gap.severity}</Badge></div>)}
@@ -209,9 +208,9 @@ export function ScheduleOverviewPage() {
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="flex-row items-start justify-between gap-3 space-y-0"><div><CardTitle className="text-base">Schedule versions</CardTitle><CardDescription>Original plan dates stay fixed. Save and inspect snapshots of the current schedule.</CardDescription></div><Button size="sm" disabled={!isPM || tasks.length === 0} onClick={() => { const version = saveVersion("Manual schedule snapshot", tasks, activeProjectId); setSelectedVersionId(version.id); setToast(`Saved ${version.label} with ${version.taskCount} tasks.`); }}><Save className="h-4 w-4" />Save version</Button></CardHeader>
+          <CardHeader className="flex-row items-start justify-between gap-3 space-y-0"><div><CardTitle className="text-base">Schedule versions</CardTitle></div><Button size="sm" disabled={!isPM || tasks.length === 0} onClick={() => { const version = saveVersion("Manual schedule snapshot", tasks, activeProjectId); setSelectedVersionId(version.id); setToast(`Saved ${version.label} with ${version.taskCount} tasks.`); }}><Save className="h-4 w-4" />Save version</Button></CardHeader>
             <CardContent className="space-y-2">
-              {projectVersions.length ? <div className="max-h-64 space-y-2 overflow-y-auto pr-1">{projectVersions.map((version) => <div key={version.id} className={`flex items-center justify-between gap-3 rounded-lg border p-3 ${selectedVersionId === version.id ? "border-primary/40 bg-primary/[0.04]" : "border-border"}`}><div className="min-w-0"><p className="truncate text-sm font-medium">{version.label}</p><p className="text-xs text-muted-foreground">{new Date(version.createdAt).toLocaleString()} · {version.taskCount} tasks</p></div><Button variant={selectedVersionId === version.id ? "secondary" : "outline"} size="sm" onClick={() => setSelectedVersionId(selectedVersionId === version.id ? null : version.id)}>{selectedVersionId === version.id ? "Hide" : "View"}</Button></div>)}</div> : <p className="py-4 text-center text-sm text-muted-foreground">No saved versions for this project. Save the current schedule to keep a snapshot.</p>}
+              {projectVersions.length ? <div className="max-h-64 space-y-2 overflow-y-auto pr-1">{projectVersions.map((version) => <div key={version.id} className={`flex items-center justify-between gap-3 rounded-lg border p-3 ${selectedVersionId === version.id ? "border-primary/40 bg-primary/[0.04]" : "border-border"}`}><div className="min-w-0"><p className="truncate text-sm font-medium">{version.label}</p><p className="text-xs text-muted-foreground">{new Date(version.createdAt).toLocaleString()} · {version.taskCount} tasks</p></div><Button variant={selectedVersionId === version.id ? "secondary" : "outline"} size="sm" onClick={() => setSelectedVersionId(selectedVersionId === version.id ? null : version.id)}>{selectedVersionId === version.id ? "Hide" : "View"}</Button></div>)}</div> : <p className="py-4 text-center text-sm text-muted-foreground">No saved versions</p>}
               {selectedVersion && <div className="mt-3 overflow-hidden rounded-lg border border-border">
                 <div className="border-b border-border bg-muted/30 px-3 py-2"><p className="text-xs font-semibold">{selectedVersion.label}</p><p className="text-[10px] text-muted-foreground">Saved {new Date(selectedVersion.createdAt).toLocaleString()}</p></div>
                 <div className="max-h-72 overflow-auto"><table className="w-full min-w-[570px] text-left text-[10px]"><thead className="sticky top-0 bg-card text-muted-foreground"><tr>{["Task", "Start", "Finish", "Status", "Progress"].map((heading) => <th key={heading} className="border-b border-border px-2.5 py-2 font-semibold">{heading}</th>)}</tr></thead><tbody>{selectedVersion.snapshot.map((task) => <tr key={task.id} className="border-b border-border/60 last:border-0"><td className="max-w-40 px-2.5 py-2"><p className="truncate font-medium text-foreground" title={task.name}>{task.name ?? task.id}</p><p className="font-mono text-[9px] text-muted-foreground">{task.id}</p></td><td className="whitespace-nowrap px-2.5 py-2">{formatShortDate(task.start)}</td><td className="whitespace-nowrap px-2.5 py-2">{formatShortDate(task.end)}</td><td className="whitespace-nowrap px-2.5 py-2">{task.status}</td><td className="px-2.5 py-2 tabular-nums">{task.progress ?? 0}%</td></tr>)}</tbody></table></div>
@@ -252,8 +251,7 @@ export function ScheduleOverviewPage() {
               <RotateCcw className="h-4.5 w-4.5" />
             </div>
             <p className="text-sm leading-relaxed text-foreground">
-              <span className="font-semibold">Redistribute slack:</span> pull buffer from non-critical tasks to
-              protect impacted critical-path work: {criticalAtRisk.length} delayed, {totalSlipDays}d total slip.
+              {criticalAtRisk.length} delayed · {totalSlipDays}d slip
             </p>
           </div>
           {isPM ? (
@@ -281,7 +279,6 @@ export function ScheduleOverviewPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Planned vs. Actual: Multi-Level Variance</CardTitle>
-            <CardDescription>On-track vs. delayed mix at every planning granularity.</CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? <Skeleton className="h-56 w-full" /> : <VarianceChart levels={levels} onSelectLevel={handleSelectLevel} />}
@@ -293,7 +290,6 @@ export function ScheduleOverviewPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Task Duration Estimation &amp; Forecast</CardTitle>
-            <CardDescription>Compare each baseline estimate with the current duration forecast after schedule re-optimization.</CardDescription>
           </CardHeader>
           <CardContent>
             <DurationEstimateChart tasks={tasks} onSelectTask={(task) => setListDrill({ title: task.name, subtitle: "Task duration estimate and current forecast", tasks: [task] })} />

@@ -6,15 +6,14 @@ const ScheduleHistoryContext = createContext(null);
 // 3 (drag-to-reschedule, Redistribute Buffers), wraps ScheduleLayout's
 // <Outlet> so any descendant page can push an entry. Entries carry a
 // `restore()` closure that writes the pre-mutation values straight back
-// onto the same (shared, unshared-clone) task objects every read path
+// onto the same shared task objects every read path
 // already points at, the same direct-mutation model the rest of this
 // prototype uses, just with a memory of what it overwrote.
 //
-// `refreshToken` only advances on undo (never on push: the action that
-// pushed an entry already re-rendered its own view). It's used as the
+// `refreshToken` advances after a mutation or undo. It's used as the
 // Outlet's `key` so undoing while looking at a *different* page than the
 // one that made the mutation still forces a fresh read of the
-// now-reverted data, without every drag remounting the whole route.
+// latest data after a change or undo.
 export function ScheduleHistoryProvider({ children }) {
   const [stack, setStack] = useState([]);
   const [versions, setVersions] = useState(() => {
@@ -38,6 +37,10 @@ export function ScheduleHistoryProvider({ children }) {
       setRefreshToken((t) => t + 1);
       return prev.slice(0, -1);
     });
+  }, []);
+
+  const refreshSchedule = useCallback(() => {
+    setRefreshToken((token) => token + 1);
   }, []);
 
   const saveVersion = useCallback((label, tasks, projectId) => {
@@ -77,13 +80,14 @@ export function ScheduleHistoryProvider({ children }) {
     () => ({
       pushHistory,
       undo,
+      refreshSchedule,
       canUndo: stack.length > 0,
       lastLabel: stack[stack.length - 1]?.label ?? null,
       refreshToken,
       versions,
       saveVersion,
     }),
-    [pushHistory, undo, stack, refreshToken, versions, saveVersion]
+    [pushHistory, undo, refreshSchedule, stack, refreshToken, versions, saveVersion]
   );
 
   return <ScheduleHistoryContext.Provider value={value}>{children}</ScheduleHistoryContext.Provider>;

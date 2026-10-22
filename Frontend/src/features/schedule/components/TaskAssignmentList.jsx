@@ -49,7 +49,7 @@ function workingMinutesInTimeline(start, end, settings) {
 }
 
 export function TaskAssignmentList({ tasks = [], onSelectTask, isPM }) {
-  const { pushHistory, saveVersion } = useScheduleHistory();
+  const { pushHistory, saveVersion, refreshSchedule } = useScheduleHistory();
   const { settings: workCalendar } = useWorkCalendar();
   const { role } = useRole();
   const canEdit = isPM ?? role === ROLES.PM;
@@ -84,7 +84,8 @@ export function TaskAssignmentList({ tasks = [], onSelectTask, isPM }) {
   const resetPage = () => setPage(0);
 
   const relevantPeople = (task) => {
-    const requiredRole = task.role ?? requirementsById.get(task.requirementId)?.resourceRole;
+    const assignedRole = taskAssigneeIds(task).map(getTeamMemberById).find((person) => person?.jobTitle)?.jobTitle;
+    const requiredRole = task.role ?? requirementsById.get(task.requirementId)?.resourceRole ?? assignedRole;
     const matchingRole = ROLE_ALIASES[requiredRole] ?? requiredRole;
     return team.filter((person) => person.jobTitle === matchingRole);
   };
@@ -93,6 +94,7 @@ export function TaskAssignmentList({ tasks = [], onSelectTask, isPM }) {
     Object.assign(task, update);
     pushHistory(label, () => Object.assign(task, previous));
     setRevision((value) => value + 1);
+    refreshSchedule();
   };
   const manuallySetStatus = (task, nextStatus) => {
     if (!canEdit || !TASK_STATUSES.some((item) => item.value === nextStatus) || task.status === nextStatus) return;
@@ -155,14 +157,14 @@ export function TaskAssignmentList({ tasks = [], onSelectTask, isPM }) {
     setRevision((value) => value + 1);
   };
 
-  if (tasks.length === 0) return <div className="rounded-xl border border-dashed border-border bg-muted/10 px-6 py-10 text-center"><CalendarDays className="mx-auto h-7 w-7 text-muted-foreground/60" /><p className="mt-2 text-sm font-medium text-foreground">No assignments in this period</p><p className="mt-1 text-xs text-muted-foreground">Tasks scheduled for this view will appear here.</p></div>;
+  if (tasks.length === 0) return <div className="rounded-xl border border-dashed border-border bg-muted/10 px-6 py-10 text-center"><CalendarDays className="mx-auto h-7 w-7 text-muted-foreground/60" /><p className="mt-2 text-sm font-medium text-foreground">No assignments in this period</p></div>;
 
   return (
     <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-gradient-to-r from-muted/40 to-card px-4 py-4 sm:px-5">
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><CalendarDays className="h-5 w-5" /></span>
-          <div><h3 className="text-sm font-semibold text-foreground">Task assignments</h3><p className="mt-0.5 text-xs text-muted-foreground">Owners, effort, and delivery dates for this schedule window</p></div>
+          <div><h3 className="text-sm font-semibold text-foreground">Task assignments</h3></div>
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="bg-background">{filteredTasks.length} {filteredTasks.length === 1 ? "task" : "tasks"}</Badge>
@@ -190,13 +192,14 @@ export function TaskAssignmentList({ tasks = [], onSelectTask, isPM }) {
               const editable = canEdit && !isCompleted;
               const peopleForRole = relevantPeople(task);
               const requirement = requirementsById.get(task.requirementId);
+              const resourceRole = task.role || requirement?.resourceRole || [...new Set(assignees.map((person) => person.jobTitle).filter(Boolean))].join(", ") || "Role not set";
               const progress = Math.min(100, Math.max(0, task.progress ?? 0));
               const late = isLate(task);
               const progressColor = late ? "bg-red-500" : task.status === "done" ? "bg-emerald-500" : task.status === "review" ? "bg-amber-500" : task.status === "in-progress" ? "bg-blue-500" : "bg-slate-400";
               return (
                 <tr key={task.id} onClick={() => onSelectTask?.(task)} className={cn("group border-t border-border/60 transition-colors hover:bg-blue-50/50 dark:hover:bg-blue-950/15", index % 2 && "bg-slate-50/60 dark:bg-slate-900/15", task.critical && "border-l-2 border-l-red-400", onSelectTask && "cursor-pointer")}>
                   <td className="px-5 py-3.5 align-top"><div className="flex items-start gap-2.5"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="font-mono text-[10px] font-medium text-muted-foreground">{task.id}</span>{task.critical && <Badge variant="danger" className="px-1.5 py-0 text-[9px]">Critical</Badge>}</div><p className="mt-1 max-w-sm font-semibold leading-snug text-foreground">{task.name}</p><p className="mt-1 text-[11px] text-muted-foreground">{requirement?.title ?? task.requirementId ?? "No requirement linked"}</p></div></div></td>
-                  <td className="px-4 py-3.5 align-top"><div className="flex items-start gap-2.5"><div className="flex shrink-0 items-center -space-x-2">{assignees.length ? assignees.slice(0, 3).map((person) => <Avatar key={person.id} title={person.name} className="h-7 w-7 border-2 border-card text-[8px] shadow-sm ring-1 ring-border/50"><AvatarFallback className="bg-primary/10 text-primary">{person.initials ?? initialsFor(person.name)}</AvatarFallback></Avatar>) : <Avatar className="h-7 w-7 border-2 border-card text-[8px]"><AvatarFallback className="bg-muted text-muted-foreground">?</AvatarFallback></Avatar>}{assignees.length > 3 && <span className="z-10 flex h-6 w-6 items-center justify-center rounded-full border-2 border-card bg-muted text-[8px] font-semibold text-muted-foreground" title={assignees.slice(3).map((person) => person.name).join(", ")}>+{assignees.length - 3}</span>}</div><div className="min-w-0"><p className="whitespace-normal break-words text-xs font-medium leading-4 text-foreground">{assignees.length ? assignees.map((person) => person.name).join(", ") : "Unassigned"}</p><p className="mt-1 text-[10px] leading-3 text-muted-foreground">{task.role ?? requirement?.resourceRole ?? "Role not set"}</p></div></div>
+                  <td className="px-4 py-3.5 align-top"><div className="flex items-start gap-2.5"><div className="flex shrink-0 items-center -space-x-2">{assignees.length ? assignees.slice(0, 3).map((person) => <Avatar key={person.id} title={person.name} className="h-7 w-7 border-2 border-card text-[8px] shadow-sm ring-1 ring-border/50"><AvatarFallback className="bg-primary/10 text-primary">{person.initials ?? initialsFor(person.name)}</AvatarFallback></Avatar>) : <Avatar className="h-7 w-7 border-2 border-card text-[8px]"><AvatarFallback className="bg-muted text-muted-foreground">?</AvatarFallback></Avatar>}{assignees.length > 3 && <span className="z-10 flex h-6 w-6 items-center justify-center rounded-full border-2 border-card bg-muted text-[8px] font-semibold text-muted-foreground" title={assignees.slice(3).map((person) => person.name).join(", ")}>+{assignees.length - 3}</span>}</div><div className="min-w-0"><p className="whitespace-normal break-words text-xs font-medium leading-4 text-foreground">{assignees.length ? assignees.map((person) => person.name).join(", ") : "Unassigned"}</p><p className="mt-1 text-[10px] leading-3 text-muted-foreground">{resourceRole}</p></div></div>
                     {canEdit && !isCompleted && <select aria-label={`Change assignees for ${task.name}`} onClick={(event) => event.stopPropagation()} onChange={(event) => { manuallyAssign(task, event.target.value); event.target.value = ""; }} defaultValue="" className="mt-2 h-7 max-w-full rounded-md border border-input bg-background px-2 text-[10px] text-muted-foreground"><option value="" disabled>Manage team</option>{peopleForRole.map((person) => <option key={person.id} value={person.id} disabled={capacityByMember.get(person.id)?.offToday}>{taskAssigneeIds(task).includes(person.id) ? `Remove ${person.name}` : `Add ${person.name}`}{capacityByMember.get(person.id)?.offToday ? " · unavailable" : ""}</option>)}</select>}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3.5 align-top"><div className={cn("flex items-center gap-2 text-xs font-medium", late ? "text-red-600 dark:text-red-400" : "text-foreground")}><CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />{formatShortDate(task.start)}</div><p className={cn("mt-1.5 pl-[22px] text-[11px]", late ? "text-red-600/80 dark:text-red-400/80" : "text-muted-foreground")}>to {formatShortDate(task.end)}{late && <span className="ml-1 font-semibold">· Late</span>}</p></td>

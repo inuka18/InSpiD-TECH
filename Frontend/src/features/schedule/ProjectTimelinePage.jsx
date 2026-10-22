@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Route, ZoomIn, ZoomOut, GitCompare } from "lucide-react";
 import { RootCausePanel } from "./components/RootCausePanel";
 import { BaselineCompareModal } from "./components/BaselineCompareModal";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../../components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Skeleton } from "../../components/ui/skeleton";
 import { EmptyState } from "../../components/common/EmptyState";
@@ -15,8 +15,8 @@ import { useSchedulePhases } from "../../hooks/useSchedulePhases";
 import { useResourceCapacity } from "../../hooks/useResourceCapacity";
 import { useActiveProject } from "../../hooks/useActiveProject";
 import { useRole, ROLES } from "../../context/RoleContext";
-import { useWorkCalendar } from "./context/WorkCalendarContext";
-import { flattenTasks, formatShortDate, addDays } from "./lib/scheduleUtils";
+import { addWorkingDays, endOfWorkingDays, useWorkCalendar } from "./context/WorkCalendarContext";
+import { flattenTasks, formatShortDate } from "./lib/scheduleUtils";
 
 const MIN_PX_PER_DAY = 2;
 const MAX_PX_PER_DAY = 60;
@@ -41,15 +41,14 @@ export function ProjectTimelinePage() {
     const projectEnd = new Date(Math.max(...allTasks.map((task) => new Date(task.end).getTime())));
     projectStart.setHours(9, 0, 0, 0);
     if (activeStart) activeStart.setHours(9, 0, 0, 0);
-    const calendarSpan = Number(settings.sprintDays ?? 10);
+    const sprintWorkdays = Number(settings.sprintDays ?? 10);
     const firstSprintNumber = activeProject?.activeSprint?.number ?? 1;
     const sprints = [];
-    let start = projectStart;
+    let start = addWorkingDays(projectStart, 0, settings.workdays);
     let number = 1;
     while (start <= projectEnd) {
-      const end = addDays(start, calendarSpan - 1);
-      end.setHours(18, 0, 0, 0);
-      const nextStart = addDays(start, calendarSpan);
+      const end = endOfWorkingDays(start, sprintWorkdays, settings.workdays);
+      const nextStart = addWorkingDays(start, sprintWorkdays, settings.workdays);
       nextStart.setHours(9, 0, 0, 0);
       const isActive = activeStart && activeStart >= start && activeStart < nextStart;
       const sprintNumber = firstSprintNumber + number - 1;
@@ -63,7 +62,7 @@ export function ProjectTimelinePage() {
       });
       if (sprintTasks.length) sprints.push({
         id: `project-sprint-${number}`,
-        name: `${isActive ? activeProject.activeSprint.name : `Sprint ${Math.max(1, sprintNumber)}`} · ${calendarSpan} days`,
+        name: `${isActive ? activeProject.activeSprint.name : `Sprint ${Math.max(1, sprintNumber)}`} · ${sprintWorkdays} working days`,
         start: start.toISOString(),
         end: end.toISOString(),
         tasks: sprintTasks,
@@ -86,7 +85,7 @@ export function ProjectTimelinePage() {
   }, [phases, settings]);
 
   if (!loading && phases.length === 0) {
-    return <EmptyState icon={Route} title="No project timeline yet" description="No phases have been scheduled for this project." />;
+    return <EmptyState icon={Route} title="No project timeline yet" />;
   }
 
   return (
@@ -95,11 +94,7 @@ export function ProjectTimelinePage() {
         <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
           <div>
             <CardTitle className="text-base">Full Project Timeline</CardTitle>
-            <CardDescription>
-              {rangeStart && rangeEnd
-                ? `${formatShortDate(rangeStart)} – ${formatShortDate(rangeEnd)} across all four phases.`
-                : "Every phase and task from kickoff to launch."}
-            </CardDescription>
+            
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
             <Button
@@ -153,7 +148,6 @@ export function ProjectTimelinePage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Project Burndown</CardTitle>
-              <CardDescription>Planned versus actual effort across the full project timeline.</CardDescription>
             </CardHeader>
             <CardContent><BurndownChart tasks={allTasks} rangeStart={rangeStart} rangeEnd={rangeEnd} height={240} /></CardContent>
         </Card>
