@@ -3,31 +3,35 @@ import { CheckCircle2, AlertTriangle, TrendingUp } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../../../components/ui/card";
 import { overlapsRange, isAtRisk, varianceDays, formatShortDate, addDays, daysBetween } from "../lib/scheduleUtils";
 import { cn } from "../../../lib/utils";
+import { useWorkCalendar } from "../context/WorkCalendarContext";
 
-const SPRINT_LENGTH = 14;
-
-function buildAllSprints(tasks, activeSprint) {
+function buildAllSprints(tasks, activeSprint, sprintLength) {
   if (tasks.length === 0) return [];
 
-  const projectStart = new Date(Math.min(...tasks.map((t) => new Date(t.baselineStart))));
+  const projectStart = activeSprint?.startDate
+    ? new Date(activeSprint.startDate)
+    : new Date(Math.min(...tasks.map((t) => new Date(t.baselineStart))));
   const projectEnd   = new Date(Math.max(...tasks.map((t) => new Date(t.end))));
 
   const sprints = [];
   let cur = new Date(projectStart);
   cur.setHours(9, 0, 0, 0);
-  let idx = 1;
+  let idx = activeSprint?.number ?? 1;
 
   while (cur <= projectEnd) {
     const start = new Date(cur);
-    const end   = new Date(addDays(cur, SPRINT_LENGTH - 1));
+    const end   = new Date(addDays(cur, sprintLength - 1));
     end.setHours(18, 0, 0, 0);
 
-    const isActive = activeSprint
-      ? new Date(activeSprint.startDate) >= start && new Date(activeSprint.startDate) <= end
-      : false;
+    const isActive = activeSprint ? idx === activeSprint.number : false;
     const label = isActive ? activeSprint.name : `Sprint ${idx}`;
 
-    const sprintTasks = tasks.filter((t) => overlapsRange(t, start, end));
+    const sprintTasks = tasks.filter((task) => {
+      const assignedSprint = Number.isInteger(task.plannedSprintNumber)
+        ? task.plannedSprintNumber
+        : task.status === "done" && Number.isInteger(task.sprintNumber) ? task.sprintNumber : null;
+      return assignedSprint === null ? overlapsRange(task, start, end) : assignedSprint === idx;
+    });
     const delayed     = sprintTasks.filter(isAtRisk);
     const onTrack     = sprintTasks.filter((t) => !isAtRisk(t));
     const totalSlip   = delayed.reduce((s, t) => s + Math.max(0, varianceDays(t)), 0);
@@ -63,7 +67,7 @@ function buildAllSprints(tasks, activeSprint) {
         : 0,
     });
 
-    cur = addDays(cur, SPRINT_LENGTH);
+    cur = addDays(cur, sprintLength);
     idx++;
   }
 
@@ -89,7 +93,9 @@ function HealthBadge({ health }) {
 }
 
 export function SprintTimelineTable({ tasks = [], activeSprint }) {
-  const sprints = useMemo(() => buildAllSprints(tasks, activeSprint), [tasks, activeSprint]);
+  const { settings } = useWorkCalendar();
+  const sprintLength = Number(settings.sprintDays ?? 10);
+  const sprints = useMemo(() => buildAllSprints(tasks, activeSprint, sprintLength), [tasks, activeSprint, sprintLength]);
 
   if (sprints.length === 0) return null;
 
@@ -110,7 +116,7 @@ export function SprintTimelineTable({ tasks = [], activeSprint }) {
               <CardTitle className="text-base">All Sprints — Original vs Actual</CardTitle>
             </div>
             <CardDescription className="mt-0.5">
-              {totalSprints} sprint{totalSprints !== 1 ? "s" : ""} derived from project task range · 14-day windows
+              {totalSprints} sprint{totalSprints !== 1 ? "s" : ""} derived from project task range · {sprintLength}-day windows
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2">

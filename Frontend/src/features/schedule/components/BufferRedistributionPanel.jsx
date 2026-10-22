@@ -1,6 +1,8 @@
 import { Layers, CheckCircle2, ArrowRight } from "lucide-react";
 import { Badge } from "../../../components/ui/badge";
 
+const MAX_VISIBLE_TASKS = 5;
+
 // The two-column buffer view on Schedule Overview. Each
 // critical task's own `donor` (from Redistribute Buffers, see
 // pullTaskInByDays and task.bufferDonor) decides its own badge, so a
@@ -35,7 +37,7 @@ export function BufferRedistributionPanel({ isPM, criticalTasks, donorTasks }) {
                 No critical-path tasks behind baseline right now.
               </p>
             ) : (
-              criticalTasks.map(({ task, behindDays, donor }) => (
+              criticalTasks.slice(0, MAX_VISIBLE_TASKS).map(({ task, behindDays, donor }) => (
                 <div key={task.id} className="rounded-lg border border-border p-2.5">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -62,6 +64,11 @@ export function BufferRedistributionPanel({ isPM, criticalTasks, donorTasks }) {
                 </div>
               ))
             )}
+            {criticalTasks.length > MAX_VISIBLE_TASKS && (
+              <p className="px-1 pt-1 text-[11px] text-muted-foreground">
+                Showing {MAX_VISIBLE_TASKS} of {criticalTasks.length} critical tasks.
+              </p>
+            )}
           </div>
         </div>
 
@@ -75,7 +82,7 @@ export function BufferRedistributionPanel({ isPM, criticalTasks, donorTasks }) {
                 No non-critical tasks with spare slack right now.
               </p>
             ) : (
-              donorTasks.map(({ task }) => (
+              donorTasks.slice(0, MAX_VISIBLE_TASKS).map(({ task }) => (
                 <div key={task.id} className="rounded-lg border border-border p-2.5">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -88,6 +95,11 @@ export function BufferRedistributionPanel({ isPM, criticalTasks, donorTasks }) {
                   </div>
                 </div>
               ))
+            )}
+            {donorTasks.length > MAX_VISIBLE_TASKS && (
+              <p className="px-1 pt-1 text-[11px] text-muted-foreground">
+                Showing {MAX_VISIBLE_TASKS} of {donorTasks.length} non-critical tasks.
+              </p>
             )}
           </div>
         </div>

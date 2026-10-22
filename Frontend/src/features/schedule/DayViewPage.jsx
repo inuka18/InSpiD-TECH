@@ -18,11 +18,11 @@ import { useSchedulePhases } from "../../hooks/useSchedulePhases";
 import { useResourceCapacity } from "../../hooks/useResourceCapacity";
 import { useScheduleView } from "../../hooks/useScheduleView";
 import { getTeamMemberById } from "../../data/mockTeam";
+import { useWorkCalendar } from "./context/WorkCalendarContext";
 import {
   flattenTasks,
   isTaskActiveOn,
   isAtRisk,
-  causeStyle,
   statusBadgeVariant,
   statusLabel,
   TODAY,
@@ -38,13 +38,19 @@ function initialsFor(name) {
 }
 
 export function DayViewPage() {
-  const { activeProjectId } = useScheduleView();
+  const { activeProject, activeProjectId } = useScheduleView();
   const { data: phases, loading } = useSchedulePhases(activeProjectId);
+  const { settings: workCalendar } = useWorkCalendar();
   const { data: capacity } = useResourceCapacity(activeProjectId);
-  const [viewDate, setViewDate] = useState(TODAY);
+  const [viewDate, setViewDate] = useState(() => new Date(activeProject?.activeSprint?.startDate ?? TODAY));
   const [selectedTask, setSelectedTask] = useState(null);
   const [compareOpen, setCompareOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    const sprintStart = activeProject?.activeSprint?.startDate;
+    if (sprintStart) setViewDate(new Date(sprintStart));
+  }, [activeProjectId]);
 
   // Deep link support: the Variance Drill-Down modal's task cards (and
   // Activity Feed / Notifications) land here with ?date=<iso> to jump
@@ -66,7 +72,7 @@ export function DayViewPage() {
 
   const dayTasks = useMemo(
     () => flattenTasks(phases).filter((t) => isTaskActiveOn(t, viewDate)),
-    [phases, viewDate]
+    [phases, viewDate, workCalendar]
   );
   const delayedTasks = dayTasks.filter(isAtRisk);
   const peopleCount = new Set(dayTasks.flatMap(taskAssigneeIds)).size;
@@ -135,10 +141,8 @@ export function DayViewPage() {
       <RootCausePanel
         tasks={dayTasks}
         label="Day"
-        onSelectCause={(type) => {
-          const style = causeStyle(type);
-          const affected = dayTasks.filter((task) => task.cause?.type === type);
-          setSelectedTask({ _causeList: true, tasks: affected, title: style.label, subtitle: `${affected.length} task${affected.length !== 1 ? "s" : ""} affected today` });
+        onSelectCause={(category, affected) => {
+          setSelectedTask({ _causeList: true, tasks: affected, title: category, subtitle: `${affected.length} task${affected.length !== 1 ? "s" : ""} affected today` });
         }}
       />
       </div>
@@ -245,6 +249,7 @@ export function DayViewPage() {
         onOpenChange={setCompareOpen}
         tasks={dayTasks}
         label="Day"
+        showGantt={false}
       />
     </div>
   );

@@ -1,6 +1,7 @@
 // Projects from the real API. The backend project has only { id, name, domain, description }, so the fields the
 // UI cards also use (colour, short description, sprint, health) are derived here.
 import { api, ApiError } from "../lib/apiClient";
+import { RENT_EASE_PROJECT, RENT_EASE_PROJECT_ID } from "../data/mockRentEase";
 
 const PROJECT_COLORS = ["#6366f1", "#0ea5e9", "#f59e0b", "#ec4899", "#14b8a6", "#8b5cf6"];
 
@@ -27,10 +28,12 @@ export function toProject(p) {
 }
 
 export async function fetchProjects() {
-  return (await api("/projects")).map(toProject);
+  const projects = (await api("/projects")).map(toProject);
+  return projects.some((project) => project.id === RENT_EASE_PROJECT_ID) ? projects : [...projects, RENT_EASE_PROJECT];
 }
 
 export async function fetchProjectById(id) {
+  if (id === RENT_EASE_PROJECT_ID) return RENT_EASE_PROJECT;
   try {
     return toProject(await api(`/projects/${encodeURIComponent(id)}`));
   } catch (err) {

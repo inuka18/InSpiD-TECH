@@ -15,6 +15,7 @@ import { TODAY } from "../lib/scheduleUtils";
 import { applyLeavePlan, getLeaveLabel } from "../lib/leaveAutomation";
 import { useScheduleHistory } from "../context/ScheduleHistoryContext";
 import { cn } from "../../../lib/utils";
+import { useWorkCalendar } from "../context/WorkCalendarContext";
 
 const CAPACITY_VARIANT = {
   "Over-allocated": "danger",
@@ -41,6 +42,7 @@ export function ResourcesDrawer({ open, onClose, project, isPM, onScheduleChange
   const { data: fullTeam } = useTeam();
   const { allProjects, inviteMember } = useProject();
   const { pushHistory } = useScheduleHistory();
+  const { settings } = useWorkCalendar();
   const [selectedCapacity, setSelectedCapacity] = useState(null);
   const [selectedTask, setSelectedTask] = useState(null);
   const [, bump] = useState(0);
@@ -203,6 +205,7 @@ export function ResourcesDrawer({ open, onClose, project, isPM, onScheduleChange
             capacity: selectedCapacity,
             phases,
             capacityRecords: capacity,
+            settings,
             ...payload,
           });
           pushHistory(`Applied ${payload.leaveType === "custom" ? `${payload.customHours}h custom` : payload.leaveType} leave for ${selectedCapacity.name}`, () => {
@@ -210,8 +213,11 @@ export function ResourcesDrawer({ open, onClose, project, isPM, onScheduleChange
             result.snapshots.forEach(({
               task,
               prevAssigneeId,
+              prevAssigneeIds,
               prevStart,
               prevEnd,
+              prevDurationMinutes,
+              prevOriginalAssigneeId,
               prevReplacement,
               prevReallocatedFrom,
               prevLeaveImpactHours,
@@ -220,8 +226,11 @@ export function ResourcesDrawer({ open, onClose, project, isPM, onScheduleChange
               prevChangeDate,
             }) => {
               task.assigneeId = prevAssigneeId;
+              task.assigneeIds = prevAssigneeIds;
               task.start = prevStart;
               task.end = prevEnd;
+              task.durationMinutes = prevDurationMinutes;
+              task.originalAssigneeId = prevOriginalAssigneeId;
               task.resourceReplacement = prevReplacement;
               task.reallocatedFrom = prevReallocatedFrom;
               task.leaveImpactHours = prevLeaveImpactHours;
