@@ -11,8 +11,9 @@ import { Avatar, AvatarFallback } from "../../../components/ui/avatar";
 import { Badge } from "../../../components/ui/badge";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
-import { flattenTasks, statusBadgeVariant, statusLabel, TODAY } from "../lib/scheduleUtils";
-import { getLeaveLabel, previewLeaveImpact } from "../lib/leaveAutomation";
+import { flattenTasks, statusBadgeVariant, statusLabel, TODAY, taskAssigneeIds } from "../lib/scheduleUtils";
+import { getLeaveHours, getLeaveLabel, previewLeaveImpact } from "../lib/leaveAutomation";
+import { useWorkCalendar } from "../context/WorkCalendarContext";
 import { cn } from "../../../lib/utils";
 
 const CAPACITY_VARIANT = {
@@ -28,13 +29,14 @@ function dateInputValue(date) {
 }
 
 export function ResourceProfileModal({ capacity, phases, capacityRecords = [], open, onOpenChange, onSelectTask, onApplyLeave }) {
+  const { settings } = useWorkCalendar();
   const [leaveType, setLeaveType] = useState(capacity?.leaveType ?? "full-day");
   const [customHours, setCustomHours] = useState(String(capacity?.leaveHours ?? 8));
   const [leaveDate, setLeaveDate] = useState(dateInputValue(capacity?.leaveDate ?? TODAY));
 
   const ratioPct = capacity ? Math.round((capacity.plannedHours / capacity.availableHours) * 100) : 0;
   const myTasks = useMemo(
-    () => (capacity ? flattenTasks(phases ?? []).filter((t) => t.assigneeId === capacity.memberId) : []),
+    () => (capacity ? flattenTasks(phases ?? []).filter((t) => taskAssigneeIds(t).includes(capacity.memberId)) : []),
     [capacity, phases]
   );
 
@@ -48,8 +50,8 @@ export function ResourceProfileModal({ capacity, phases, capacityRecords = [], o
   const selectedLeaveDate = useMemo(() => new Date(`${leaveDate}T12:00:00`), [leaveDate]);
 
   const leavePreview = useMemo(
-    () => (capacity ? previewLeaveImpact({ capacity, phases, capacityRecords, leaveType, customHours, leaveDate: selectedLeaveDate }) : null),
-    [capacity, phases, capacityRecords, leaveType, customHours, selectedLeaveDate]
+    () => (capacity ? previewLeaveImpact({ capacity, phases, capacityRecords, leaveType, customHours, leaveDate: selectedLeaveDate, settings }) : null),
+    [capacity, phases, capacityRecords, leaveType, customHours, selectedLeaveDate, settings]
   );
 
   const handleApply = () => {
@@ -101,8 +103,8 @@ export function ResourceProfileModal({ capacity, phases, capacityRecords = [], o
             <p className="mt-3 text-xs font-medium text-muted-foreground">Leave duration</p>
             <div className="mt-2 grid grid-cols-3 gap-2">
               {[
-                { value: "full-day", label: "Full day", hours: "8 hours", icon: Sun },
-                { value: "half-day", label: "Half day", hours: "4 hours", icon: Clock3 },
+                { value: "full-day", label: "Full day", hours: `${settings.hoursPerDay} hours`, icon: Sun },
+                { value: "half-day", label: "Half day", hours: `${settings.hoursPerDay / 2} hours`, icon: Clock3 },
                 { value: "custom", label: "Custom", hours: "Set hours", icon: Check },
               ].map(({ value, label, hours, icon: Icon }) => {
                 const active = leaveType === value;
@@ -124,7 +126,7 @@ export function ResourceProfileModal({ capacity, phases, capacityRecords = [], o
                   <Input id="custom-leave-hours" type="number" min="0.5" max="24" step="0.5" value={customHours} onChange={(e) => setCustomHours(e.target.value)} placeholder="Enter hours" />
                 </> : <>
                   <span className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-foreground"><Clock3 className="h-3.5 w-3.5 text-muted-foreground" />Leave hours</span>
-                  <div className="flex h-9 items-center rounded-lg border border-input bg-background px-3 text-sm text-foreground">{leaveType === "half-day" ? "4 hours" : "8 hours"}</div>
+                  <div className="flex h-9 items-center rounded-lg border border-input bg-background px-3 text-sm text-foreground">{getLeaveHours(leaveType, customHours, settings)} hours</div>
                 </>}
               </div>
             </div>
@@ -158,9 +160,7 @@ export function ResourceProfileModal({ capacity, phases, capacityRecords = [], o
                   {leavePreview.affectedTasks.slice(0, 4).map((task) => (
                     <li key={task.id} className="flex items-center justify-between gap-2 rounded border border-border bg-background px-2 py-1.5">
                       <span className="truncate">{task.name}</span>
-                      <span className="shrink-0 text-muted-foreground">
-                        {leavePreview.replacement ? `Reassign to ${leavePreview.replacement.name}` : `Slip ${leavePreview.leaveDays}d`}
-                      </span>
+                      <span className="shrink-0 text-muted-foreground">{leavePreview.taskPlans.find((plan) => plan.task.id === task.id)?.replacement ? `Assign to ${leavePreview.taskPlans.find((plan) => plan.task.id === task.id).replacement.name}` : "Move to next working day"}</span>
                     </li>
                   ))}
                 </ul>

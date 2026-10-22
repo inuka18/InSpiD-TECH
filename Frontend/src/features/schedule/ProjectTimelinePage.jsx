@@ -15,23 +15,61 @@ import { useSchedulePhases } from "../../hooks/useSchedulePhases";
 import { useResourceCapacity } from "../../hooks/useResourceCapacity";
 import { useActiveProject } from "../../hooks/useActiveProject";
 import { useRole, ROLES } from "../../context/RoleContext";
-import { flattenTasks, formatShortDate, causeStyle } from "./lib/scheduleUtils";
+import { useWorkCalendar } from "./context/WorkCalendarContext";
+import { flattenTasks, formatShortDate, addDays } from "./lib/scheduleUtils";
 
 const MIN_PX_PER_DAY = 2;
 const MAX_PX_PER_DAY = 60;
 const ZOOM_STEP = 2;
 
 export function ProjectTimelinePage() {
-  const { activeProjectId } = useActiveProject();
+  const { activeProject, activeProjectId } = useActiveProject();
   const { data: phases, loading } = useSchedulePhases(activeProjectId);
   const { data: capacity } = useResourceCapacity(activeProjectId);
   const { role } = useRole();
+  const { settings } = useWorkCalendar();
   const isPM = role === ROLES.PM;
   const [selectedTask, setSelectedTask] = useState(null);
   const [selectedCapacity, setSelectedCapacity] = useState(null);
   const [pxPerDay, setPxPerDay] = useState(10);
   const [compareOpen, setCompareOpen] = useState(false);
   const allTasks = useMemo(() => flattenTasks(phases), [phases]);
+  const sprintPhases = useMemo(() => {
+    if (!allTasks.length) return [];
+    const projectStart = new Date(Math.min(...allTasks.map((task) => new Date(task.start).getTime())));
+    const projectEnd = new Date(Math.max(...allTasks.map((task) => new Date(task.end).getTime())));
+    projectStart.setHours(9, 0, 0, 0);
+    const activeStart = activeProject?.activeSprint?.startDate ? new Date(activeProject.activeSprint.startDate) : null;
+    const calendarSpan = Number(settings.sprintDays ?? 10);
+    const activeWindowNumber = activeStart ? Math.floor((activeStart.getTime() - projectStart.getTime()) / (calendarSpan * 24 * 60 * 60 * 1000)) + 1 : null;
+    const sprints = [];
+    let start = projectStart;
+    let number = 1;
+    while (start <= projectEnd) {
+      const end = addDays(start, calendarSpan - 1);
+      end.setHours(18, 0, 0, 0);
+      const nextStart = addDays(start, calendarSpan);
+      nextStart.setHours(9, 0, 0, 0);
+      const isActive = activeStart && activeStart >= start && activeStart < nextStart;
+      const sprintNumber = activeWindowNumber
+        ? activeProject.activeSprint.number + number - activeWindowNumber
+        : number;
+      const sprintTasks = allTasks.filter((task) => {
+        const taskStart = new Date(task.start);
+        return taskStart >= start && taskStart < nextStart;
+      });
+      if (sprintTasks.length) sprints.push({
+        id: `project-sprint-${number}`,
+        name: isActive ? activeProject.activeSprint.name : `Sprint ${Math.max(1, sprintNumber)}`,
+        start: start.toISOString(),
+        end: end.toISOString(),
+        tasks: sprintTasks,
+      });
+      start = nextStart;
+      number += 1;
+    }
+    return sprints;
+  }, [allTasks, activeProject, phases, settings]);
 
   const { rangeStart, rangeEnd } = useMemo(() => {
     if (phases.length === 0) return { rangeStart: null, rangeEnd: null };
@@ -87,7 +125,7 @@ export function ProjectTimelinePage() {
             <Skeleton className="h-[28rem] w-full" />
           ) : (
             <GanttChart
-              phases={phases}
+              phases={sprintPhases}
               rangeStart={rangeStart}
               rangeEnd={rangeEnd}
               onSelectTask={setSelectedTask}
@@ -95,6 +133,8 @@ export function ProjectTimelinePage() {
               capacity={capacity}
               pxPerDay={pxPerDay}
               isPM={isPM}
+              groupByPhaseRequirement
+              projectId={activeProjectId}
             />
           )}
         </CardContent>
@@ -112,10 +152,8 @@ export function ProjectTimelinePage() {
         <RootCausePanel
           tasks={allTasks}
           label="Project"
-          onSelectCause={(type) => {
-            const style = causeStyle(type);
-            const affected = allTasks.filter((task) => task.cause?.type === type);
-            setSelectedTask({ _causeList: true, tasks: affected, title: style.label, subtitle: `${affected.length} task${affected.length !== 1 ? "s" : ""} affected in this project` });
+          onSelectCause={(category, affected) => {
+            setSelectedTask({ _causeList: true, tasks: affected, title: category, subtitle: `${affected.length} task${affected.length !== 1 ? "s" : ""} affected in this project` });
           }}
         />
         </div>

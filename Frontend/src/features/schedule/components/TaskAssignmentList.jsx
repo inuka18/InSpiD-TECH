@@ -14,16 +14,16 @@ import { ROLES, useRole } from "../../../context/RoleContext";
 import { useScheduleHistory } from "../context/ScheduleHistoryContext";
 import { addWorkingMinutes, normalizeWorkingStart, useWorkCalendar } from "../context/WorkCalendarContext";
 import { cn } from "../../../lib/utils";
-import { formatShortDate, statusBadgeVariant, statusLabel, taskAssigneeIds } from "../lib/scheduleUtils";
+import { formatShortDate, isLate, statusBadgeVariant, statusLabel, taskAssigneeIds } from "../lib/scheduleUtils";
 
 export const WORKDAY_MINUTES = 480;
 const MINUTES_PER_POINT = 240;
 const ROLE_ALIASES = { "Mobile Developer": "Frontend Developer", "Product Manager": "Project Manager" };
 const STATUS_DOT = {
-  "not-started": "bg-muted-foreground/50",
-  "in-progress": "bg-primary",
-  review: "bg-status-modified-fg",
-  done: "bg-status-confirmed-fg",
+  "not-started": "bg-slate-400",
+  "in-progress": "bg-blue-500",
+  review: "bg-amber-500",
+  done: "bg-emerald-500",
 };
 const initialsFor = (name) => name.split(" ").map((part) => part[0]).join("").toUpperCase();
 const estimateMinutes = (task) => task.durationMinutes ?? Math.max(1, task.storyPoints ?? 1) * MINUTES_PER_POINT;
@@ -164,7 +164,7 @@ export function TaskAssignmentList({ tasks = [], onSelectTask, isPM }) {
 
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1040px] border-collapse text-left text-sm">
-          <thead><tr className="bg-muted/35 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <thead><tr className="sticky top-0 z-10 bg-slate-50/95 text-[10px] font-semibold uppercase tracking-wider text-slate-500 backdrop-blur dark:bg-slate-900/95 dark:text-slate-400">
             <th className="w-[28%] px-5 py-3">Task / Requirement</th><th className="w-[23%] px-4 py-3">Assigned team</th><th className="w-[15%] px-4 py-3">Schedule</th><th className="w-[13%] px-4 py-3">Effort</th><th className="w-[11%] px-4 py-3">Status</th><th className="w-[10%] px-4 py-3">Progress</th>
           </tr></thead>
           <tbody>
@@ -175,16 +175,18 @@ export function TaskAssignmentList({ tasks = [], onSelectTask, isPM }) {
               const peopleForRole = relevantPeople(task);
               const requirement = requirementsById.get(task.requirementId);
               const progress = Math.min(100, Math.max(0, task.progress ?? 0));
+              const late = isLate(task);
+              const progressColor = late ? "bg-red-500" : task.status === "done" ? "bg-emerald-500" : task.status === "review" ? "bg-amber-500" : task.status === "in-progress" ? "bg-blue-500" : "bg-slate-400";
               return (
-                <tr key={task.id} onClick={() => onSelectTask?.(task)} className={cn("group border-t border-border/70 transition-colors hover:bg-primary/[0.035]", index % 2 && "bg-muted/[0.12]", onSelectTask && "cursor-pointer")}>
+                <tr key={task.id} onClick={() => onSelectTask?.(task)} className={cn("group border-t border-border/60 transition-colors hover:bg-blue-50/50 dark:hover:bg-blue-950/15", index % 2 && "bg-slate-50/60 dark:bg-slate-900/15", task.critical && "border-l-2 border-l-red-400", onSelectTask && "cursor-pointer")}>
                   <td className="px-5 py-3.5 align-top"><div className="flex items-start gap-2.5"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="font-mono text-[10px] font-medium text-muted-foreground">{task.id}</span>{task.critical && <Badge variant="danger" className="px-1.5 py-0 text-[9px]">Critical</Badge>}</div><p className="mt-1 max-w-sm font-semibold leading-snug text-foreground">{task.name}</p><p className="mt-1 text-[11px] text-muted-foreground">{requirement?.title ?? task.requirementId ?? "No requirement linked"}</p></div></div></td>
-                  <td className="px-4 py-3.5 align-top"><div className="flex items-center gap-2.5"><div className="flex shrink-0 -space-x-2">{assignees.length ? assignees.slice(0, 3).map((person) => <Avatar key={person.id} className="h-7 w-7 border-2 border-card text-[9px]"><AvatarFallback>{initialsFor(person.name)}</AvatarFallback></Avatar>) : <Avatar className="h-7 w-7 text-[9px]"><AvatarFallback>?</AvatarFallback></Avatar>}</div><div className="min-w-0"><p className="truncate text-xs font-medium text-foreground">{assignees.length ? assignees.map((person) => person.name).join(", ") : "Unassigned"}</p><p className="mt-0.5 truncate text-[10px] text-muted-foreground">{task.role ?? requirement?.resourceRole ?? "Role not set"}</p></div></div>
+                  <td className="px-4 py-3.5 align-top"><div className="flex items-start gap-2.5"><div className="flex shrink-0 items-center -space-x-2">{assignees.length ? assignees.slice(0, 3).map((person) => <Avatar key={person.id} title={person.name} className="h-7 w-7 border-2 border-card text-[8px] shadow-sm ring-1 ring-border/50"><AvatarFallback className="bg-primary/10 text-primary">{person.initials ?? initialsFor(person.name)}</AvatarFallback></Avatar>) : <Avatar className="h-7 w-7 border-2 border-card text-[8px]"><AvatarFallback className="bg-muted text-muted-foreground">?</AvatarFallback></Avatar>}{assignees.length > 3 && <span className="z-10 flex h-6 w-6 items-center justify-center rounded-full border-2 border-card bg-muted text-[8px] font-semibold text-muted-foreground" title={assignees.slice(3).map((person) => person.name).join(", ")}>+{assignees.length - 3}</span>}</div><div className="min-w-0"><p className="whitespace-normal break-words text-xs font-medium leading-4 text-foreground">{assignees.length ? assignees.map((person) => person.name).join(", ") : "Unassigned"}</p><p className="mt-1 text-[10px] leading-3 text-muted-foreground">{task.role ?? requirement?.resourceRole ?? "Role not set"}</p></div></div>
                     {canEdit && !isCompleted && <select aria-label={`Change assignees for ${task.name}`} onClick={(event) => event.stopPropagation()} onChange={(event) => { manuallyAssign(task, event.target.value); event.target.value = ""; }} defaultValue="" className="mt-2 h-7 max-w-full rounded-md border border-input bg-background px-2 text-[10px] text-muted-foreground"><option value="" disabled>Manage team</option>{peopleForRole.map((person) => <option key={person.id} value={person.id} disabled={capacityByMember.get(person.id)?.offToday}>{taskAssigneeIds(task).includes(person.id) ? `Remove ${person.name}` : `Add ${person.name}`}{capacityByMember.get(person.id)?.offToday ? " · unavailable" : ""}</option>)}</select>}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3.5 align-top"><div className="flex items-center gap-2 text-xs font-medium text-foreground"><CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />{formatShortDate(task.start)}</div><p className="mt-1.5 pl-[22px] text-[11px] text-muted-foreground">to {formatShortDate(task.end)}</p></td>
+                  <td className="whitespace-nowrap px-4 py-3.5 align-top"><div className={cn("flex items-center gap-2 text-xs font-medium", late ? "text-red-600 dark:text-red-400" : "text-foreground")}><CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />{formatShortDate(task.start)}</div><p className={cn("mt-1.5 pl-[22px] text-[11px]", late ? "text-red-600/80 dark:text-red-400/80" : "text-muted-foreground")}>to {formatShortDate(task.end)}{late && <span className="ml-1 font-semibold">· Late</span>}</p></td>
                   <td className="px-4 py-3.5 align-top"><div className="flex items-center gap-1.5"><Clock3 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /><Input aria-label={`Effort hours for ${task.name}`} type="number" min="0" step="1" value={durationHours(task)} onClick={(event) => event.stopPropagation()} onChange={(event) => manuallySetDuration(task, event.target.value, durationMinutesPart(task))} disabled={!editable} className="h-8 w-14 px-1.5 text-center text-xs" /><span className="text-[10px] text-muted-foreground">h</span><Input aria-label={`Effort minutes for ${task.name}`} type="number" min="0" max="59" step="1" value={durationMinutesPart(task)} onClick={(event) => event.stopPropagation()} onChange={(event) => manuallySetDuration(task, durationHours(task), event.target.value)} disabled={!editable} className="h-8 w-12 px-1 text-center text-xs" /><span className="text-[10px] text-muted-foreground">m</span></div><p className="mt-1.5 pl-5 text-[10px] text-muted-foreground">{durationLabel(estimateMinutes(task))} total</p></td>
                   <td className="px-4 py-3.5 align-top"><Badge variant={statusBadgeVariant(task)} className="whitespace-nowrap bg-opacity-80"><span className={cn("h-1.5 w-1.5 rounded-full", STATUS_DOT[task.status] ?? "bg-muted-foreground")} />{statusLabel(task)}</Badge></td>
-                  <td className="px-4 py-3.5 align-top"><div className="flex items-center justify-between gap-2"><span className="text-xs font-semibold tabular-nums text-foreground">{progress}%</span>{progress === 100 ? <CheckCircle2 className="h-3.5 w-3.5 text-status-confirmed-fg" /> : <span className="text-[10px] text-muted-foreground">complete</span>}</div><div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${progress}%` }} /></div></td>
+                  <td className="px-4 py-3.5 align-top"><div className="flex items-center justify-between gap-2"><span className={cn("text-xs font-semibold tabular-nums", late ? "text-red-600 dark:text-red-400" : "text-foreground")}>{progress}%</span>{progress === 100 ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> : <span className="text-[10px] text-muted-foreground">complete</span>}</div><div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted"><div className={cn("h-full rounded-full transition-[width]", progressColor)} style={{ width: `${progress}%` }} /></div></td>
                 </tr>
               );
             })}

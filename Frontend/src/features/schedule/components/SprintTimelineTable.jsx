@@ -3,10 +3,9 @@ import { CheckCircle2, AlertTriangle, TrendingUp } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../../../components/ui/card";
 import { overlapsRange, isAtRisk, varianceDays, formatShortDate, addDays, daysBetween } from "../lib/scheduleUtils";
 import { cn } from "../../../lib/utils";
+import { useWorkCalendar } from "../context/WorkCalendarContext";
 
-const SPRINT_LENGTH = 14;
-
-function buildAllSprints(tasks, activeSprint) {
+function buildAllSprints(tasks, activeSprint, sprintLength) {
   if (tasks.length === 0) return [];
 
   const projectStart = new Date(Math.min(...tasks.map((t) => new Date(t.baselineStart))));
@@ -19,7 +18,7 @@ function buildAllSprints(tasks, activeSprint) {
 
   while (cur <= projectEnd) {
     const start = new Date(cur);
-    const end   = new Date(addDays(cur, SPRINT_LENGTH - 1));
+    const end   = new Date(addDays(cur, sprintLength - 1));
     end.setHours(18, 0, 0, 0);
 
     const isActive = activeSprint
@@ -63,7 +62,7 @@ function buildAllSprints(tasks, activeSprint) {
         : 0,
     });
 
-    cur = addDays(cur, SPRINT_LENGTH);
+    cur = addDays(cur, sprintLength);
     idx++;
   }
 
@@ -89,7 +88,9 @@ function HealthBadge({ health }) {
 }
 
 export function SprintTimelineTable({ tasks = [], activeSprint }) {
-  const sprints = useMemo(() => buildAllSprints(tasks, activeSprint), [tasks, activeSprint]);
+  const { settings } = useWorkCalendar();
+  const sprintLength = Number(settings.sprintDays ?? 10);
+  const sprints = useMemo(() => buildAllSprints(tasks, activeSprint, sprintLength), [tasks, activeSprint, sprintLength]);
 
   if (sprints.length === 0) return null;
 

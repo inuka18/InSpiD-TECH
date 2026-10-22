@@ -1,6 +1,8 @@
 import { Link, Navigate, Outlet, useParams } from "react-router-dom";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { useProject } from "../../context/ProjectContext";
+import { ScheduleHistoryProvider } from "../../features/schedule/context/ScheduleHistoryContext";
+import { WorkCalendarProvider } from "../../features/schedule/context/WorkCalendarContext";
 
 // Wraps every /projects/:projectId/* route. Resolves the active project
 // straight from the URL param each render (no separate context state to
@@ -49,7 +51,11 @@ export function ProjectScopedLayout() {
         <span className="text-sm font-semibold text-foreground">{project.name}</span>
       </div>
 
-      <Outlet context={{ project }} />
+      <ScheduleHistoryProvider>
+        <WorkCalendarProvider>
+          <Outlet context={{ project }} />
+        </WorkCalendarProvider>
+      </ScheduleHistoryProvider>
     </div>
   );
 }

@@ -15,6 +15,7 @@ import { applyLeavePlan, getLeaveLabel } from "./lib/leaveAutomation";
 import { useScheduleHistory } from "./context/ScheduleHistoryContext";
 import { useRole, ROLES } from "../../context/RoleContext";
 import { useActiveProject } from "../../hooks/useActiveProject";
+import { useWorkCalendar } from "./context/WorkCalendarContext";
 
 const SKILLS = {
   "Backend Developer": ["Node.js", "Express", "MongoDB", "AWS"], "Frontend Developer": ["React", "TypeScript", "JavaScript", "Accessibility"],
@@ -43,6 +44,7 @@ export function ResourceManagementPage({ project: projectOverride, embedded = fa
   const [selectedLeave, setSelectedLeave] = useState(null);
   const [, bump] = useState(0);
   const { pushHistory } = useScheduleHistory();
+  const { settings } = useWorkCalendar();
   const allTasks = useMemo(() => flattenTasks(phases), [phases]);
   const resources = useMemo(() => capacity.map((resource) => {
     const utilization = Math.round((resource.plannedHours / resource.availableHours) * 100);
@@ -56,14 +58,17 @@ export function ResourceManagementPage({ project: projectOverride, embedded = fa
   const applyLeave = (payload) => {
     if (!selectedLeave) return;
     const previousCapacity = Object.fromEntries(["offToday", "leaveType", "leaveHours", "leaveDate", "returnDate", "availableHours", "status"].map((key) => [key, selectedLeave[key]]));
-    const result = applyLeavePlan({ capacity: selectedLeave, phases, capacityRecords: capacity, ...payload });
+    const result = applyLeavePlan({ capacity: selectedLeave, phases, capacityRecords: capacity, settings, ...payload });
     pushHistory(`Applied ${getLeaveLabel(payload.leaveType, payload.customHours)} leave for ${selectedLeave.name}`, () => {
       Object.assign(selectedLeave, previousCapacity);
       result.snapshots.forEach((snapshot) => {
         Object.assign(snapshot.task, {
           assigneeId: snapshot.prevAssigneeId,
+          assigneeIds: snapshot.prevAssigneeIds,
           start: snapshot.prevStart,
           end: snapshot.prevEnd,
+          durationMinutes: snapshot.prevDurationMinutes,
+          originalAssigneeId: snapshot.prevOriginalAssigneeId,
           resourceReplacement: snapshot.prevReplacement,
           reallocatedFrom: snapshot.prevReallocatedFrom,
           leaveImpactHours: snapshot.prevLeaveImpactHours,

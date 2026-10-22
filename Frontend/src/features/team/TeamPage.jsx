@@ -16,7 +16,6 @@ import { useMemberProfile } from "../../hooks/useMemberProfile";
 import { useProject } from "../../context/ProjectContext";
 import { useRole, ROLES } from "../../context/RoleContext";
 import { ResourceManagementPage } from "../schedule/ResourceManagementPage";
-import { ScheduleHistoryProvider } from "../schedule/context/ScheduleHistoryContext";
 import { taskAssigneeIds } from "../schedule/lib/scheduleUtils";
 import { RENT_EASE_PROJECT_ID } from "../../data/mockRentEase";
 
@@ -199,9 +198,7 @@ export function TeamPage() {
       </div>
 
       <div className="mt-10 border-t border-border pt-8">
-        <ScheduleHistoryProvider>
-          <ResourceManagementPage project={activeProject} embedded leaveOnly />
-        </ScheduleHistoryProvider>
+        <ResourceManagementPage project={activeProject} embedded leaveOnly />
       </div>
 
       <TeamMemberDetailDialog

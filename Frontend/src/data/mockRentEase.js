@@ -8,8 +8,8 @@ export const RENT_EASE_PROJECT = {
   colorTag: "#0f766e",
   shortDescription: "Property rental management system schedule demo.",
   description: "Frontend-only 10-sprint planning demo for the RentEase property rental management system.",
-  startDate: "2026-10-26T09:00:00+05:30",
-  activeSprint: { name: "Sprint 1: Planning and Requirements", number: 1, startDate: "2026-10-26T00:00:00+05:30", endDate: "2026-11-08T23:59:59+05:30" },
+  startDate: "2026-10-01T09:00:00+05:30",
+  activeSprint: { name: "Sprint 1: Planning and Requirements", number: 1, startDate: "2026-10-01T00:00:00+05:30", endDate: "2026-10-14T23:59:59+05:30" },
   health: "on-track",
 };
 
@@ -78,7 +78,7 @@ const TASKS = [
   ["T40", "Release approval and demonstration", 1, "re-pm", ["T39"], 10],
 ];
 
-const PROJECT_START = new Date("2026-10-26T03:30:00.000Z"); // 09:00 Asia/Colombo
+const PROJECT_START = new Date("2026-10-01T03:30:00.000Z"); // 09:00 Asia/Colombo
 
 function addWorkingDays(date, amount) {
   const result = new Date(date);
@@ -150,7 +150,7 @@ export function buildRentEasePhases() {
       status: "not-started",
       priority: ["T01", "T04", "T12", "T16", "T20", "T24", "T28", "T32", "T36", "T40"].includes(id) ? "high" : "medium",
       critical: true,
-      milestone: false,
+      milestone: ["T04", "T12", "T20", "T28", "T32", "T36", "T40"].includes(id),
       dependencies: [...dependencies],
       dependencyDetails: dependencies.map((predecessorId) => ({ predecessorId, type: "FS", lagWorkingDays: 0 })),
       successorIds: [],

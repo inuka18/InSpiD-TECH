@@ -4,8 +4,19 @@ const DEFAULT_WORK_CALENDAR = { workdays: [1, 2, 3, 4, 5], hoursPerDay: 8, start
 const WorkCalendarContext = createContext(null);
 
 export function WorkCalendarProvider({ children }) {
-  const [settings, setSettings] = useState(DEFAULT_WORK_CALENDAR);
-  const value = useMemo(() => ({ settings, setSettings }), [settings]);
+  const [settings, setSettings] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("schedule-work-calendar") ?? "null");
+      return saved ? { ...DEFAULT_WORK_CALENDAR, ...saved } : DEFAULT_WORK_CALENDAR;
+    } catch {
+      return DEFAULT_WORK_CALENDAR;
+    }
+  });
+  const updateSettings = (next) => {
+    setSettings(next);
+    try { localStorage.setItem("schedule-work-calendar", JSON.stringify(next)); } catch { /* storage may be unavailable */ }
+  };
+  const value = useMemo(() => ({ settings, setSettings: updateSettings }), [settings]);
   return <WorkCalendarContext.Provider value={value}>{children}</WorkCalendarContext.Provider>;
 }
 
@@ -75,6 +86,7 @@ export function workingDaysBetween(start, end, workdays) {
 export function recalculateTasksForWorkCalendar(phases, previousSettings, nextSettings) {
   const snapshots = [];
   phases.flatMap((phase) => phase.tasks).forEach((task) => {
+    if (task.status === "done") return;
     snapshots.push({ task, start: task.start, end: task.end, durationMinutes: task.durationMinutes });
     const effort = task.durationMinutes ?? workingDaysBetween(task.start, task.end, previousSettings.workdays) * previousSettings.hoursPerDay * 60;
     const nextStart = nextWorkingStart(task.start, nextSettings);

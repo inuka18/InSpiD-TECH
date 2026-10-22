@@ -16,11 +16,11 @@ export function ScheduleStatRow({ tasks, onTrackCount, delayedCount, peopleCount
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
       {stats.map(({ label, value, icon: Icon, accentClass }) => (
-        <Card key={label} className="transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-md">
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg", accentClass)}>
+        <Card key={label} className="border-border/70 bg-gradient-to-br from-card to-muted/15 shadow-sm transition-all duration-200 hover:border-primary/25 hover:shadow-md">
+          <CardContent className="flex items-center gap-3 p-3.5 sm:p-4">
+            <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl", accentClass)}>
               <Icon className="h-4.5 w-4.5" />
             </div>
             <div className="min-w-0">

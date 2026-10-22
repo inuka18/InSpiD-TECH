@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ListChecks, RotateCcw, CheckCircle2, Save, Database } from "lucide-react";
+import { ListChecks, RotateCcw, CheckCircle2, Save, Database, CalendarDays, Users, Target, Clock3 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
@@ -12,6 +12,7 @@ import { RestrictedButton } from "./components/RestrictedButton";
 import { SprintTimelineTable } from "./components/SprintTimelineTable";
 import { MilestoneCompareTable } from "./components/MilestoneCompareTable";
 import { DurationEstimateChart } from "./components/DurationEstimateChart";
+import { RootCausePanel } from "./components/RootCausePanel";
 import { ImpactReschedulePanel } from "./components/ImpactReschedulePanel";
 import { PertNetworkDiagram } from "../dashboard/components/PertNetworkDiagram";
 import { useSchedulePhases } from "../../hooks/useSchedulePhases";
@@ -30,20 +31,21 @@ import {
   addDays,
   endOfDay,
   pullTaskInByDays,
+  formatShortDate,
+  taskAssigneeIds,
   TODAY,
 } from "./lib/scheduleUtils";
 
-const weekStart = startOfWeek(TODAY);
-const weekEnd   = endOfDay(addDays(weekStart, 6));
-
-function buildLevel(key, label, pool) {
+function buildLevel(key, label, pool, dateLabel) {
   const delayed = pool.filter(isAtRisk);
   const onTrack = pool.filter((t) => !isAtRisk(t));
   return {
     key,
     label,
     tasks: pool,
+    dateLabel,
     total: pool.length,
+    peopleCount: new Set(pool.flatMap(taskAssigneeIds)).size,
     onTrackCount: onTrack.length,
     delayedCount: delayed.length,
     totalSlip: delayed.reduce((sum, t) => sum + Math.max(0, varianceDays(t)), 0),
@@ -52,6 +54,13 @@ function buildLevel(key, label, pool) {
 
 export function ScheduleOverviewPage() {
   const { activeProject, activeProjectId } = useActiveProject();
+  // Match the default date used by the Day and Week pages so the overview
+  // cards describe the selected project's active planning window.
+  const overviewDate = activeProject?.activeSprint?.startDate
+    ? new Date(activeProject.activeSprint.startDate)
+    : TODAY;
+  const weekStart = startOfWeek(overviewDate);
+  const weekEnd = endOfDay(addDays(weekStart, 6));
   const { role } = useRole();
   const isPM = role === ROLES.PM;
   const { data: phases, loading } = useSchedulePhases(activeProjectId);
@@ -114,7 +123,7 @@ export function ScheduleOverviewPage() {
   };
 
   // ── Multi-level variance ──────────────────────────────────────────────────
-  const dayPool    = tasks.filter((t) => isTaskActiveOn(t, TODAY));
+  const dayPool    = tasks.filter((t) => isTaskActiveOn(t, overviewDate));
   const weekPool   = tasks.filter((t) => overlapsRange(t, weekStart, weekEnd));
   const sprint     = activeProject?.activeSprint;
   const sprintStart = sprint ? new Date(sprint.startDate) : null;
@@ -123,10 +132,10 @@ export function ScheduleOverviewPage() {
     ? tasks.filter((t) => overlapsRange(t, sprintStart, sprintEnd))
     : [];
   const levels = [
-    buildLevel("day",     "Day",     dayPool),
-    buildLevel("week",    "Week",    weekPool),
-    buildLevel("sprint",  "Sprint",  sprintPool),
-    buildLevel("project", "Project", tasks),
+    buildLevel("day",     "Day",     dayPool, formatShortDate(overviewDate)),
+    buildLevel("week",    "Week",    weekPool, `${formatShortDate(weekStart)} – ${formatShortDate(weekEnd)}`),
+    buildLevel("sprint",  "Sprint",  sprintPool, sprint ? `${formatShortDate(sprintStart)} – ${formatShortDate(sprintEnd)}` : "No active sprint"),
+    buildLevel("project", "Project", tasks, "Entire project"),
   ];
   const openGaps = gaps.filter((gap) => gap.status !== "Propagated");
 
@@ -154,23 +163,31 @@ export function ScheduleOverviewPage() {
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {levels.map((level) => {
+            const Icon = { day: CalendarDays, week: Users, sprint: Target, project: Clock3 }[level.key];
             return (
-              <div key={level.key} className="rounded-lg border border-border p-4">
-                <p className="text-sm font-semibold text-foreground">{level.label}</p>
-                <div className="mt-2 grid grid-cols-4 gap-1 text-center">
-                  <div><p className="text-sm font-bold text-foreground">{level.total}</p><p className="text-[9px] text-muted-foreground">Tasks</p></div>
-                  <div><p className="text-sm font-bold text-status-confirmed-fg">{level.onTrackCount}</p><p className="text-[9px] text-muted-foreground">On Track</p></div>
-                  <div><p className="text-sm font-bold text-status-dropped-fg">{level.delayedCount}</p><p className="text-[9px] text-muted-foreground">Delayed</p></div>
-                  <div><p className="text-sm font-bold text-foreground">{level.totalSlip}d</p><p className="text-[9px] text-muted-foreground">Slip</p></div>
+              <button key={level.key} type="button" onClick={() => handleSelectLevel(level)} className="group rounded-xl border border-border/80 bg-card p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/8 text-primary"><Icon className="h-4 w-4" /></span>
+                    <div className="min-w-0"><p className="text-sm font-semibold text-foreground">{level.label}</p><p className="truncate text-[10px] text-muted-foreground">{level.dateLabel}</p></div>
+                  </div>
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-[9px] font-medium text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary">Details</span>
                 </div>
-              </div>
+                <div className="mt-4 grid grid-cols-4 divide-x divide-border/70">
+                  <div className="px-2 first:pl-0"><p className="text-base font-bold tabular-nums text-foreground">{level.total}</p><p className="mt-0.5 text-[9px] text-muted-foreground">Tasks</p></div>
+                  <div className="px-2"><p className="text-base font-bold tabular-nums text-status-confirmed-fg">{level.onTrackCount}</p><p className="mt-0.5 text-[9px] text-muted-foreground">On track</p></div>
+                  <div className="px-2"><p className="text-base font-bold tabular-nums text-status-dropped-fg">{level.delayedCount}</p><p className="mt-0.5 text-[9px] text-muted-foreground">At risk</p></div>
+                  <div className="px-2 pr-0"><p className="text-base font-bold tabular-nums text-foreground">{level.peopleCount}</p><p className="mt-0.5 text-[9px] text-muted-foreground">People</p></div>
+                </div>
+                <div className="mt-3 flex items-center justify-between border-t border-border/60 pt-2.5 text-[10px] text-muted-foreground"><span>{level.totalSlip}d schedule slip</span><span>View task details</span></div>
+              </button>
             );
           })}
         </div>
       )}
 
       {!loading && (
-        <div className="grid gap-4 xl:grid-cols-2">
+        <div className="grid gap-4 xl:grid-cols-3">
           <Card className="border-primary/20">
             <CardHeader>
               <div className="flex items-center gap-2"><Database className="h-4 w-4 text-primary" /><CardTitle className="text-base">Schedule inputs</CardTitle></div>
@@ -185,6 +202,15 @@ export function ScheduleOverviewPage() {
             <CardHeader className="flex-row items-start justify-between gap-3 space-y-0"><div><CardTitle className="text-base">Schedule versions</CardTitle><CardDescription>Save a version before or after applying a re-optimization.</CardDescription></div><Button size="sm" onClick={() => saveVersion("Manual schedule snapshot", tasks)}><Save className="h-4 w-4" />Save version</Button></CardHeader>
             <CardContent className="space-y-2">{versions.length ? versions.slice(0, 3).map((version) => <div key={version.id} className="flex items-center justify-between rounded-lg border border-border p-3"><div><p className="text-sm font-medium">{version.label}</p><p className="text-xs text-muted-foreground">{new Date(version.createdAt).toLocaleString()} · {version.taskCount} tasks</p></div><Badge variant="outline">{version.id}</Badge></div>) : <p className="py-4 text-center text-sm text-muted-foreground">No saved versions yet. Save the current schedule before re-optimizing.</p>}</CardContent>
           </Card>
+          <RootCausePanel
+            tasks={tasks}
+            label="Project overview"
+            onSelectCause={(category, affected) => setListDrill({
+              title: `${category} causes`,
+              subtitle: `${affected.length} task${affected.length === 1 ? "" : "s"} in this category`,
+              tasks: affected,
+            })}
+          />
         </div>
       )}
 

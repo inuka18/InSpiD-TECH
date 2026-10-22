@@ -25,8 +25,9 @@ export function SprintPlanner({ projectId, onClose }) {
     const next = { ...settings, workdays: draftDays, hoursPerDay: Number(draftHours), sprintDays: Number(sprintDays) };
     if (draftDays.length === 0 || !Number(draftHours) || Number(draftHours) < 1 || Number(draftHours) > 24 || !Number(sprintDays) || Number(sprintDays) < 1 || Number(sprintDays) > 60) return;
     const changedCalendar = Number(draftHours) !== settings.hoursPerDay || draftDays.length !== settings.workdays.length || !draftDays.every((day) => settings.workdays.includes(day));
-    if (changedCalendar) {
-      const snapshots = recalculateTasksForWorkCalendar(phases, settings, next);
+    const changed = changedCalendar || Number(sprintDays) !== settings.sprintDays;
+    if (changed) {
+      const snapshots = changedCalendar ? recalculateTasksForWorkCalendar(phases, settings, next) : [];
       pushHistory("Changed sprint planner settings", () => {
         snapshots.forEach(({ task, start, end, durationMinutes }) => Object.assign(task, { start, end, durationMinutes }));
         setSettings(settings);
@@ -43,9 +44,12 @@ export function SprintPlanner({ projectId, onClose }) {
         <div><h3 className="text-sm font-semibold">Sprint Planner</h3><p className="text-xs text-muted-foreground">Set sprint length and team working time.</p></div>
       </div>
       <label className="mb-4 flex items-center justify-between gap-3 text-sm">
-        Sprint days
-        <input aria-label="Sprint days" type="number" min="1" max="60" value={sprintDays} onChange={(event) => setSprintDays(event.target.value)} className="h-9 w-24 rounded-md border border-input bg-background px-2 text-sm" />
+        Sprint length (calendar days)
+        <input aria-label="Sprint length in calendar days" type="number" min="1" max="60" value={sprintDays} onChange={(event) => setSprintDays(event.target.value)} className="h-9 w-24 rounded-md border border-input bg-background px-2 text-sm" />
       </label>
+      <p className="-mt-2 mb-4 rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+        Sprint length is {Number(sprintDays) || 0} calendar days. Working days and hours control task scheduling.
+      </p>
       <div className="mb-3">
         <p className="mb-2 text-xs font-medium text-muted-foreground">Working days</p>
         <div className="flex flex-wrap gap-1" role="group" aria-label="Working days">

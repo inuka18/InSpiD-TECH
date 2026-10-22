@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Diamond } from "lucide-react";
-import { statusBarClass } from "../lib/scheduleUtils";
+import { isLate } from "../lib/scheduleUtils";
 import { cn } from "../../../lib/utils";
 
 export function TaskBar({ task, rangeStart, rangeEnd, onClick, draggable, onReschedule, containerRef, totalDays, pxPerDay, rowHeight = 48 }) {
@@ -17,11 +17,20 @@ export function TaskBar({ task, rangeStart, rangeEnd, onClick, draggable, onResc
   const barWidth  = Math.max(barRight - barLeft,  0.5);
   const baseWidth = Math.max(baseRight - baseLeft, 0.5);
   const progressWidth = Math.min(Math.max(task.progress || 0, 0), 100);
+  const barColor = isLate(task)
+    ? "bg-[#c74848]"
+    : task.status === "done"
+    ? "bg-[#2e8067]"
+    : task.status === "review"
+      ? "bg-[#b7791f]"
+      : task.status === "in-progress"
+        ? "bg-[#426fba]"
+        : "bg-[#7b8798]";
 
   // Vertical positions relative to row height
-  const baselineTop = Math.round(rowHeight * 0.15);
-  const barTop      = Math.round(rowHeight * 0.38);
+  const baselineTop = Math.round(rowHeight * 0.13);
   const barH        = Math.round(rowHeight * 0.4);
+  const barTop      = Math.round((rowHeight - barH) / 2);
 
   const [dragPx, setDragPx] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -58,26 +67,32 @@ export function TaskBar({ task, rangeStart, rangeEnd, onClick, draggable, onResc
     <div className="relative w-full" style={{ height: rowHeight }}>
 
       {/* Baseline ghost track */}
-      {baseWidth > 0.3 && (
+      {!task.milestone && baseWidth > 0.3 && (
         <div
-          className="absolute h-[4px] rounded-full border border-dashed border-muted-foreground/35 bg-muted-foreground/10"
+          className="absolute h-[3px] rounded-full border border-dashed border-slate-400/50 bg-slate-300/30"
           style={{ left: `${baseLeft}%`, width: `${baseWidth}%`, top: baselineTop }}
           title={`Baseline: ${task.baselineStart} – ${task.baselineEnd}`}
         />
       )}
 
       {/* Actual task bar */}
-      <button
+      {!task.milestone && <button
         type="button"
         onClick={!draggable ? () => onClick?.(task) : undefined}
+        onKeyDown={draggable ? (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onClick?.(task);
+          }
+        } : undefined}
         onPointerDown={draggable ? handlePointerDown : undefined}
         aria-label={`${task.name}, ${task.progress || 0}% complete`}
         title={`${task.name} · ${task.progress || 0}% complete · ${new Date(task.start).toLocaleDateString()} – ${new Date(task.end).toLocaleDateString()}`}
         className={cn(
-          "absolute flex items-center overflow-hidden rounded-md border border-white/20 text-left text-[10px] font-semibold leading-none text-white shadow-sm transition-all",
-          !isDragging && "hover:z-10 hover:brightness-110 hover:shadow-md",
+          "absolute flex items-center overflow-hidden rounded-md border border-white/25 text-left text-[10px] font-semibold leading-none tracking-[0.01em] text-white ring-1 ring-inset ring-black/10 shadow-[0_1px_3px_rgb(16_24_40_/_16%)] transition-[filter,box-shadow,transform] duration-150",
+          !isDragging && "hover:z-10 hover:brightness-105 hover:shadow-[0_3px_8px_rgb(16_24_40_/_22%)]",
           isDragging ? "z-20 cursor-grabbing shadow-lg opacity-90" : draggable ? "cursor-grab" : "cursor-pointer",
-          statusBarClass(task)
+          barColor
         )}
         style={{
           left: `${barLeft}%`,
@@ -89,18 +104,13 @@ export function TaskBar({ task, rangeStart, rangeEnd, onClick, draggable, onResc
       >
         {/* Progress fill */}
         <div
-          className="absolute inset-y-0 left-0 rounded-l-md bg-white/20"
+          className="absolute inset-y-0 left-0 rounded-full bg-white/25 shadow-[inset_-1px_0_0_rgb(255_255_255_/_20%)]"
           style={{ width: `${progressWidth}%` }}
         />
         <span className="relative truncate px-2">{task.name}</span>
-      </button>
+      </button>}
 
-      {task.milestone && (
-        <Diamond
-          className="absolute h-3.5 w-3.5 fill-primary text-primary drop-shadow-sm"
-          style={{ left: `calc(${barRight}% - 7px)`, top: barTop - 2 }}
-        />
-      )}
+      {task.milestone && <Diamond className="absolute z-10 h-5 w-5 fill-amber-400 text-amber-700 drop-shadow-md" style={{ left: `calc(${barRight}% - 10px)`, top: Math.round((rowHeight - 20) / 2) }} aria-label={`${task.name} milestone`} role="img" />}
     </div>
   );
 }

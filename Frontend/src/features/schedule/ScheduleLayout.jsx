@@ -6,8 +6,7 @@ import { cn } from "../../lib/utils";
 import { useActiveProject } from "../../hooks/useActiveProject";
 import { useRole, ROLES } from "../../context/RoleContext";
 import { CalendarView } from "./components/CalendarView";
-import { ScheduleHistoryProvider, useScheduleHistory } from "./context/ScheduleHistoryContext";
-import { WorkCalendarProvider } from "./context/WorkCalendarContext";
+import { useScheduleHistory } from "./context/ScheduleHistoryContext";
 import { SprintPlanner } from "./components/SprintPlanner";
 
 const SUB_NAV = [
@@ -19,13 +18,7 @@ const SUB_NAV = [
 ];
 
 export function ScheduleLayout() {
-  return (
-    <ScheduleHistoryProvider>
-      <WorkCalendarProvider>
-        <ScheduleLayoutInner />
-      </WorkCalendarProvider>
-    </ScheduleHistoryProvider>
-  );
+  return <ScheduleLayoutInner />;
 }
 
 function ScheduleLayoutInner() {
@@ -52,26 +45,26 @@ function ScheduleLayoutInner() {
   };
 
   return (
-    <div className="schedule-theme flex h-full flex-col">
-      <div className="mb-6">
+    <div className="schedule-theme flex h-full flex-col gap-5">
+      <div className="mb-0 rounded-2xl border border-border/70 bg-gradient-to-br from-card via-card to-muted/20 px-4 py-4 shadow-sm sm:px-5 sm:py-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-2xl font-bold tracking-tight text-foreground">Schedule</h2>
-            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            <p className="mt-1 max-w-2xl text-sm leading-5 text-muted-foreground">
               Baseline vs. actual delivery across every planning level, with delay causes traced back to their
               source{activeProject ? ` for ${activeProject.name}` : ""}.
             </p>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             {isPM && (
-              <Button variant="outline" size="sm" onClick={undo} disabled={!canUndo} title={lastLabel ? `Undo: ${lastLabel}` : undefined}>
+              <Button variant="outline" size="sm" className="border-border/80 bg-background shadow-sm" onClick={undo} disabled={!canUndo} title={lastLabel ? `Undo: ${lastLabel}` : undefined}>
                 <Undo2 className="h-4 w-4" />
                 Undo
               </Button>
             )}
             {isPM && (
               <div className="relative">
-                <Button variant={plannerOpen ? "default" : "outline"} size="sm" onClick={() => setPlannerOpen((open) => !open)} aria-expanded={plannerOpen}>
+                <Button variant={plannerOpen ? "default" : "outline"} size="sm" className={!plannerOpen ? "border-border/80 bg-background shadow-sm" : "shadow-sm"} onClick={() => setPlannerOpen((open) => !open)} aria-expanded={plannerOpen}>
                   <CalendarRange className="h-4 w-4" />
                   Sprint Planner
                 </Button>
@@ -81,6 +74,7 @@ function ScheduleLayoutInner() {
             <Button
               variant={calendarView ? "default" : "outline"}
               size="sm"
+              className={!calendarView ? "border-border/80 bg-background shadow-sm" : "shadow-sm"}
               onClick={() => setCalendarView((v) => !v)}
             >
               <Calendar className="h-4 w-4" />
@@ -89,17 +83,17 @@ function ScheduleLayoutInner() {
           </div>
         </div>
 
-        <div className="mt-5 flex gap-1 overflow-x-auto border-b border-border scrollbar-thin">
+        <div className="mt-5 flex gap-1 overflow-x-auto border-b border-border/80 scrollbar-thin">
           {SUB_NAV.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
               className={({ isActive }) =>
                 cn(
-                  "flex items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors",
+                  "-mb-px flex items-center gap-2 whitespace-nowrap rounded-t-lg border-b-2 px-3.5 py-2.5 text-sm font-medium transition-colors",
                   isActive
-                    ? "border-primary text-primary"
-                    : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
+                    ? "border-primary bg-primary/[0.055] text-primary"
+                    : "border-transparent text-muted-foreground hover:border-border/80 hover:bg-muted/40 hover:text-foreground"
                 )
               }
             >
