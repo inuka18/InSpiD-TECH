@@ -1,5 +1,5 @@
-import { addDays, startOfDay } from "./scheduleUtils";
-import { addWorkingMinutes, normalizeWorkingStart, workingDaysBetween } from "../context/WorkCalendarContext";
+import { startOfDay } from "./scheduleUtils";
+import { addWorkingMinutes, addWorkingDays, endOfWorkingDays, normalizeWorkingStart, workingDaysBetween } from "../context/WorkCalendarContext";
 
 const BASELINE_HOURS_PER_DAY = 8;
 const HOURS_PER_STORY_POINT = 4;
@@ -45,16 +45,10 @@ function topologicalSort(items, getId, getDependencies) {
 }
 
 function sprintWindow(anchor, sprintNumber, sprintDays, settings, firstSprintNumber) {
-  const start = addDays(anchor, (sprintNumber - firstSprintNumber) * sprintDays);
-  const end = addDays(start, sprintDays - 1);
-  let workingDays = 0;
-  const cursor = startOfDay(start);
-  const finalDay = startOfDay(end);
-  while (cursor <= finalDay) {
-    if (settings.workdays.includes(cursor.getDay())) workingDays += 1;
-    cursor.setDate(cursor.getDate() + 1);
-  }
-  return { start, end, capacityMinutes: workingDays * settings.hoursPerDay * 60 };
+  const workingDayOffset = (sprintNumber - firstSprintNumber) * sprintDays;
+  const start = addWorkingDays(anchor, workingDayOffset, settings.workdays);
+  const end = endOfWorkingDays(start, sprintDays, settings.workdays);
+  return { start, end, capacityMinutes: sprintDays * settings.hoursPerDay * 60 };
 }
 
 export function calculateRequirementSprintPlan(phases, settings, projectStart, firstSprintNumber = 1) {

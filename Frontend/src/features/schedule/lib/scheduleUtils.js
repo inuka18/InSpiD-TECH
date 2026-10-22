@@ -74,6 +74,15 @@ export function isSameDay(a, b) {
   return da.getFullYear() === db.getFullYear() && da.getMonth() === db.getMonth() && da.getDate() === db.getDate();
 }
 
+export function isOnLeaveOnDate(resource, date) {
+  const leaveStart = resource.leaveDate ? new Date(resource.leaveDate) : resource.offToday ? TODAY : null;
+  if (!leaveStart || Number.isNaN(leaveStart.getTime())) return false;
+  // returnDate is the first day back at work, so treat it as an exclusive end.
+  const leaveEnd = resource.returnDate ? startOfDay(resource.returnDate) : endOfDay(leaveStart);
+  const day = startOfDay(date).getTime();
+  return day >= startOfDay(leaveStart).getTime() && day < leaveEnd.getTime();
+}
+
 // Does a task's actual window touch a given [rangeStart, rangeEnd] span at
 // all. Used to pool tasks into the Day/Week/Sprint/Project granularity
 // levels on the Schedule Overview's variance chart.

@@ -56,15 +56,12 @@ export function SprintPlanner({ projectId, projectStart, firstSprintNumber = 1, 
     <div className="absolute right-0 top-full z-30 mt-2 w-[min(24rem,calc(100vw-2rem))] rounded-xl border border-border bg-card p-4 text-left shadow-xl">
       <div className="mb-4 flex items-center gap-2">
         <CalendarRange className="h-4 w-4 text-primary" />
-        <div><h3 className="text-sm font-semibold">Sprint Planner</h3><p className="text-xs text-muted-foreground">Set sprint length and team working time.</p></div>
+        <div><h3 className="text-sm font-semibold">Sprint Planner</h3></div>
       </div>
       <label className="mb-4 flex items-center justify-between gap-3 text-sm">
-        Sprint length (calendar days)
-        <input aria-label="Sprint length in calendar days" type="number" min="1" max="60" value={sprintDays} onChange={(event) => setSprintDays(event.target.value)} className="h-9 w-24 rounded-md border border-input bg-background px-2 text-sm" />
+        Sprint length (working days)
+        <input aria-label="Sprint length in working days" type="number" min="1" max="60" value={sprintDays} onChange={(event) => setSprintDays(event.target.value)} className="h-9 w-24 rounded-md border border-input bg-background px-2 text-sm" />
       </label>
-      <p className="-mt-2 mb-4 rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
-        Sprint length is {Number(sprintDays) || 0} calendar days. Working days and hours control task scheduling.
-      </p>
       <div className="mb-3">
         <p className="mb-2 text-xs font-medium text-muted-foreground">Working days</p>
         <div className="flex flex-wrap gap-1" role="group" aria-label="Working days">

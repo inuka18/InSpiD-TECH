@@ -78,7 +78,7 @@ export function ResourceProfileModal({ capacity, phases, capacityRecords = [], o
             </Avatar>
             <div>
               <DialogTitle>{capacity.name}</DialogTitle>
-              <DialogDescription>{capacity.role} · Review capacity and plan this team member&apos;s leave.</DialogDescription>
+              <DialogDescription>{capacity.role}</DialogDescription>
             </div>
           </div>
         </DialogHeader>
@@ -99,7 +99,6 @@ export function ResourceProfileModal({ capacity, phases, capacityRecords = [], o
 
           <div className="rounded-lg border border-border bg-muted/20 p-3">
             <p className="text-sm font-semibold text-foreground">Plan time off</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">Choose a duration and date. Review the work impact before saving.</p>
             <p className="mt-3 text-xs font-medium text-muted-foreground">Leave duration</p>
             <div className="mt-2 grid grid-cols-3 gap-2">
               {[
@@ -130,9 +129,6 @@ export function ResourceProfileModal({ capacity, phases, capacityRecords = [], o
                 </>}
               </div>
             </div>
-            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-              {leaveType === "custom" ? "Enter between 0.5 and 24 hours. The impact preview updates automatically." : "Leave hours are set automatically. Review the schedule impact before saving."}
-            </p>
             <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
               <div className="rounded-md border border-border bg-background px-2.5 py-2">
                 <p className="font-semibold text-foreground">Leave impact</p>

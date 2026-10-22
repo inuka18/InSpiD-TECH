@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { CheckCircle2, AlertTriangle, TrendingUp } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../../../components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "../../../components/ui/card";
 import { overlapsRange, isAtRisk, varianceDays, formatShortDate, addDays, daysBetween } from "../lib/scheduleUtils";
 import { cn } from "../../../lib/utils";
 import { useWorkCalendar } from "../context/WorkCalendarContext";
@@ -99,7 +99,6 @@ export function SprintTimelineTable({ tasks = [], activeSprint }) {
 
   if (sprints.length === 0) return null;
 
-  const totalSprints = sprints.length;
   const onTrackCount = sprints.filter((s) => s.health === "on-track").length;
   const delayedCount = sprints.filter((s) => s.health === "delayed").length;
   const atRiskCount  = sprints.filter((s) => s.health === "at-risk").length;
@@ -115,9 +114,6 @@ export function SprintTimelineTable({ tasks = [], activeSprint }) {
               <TrendingUp className="h-4 w-4 text-primary" />
               <CardTitle className="text-base">All Sprints — Original vs Actual</CardTitle>
             </div>
-            <CardDescription className="mt-0.5">
-              {totalSprints} sprint{totalSprints !== 1 ? "s" : ""} derived from project task range · {sprintLength}-day windows
-            </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">

@@ -16,12 +16,11 @@ import { useSchedulePhases } from "../../hooks/useSchedulePhases";
 import { useResourceCapacity } from "../../hooks/useResourceCapacity";
 import { useScheduleView } from "../../hooks/useScheduleView";
 import { useRole, ROLES } from "../../context/RoleContext";
-import { useWorkCalendar } from "./context/WorkCalendarContext";
+import { addWorkingDays, endOfWorkingDays, useWorkCalendar } from "./context/WorkCalendarContext";
 import {
   flattenTasks,
   isAtRisk,
   overlapsRange,
-  addDays,
   formatShortDate,
   taskAssigneeIds,
 } from "./lib/scheduleUtils";
@@ -41,8 +40,8 @@ export function SprintViewPage() {
 
   const sprint = activeProject?.activeSprint;
   const sprintLengthDays = Number(settings.sprintDays ?? 10);
-  const sprintStart = sprint ? addDays(new Date(sprint.startDate), sprintOffset * sprintLengthDays) : null;
-  const sprintEnd = sprint ? addDays(sprintStart, sprintLengthDays - 1) : null;
+  const sprintStart = sprint ? addWorkingDays(new Date(sprint.startDate), sprintOffset * sprintLengthDays, settings.workdays) : null;
+  const sprintEnd = sprint ? endOfWorkingDays(sprintStart, sprintLengthDays, settings.workdays) : null;
   const sprintNumber = sprint ? sprint.number + sprintOffset : null;
   const sprintLabel = sprint ? (sprintOffset === 0 ? sprint.name : `Sprint ${sprintNumber}`) : "";
 
@@ -59,7 +58,7 @@ export function SprintViewPage() {
   const peopleCount = new Set(sprintTasks.flatMap(taskAssigneeIds)).size;
 
   if (!sprint) {
-    return <EmptyState icon={Target} title="No active sprint" description="This project doesn't have an active sprint configured." />;
+    return <EmptyState icon={Target} title="No active sprint" />;
   }
 
   return (
@@ -74,7 +73,7 @@ export function SprintViewPage() {
             <div>
               <CardTitle className="text-base">{sprintLabel}</CardTitle>
               <CardDescription>
-                {formatShortDate(sprintStart)} – {formatShortDate(sprintEnd)} · {sprintLengthDays} calendar days
+                {formatShortDate(sprintStart)} – {formatShortDate(sprintEnd)} · {sprintLengthDays} working days
               </CardDescription>
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
@@ -119,7 +118,6 @@ export function SprintViewPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Sprint Burndown</CardTitle>
-                <CardDescription>Planned versus actual effort within this sprint only.</CardDescription>
               </CardHeader>
               <CardContent><BurndownChart tasks={sprintTasks} rangeStart={sprintStart} rangeEnd={sprintEnd} height={220} /></CardContent>
             </Card>

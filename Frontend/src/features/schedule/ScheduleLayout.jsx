@@ -50,10 +50,6 @@ function ScheduleLayoutInner() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-2xl font-bold tracking-tight text-foreground">Schedule</h2>
-            <p className="mt-1 max-w-2xl text-sm leading-5 text-muted-foreground">
-              Baseline vs. actual delivery across every planning level, with delay causes traced back to their
-              source{activeProject ? ` for ${activeProject.name}` : ""}.
-            </p>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             {isPM && (

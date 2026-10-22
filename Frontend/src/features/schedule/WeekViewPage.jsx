@@ -16,6 +16,7 @@ import { Avatar, AvatarFallback } from "../../components/ui/avatar";
 import { Badge } from "../../components/ui/badge";
 import { isLate, isSameDay, statusLabel } from "./lib/scheduleUtils";
 import { useSchedulePhases } from "../../hooks/useSchedulePhases";
+import { useResourceCapacity } from "../../hooks/useResourceCapacity";
 import { useScheduleView } from "../../hooks/useScheduleView";
 import { useWorkCalendar } from "./context/WorkCalendarContext";
 import {
@@ -28,14 +29,15 @@ import {
   endOfDay,
   TODAY,
   formatShortDate,
-  formatDayOfWeek,
   taskAssigneeIds,
+  isOnLeaveOnDate,
 } from "./lib/scheduleUtils";
 
 export function WeekViewPage() {
   const { activeProject, activeProjectId } = useScheduleView();
   const navigate = useNavigate();
   const { data: phases, loading } = useSchedulePhases(activeProjectId);
+  const { data: capacity } = useResourceCapacity(activeProjectId);
   const { settings: workCalendar } = useWorkCalendar();
   const [weekOffset, setWeekOffset] = useState(0);
   const [selectedTask, setSelectedTask] = useState(null);
@@ -77,9 +79,28 @@ export function WeekViewPage() {
     () => Array.from({ length: 7 }, (_, index) => {
       const date = addDays(weekStart, index);
       return { date, tasks: flattenTasks(phases).filter((task) => isTaskActiveOn(task, date)) };
-    }),
+    }).filter(({ date }) => workCalendar.workdays.includes(date.getDay())),
     [phases, weekStart, workCalendar]
   );
+  const leaveAssignments = useMemo(() => {
+    const calendarDates = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
+    const tasks = flattenTasks(phases);
+    return calendarDates.flatMap((date) => capacity
+      .filter((resource) => isOnLeaveOnDate(resource, date))
+      .map((resource) => {
+        const relatedTasks = tasks.filter((task) => {
+          const assignedBeforeLeave = task.originalAssigneeId === resource.memberId
+            || task.prevAssigneeId === resource.memberId;
+          const assignedNow = taskAssigneeIds(task).includes(resource.memberId);
+          const recordedForLeave = task.reallocatedFrom === resource.name
+            && task.leaveDate && isSameDay(task.leaveDate, date);
+          return recordedForLeave || ((assignedNow || assignedBeforeLeave)
+            && (isTaskActiveOn(task, date) || overlapsRange(task, weekStart, weekEnd)));
+        });
+        return { resource, date, tasks: relatedTasks };
+      })
+    );
+  }, [weekStart, weekEnd, capacity, phases]);
 
   const handleSelectDay = (day) => {
     const date = new Date(day);
@@ -97,7 +118,6 @@ export function WeekViewPage() {
               <CardTitle className="text-base">
                 Week of {formatShortDate(weekStart)} – {formatShortDate(weekEnd)}
               </CardTitle>
-              <CardDescription className="mt-1">Day-by-day tasks, owners, and delivery status.</CardDescription>
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
@@ -126,7 +146,6 @@ export function WeekViewPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Weekly Gantt plan</CardTitle>
-              <CardDescription>Only tasks that overlap the selected seven-day week are shown.</CardDescription>
             </CardHeader>
             <CardContent>
               <GanttChart phases={phases} rangeStart={weekStart} rangeEnd={weekEnd} onSelectTask={setSelectedTask} />
@@ -139,7 +158,6 @@ export function WeekViewPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Week Burndown</CardTitle>
-                <CardDescription>Planned versus actual effort for this seven-day period.</CardDescription>
               </CardHeader>
               <CardContent><BurndownChart tasks={weekTasks} rangeStart={weekStart} rangeEnd={weekEnd} height={220} /></CardContent>
             </Card>
@@ -157,21 +175,41 @@ export function WeekViewPage() {
           <>
             <TaskAssignmentList tasks={weekTasks} onSelectTask={setSelectedTask} />
 
+            {leaveAssignments.length > 0 && <Card className="overflow-hidden border-amber-200/70">
+              <CardHeader className="border-b border-amber-200/60 bg-amber-50/60 py-3 dark:bg-amber-950/15">
+                <div className="flex items-center justify-between"><CardTitle className="text-sm">Team leave</CardTitle><Badge variant="outline">{leaveAssignments.length} leave day{leaveAssignments.length === 1 ? "" : "s"}</Badge></div>
+              </CardHeader>
+              <CardContent className="divide-y divide-border p-0">
+                {leaveAssignments.map(({ resource, date, tasks }) => (
+                  <div key={`${resource.id}-${date.toISOString()}`} className="flex flex-wrap items-start gap-3 px-4 py-3">
+                    <Avatar className="h-8 w-8 shrink-0 text-[10px]"><AvatarFallback>{resource.name.split(" ").map((part) => part[0]).join("").slice(0, 2)}</AvatarFallback></Avatar>
+                    <div className="min-w-36 flex-1">
+                      <p className="text-sm font-medium text-foreground">{resource.name}</p>
+                      <p className="text-xs text-muted-foreground">{date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })} · {resource.role} · {resource.leaveType ? `${resource.leaveType} leave` : "On leave"}</p>
+                    </div>
+                    <div className="flex min-w-52 flex-1 flex-wrap gap-1.5">
+                      {tasks.length ? tasks.map((task) => <button key={task.id} type="button" onClick={() => setSelectedTask(task)} className="max-w-full truncate rounded-md border border-border bg-background px-2 py-1 text-left text-xs font-medium text-primary hover:border-primary/40 hover:bg-primary/5">{task.name}</button>) : <span className="text-xs text-muted-foreground">No tasks assigned</span>}
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>}
+
             <Card className="overflow-hidden rounded-2xl border-border/80 shadow-sm">
-              <CardHeader className={`border-b border-border/70 px-4 py-4 ${isCurrentWeek ? "bg-gradient-to-r from-primary/[0.07] via-primary/[0.025] to-card" : "bg-gradient-to-r from-muted/35 to-card"}`}>
+              <CardHeader className={`border-b border-border/70 px-5 py-4 ${isCurrentWeek ? "bg-gradient-to-r from-primary/[0.07] via-primary/[0.025] to-card" : "bg-gradient-to-r from-muted/35 to-card"}`}>
                 <div className="flex flex-wrap items-center gap-2"><CardTitle className="text-base">Weekly planner</CardTitle>{isCurrentWeek && <Badge variant="outline" className="border-blue-200 bg-blue-50 text-[10px] font-medium text-blue-700">Current week</Badge>}</div>
-                <CardDescription>Week of {formatShortDate(weekStart)} – {formatShortDate(weekEnd)} · Select a task for details or a day to open its schedule.</CardDescription>
+                <CardDescription className="mt-1">{formatShortDate(weekStart)} – {formatShortDate(weekEnd)}</CardDescription>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="overflow-x-auto bg-muted/30 p-2 sm:p-3">
-                  <div className="grid min-w-[1400px] grid-cols-7 gap-2">
+                <div className="overflow-x-auto bg-muted/20 p-3 sm:p-4">
+                  <div className="grid min-w-[1000px] gap-3" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))` }}>
                     {days.map(({ date, tasks }) => (
-                      <section key={date.toISOString()} className={`min-h-[310px] overflow-hidden rounded-xl border bg-card shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-all hover:shadow-sm ${isSameDay(date, TODAY) ? "border-primary/35 ring-1 ring-primary/10" : "border-border/80"}`}>
+                      <section key={date.toISOString()} className={`min-h-[310px] overflow-hidden rounded-xl border bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${isSameDay(date, TODAY) ? "border-primary/40 ring-1 ring-primary/15" : "border-border/80"}`}>
                         <button type="button" onClick={() => handleSelectDay(date)} className={`w-full min-h-[78px] border-b px-3 py-3 text-left transition-colors hover:bg-primary/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary ${isSameDay(date, TODAY) ? "border-primary/15 bg-primary/[0.07]" : "border-border/70 bg-muted/20"}`}>
-                          <div className="flex items-center justify-between gap-1"><p className="text-[15px] font-semibold text-slate-900 dark:text-slate-100">{formatDayOfWeek(date)}</p>{isSameDay(date, TODAY) && <span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-[9px] font-semibold text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">Today</span>}</div>
-                          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{tasks.length} task{tasks.length === 1 ? "" : "s"} scheduled</p>
+                          <div className="flex items-center justify-between gap-1"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{date.toLocaleDateString(undefined, { weekday: "long" })}</p>{isSameDay(date, TODAY) && <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[9px] font-semibold text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">Today</span>}</div>
+                          <div className="mt-1 flex items-end justify-between"><p className="text-lg font-semibold leading-none text-foreground">{date.toLocaleDateString(undefined, { month: "short", day: "numeric" })}</p><span className="text-[10px] font-medium text-muted-foreground">{tasks.length} task{tasks.length === 1 ? "" : "s"}</span></div>
                         </button>
-                        <div className="min-h-48 space-y-2 p-2">
+                        <div className="min-h-48 space-y-2 p-2.5">
                           {tasks.length === 0 ? (
                             <p className="rounded-lg border border-dashed border-border px-2 py-5 text-center text-xs text-muted-foreground">No scheduled work</p>
                           ) : tasks.slice(0, 4).map((task) => {

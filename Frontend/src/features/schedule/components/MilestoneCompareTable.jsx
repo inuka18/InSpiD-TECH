@@ -1,5 +1,5 @@
 import { Diamond, CheckCircle2, Clock, AlertTriangle } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../../../components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "../../../components/ui/card";
 import { Badge } from "../../../components/ui/badge";
 import { varianceDays, isLate, isAtRisk, formatShortDate } from "../lib/scheduleUtils";
 import { cn } from "../../../lib/utils";
@@ -12,7 +12,6 @@ function StatusIcon({ task }) {
 
 export function MilestoneCompareTable({ tasks = [] }) {
   const milestones = tasks.filter((task) => task.milestone);
-  const done = milestones.filter((task) => task.status === "done").length;
   const atRisk = milestones.filter(isAtRisk).length;
   const onTrack = milestones.length - atRisk;
 
@@ -25,9 +24,6 @@ export function MilestoneCompareTable({ tasks = [] }) {
               <Diamond className="h-4 w-4 text-primary" />
               <CardTitle className="text-base">Milestone Tracker — Original vs Actual</CardTitle>
             </div>
-            <CardDescription className="mt-0.5">
-              {milestones.length} milestone{milestones.length !== 1 ? "s" : ""} · {done} completed · {atRisk} at risk
-            </CardDescription>
           </div>
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">{onTrack} on track</span>

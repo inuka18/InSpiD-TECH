@@ -47,6 +47,25 @@ export function normalizeWorkingStart(start, settings) {
   return nextWorkingStart(start, settings);
 }
 
+export function addWorkingDays(start, dayCount, workdays) {
+  const cursor = new Date(start);
+  if (!workdays?.length) return cursor;
+  while (!workdays.includes(cursor.getDay())) cursor.setDate(cursor.getDate() + 1);
+  const direction = Number(dayCount) < 0 ? -1 : 1;
+  let remaining = Math.abs(Number(dayCount) || 0);
+  while (remaining > 0) {
+    cursor.setDate(cursor.getDate() + direction);
+    if (workdays.includes(cursor.getDay())) remaining -= 1;
+  }
+  return cursor;
+}
+
+export function endOfWorkingDays(start, dayCount, workdays) {
+  const end = addWorkingDays(start, Math.max(0, Number(dayCount) - 1), workdays);
+  end.setHours(23, 59, 59, 999);
+  return end;
+}
+
 export function addWorkingMinutes(start, minutes, settings) {
   let cursor = nextWorkingStart(start, settings);
   let remaining = Math.max(0, Number(minutes) || 0);
