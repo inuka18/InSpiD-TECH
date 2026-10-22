@@ -7,6 +7,7 @@ const signalParams = z.object({ projectId: z.string().min(1), signalId: z.string
 const listQuery = z.object({
   reviewStatus: z.enum(REVIEW_STATUSES).optional(),
   requirementId: z.string().min(1).optional(),
+  includeSuppressed: z.enum(['true', 'false']).transform((v) => v === 'true').optional(), // repeats of a rejected candidate
 });
 
 // authorRole defaults to the user's job title, timestamp to now (done in the service).

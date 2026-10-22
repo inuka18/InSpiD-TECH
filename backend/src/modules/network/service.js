@@ -263,6 +263,52 @@ async function onSignalApplied({ projectId, signal, requirementId, actor }) {
   }
 }
 
+/**
+ * Several signals applied at once (approving / merging a requirement candidate): evidence rows and signal profiles for all of
+ * them (ONE /embed call), then ONE network recompute, so there is at most ONE NETWORK_UPDATE ledger entry in total.
+ * items: [{ signal, requirementId }]. Never throws (same contract as onSignalApplied).
+ */
+async function onSignalsApplied({ projectId, items, actor, triggerReqId = null }) {
+  const usable = (items || []).filter((it) => it.signal && it.requirementId && !isSeeded(it.signal));
+  try {
+    if (usable.length) {
+      const ids = (await Requirement.find({ projectId }).select('reqId').lean()).map((r) => r.reqId);
+      const rows = usable.flatMap((it) => extractEvidence({
+        text: it.signal.text, requirementId: it.requirementId, alternatives: it.signal.matchAlternatives || [], projectReqIds: ids,
+      }).map((r) => ({ ...r, projectId, signalId: it.signal.signalId, createdAt: new Date() })));
+      if (rows.length) {
+        try {
+          await SignalEvidence.insertMany(rows, { ordered: false });
+        } catch (err) {
+          const dupOnly = err.code === 11000 || (err.writeErrors?.length && err.writeErrors.every((w) => (w.err?.code ?? w.code) === 11000));
+          if (!dupOnly) throw err;
+        }
+      }
+      let vectors = null;
+      try {
+        const res = await aiClient.embed(usable.map((it) => it.signal.text));
+        if (Array.isArray(res?.vectors) && res.vectors.length === usable.length) vectors = res.vectors;
+      } catch (err) {
+        if (!(err instanceof AppError)) throw err;
+      }
+      if (vectors) {
+        await withLock(projectId, async () => {
+          for (let k = 0; k < usable.length; k += 1) await foldIntoProfile(projectId, usable[k].requirementId, vectors[k]);
+        });
+      } else {
+        await setState(projectId, { stale: true }, { pendingSignalIds: { $each: usable.map((it) => it.signal.signalId) } });
+        console.warn('network: candidate signals not folded into the profiles (ai-service down); marked stale');
+      }
+    }
+    if (triggerReqId || usable.length) await onRequirementChanged(projectId, triggerReqId || usable[0].requirementId, { email: actor });
+    return { updated: true };
+  } catch (err) {
+    console.error(`network: batch update failed (${err.message})`);
+    try { await setState(projectId, { stale: true }); } catch { /* ignore */ }
+    return { failed: true };
+  }
+}
+
 // Called when a requirement is created or its title/description changes. The edit must not fail because the
 // ai-service is down: the network is then refreshed by the next GET /network or POST /network/recompute.
 async function onRequirementChanged(projectId, reqId, user) {
@@ -411,6 +457,6 @@ async function removeManualLink(projectId, linkId, user) {
 }
 
 module.exports = {
-  getNetwork, computeNetwork, recompute, onRequirementChanged, onSignalApplied, linkEvidence, createBaseline, ensureInitialBaseline,
+  getNetwork, computeNetwork, recompute, onRequirementChanged, onSignalApplied, onSignalsApplied, linkEvidence, createBaseline, ensureInitialBaseline,
   listManualLinks, addManualLink, removeManualLink, withLock, textOnlyLinks,
 };

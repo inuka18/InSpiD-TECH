@@ -15,7 +15,8 @@
     "test": "node tests/guard.js && node --test tests/unit tests/integration",
     "test:unit": "node --test tests/unit",
     "network:build": "node src/scripts/networkBuild.js",
-    "network:evaluate": "node src/scripts/networkEvaluate.js"
+    "network:evaluate": "node src/scripts/networkEvaluate.js",
+    "newreq:evaluate": "node src/scripts/newRequirementEvaluate.js"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",

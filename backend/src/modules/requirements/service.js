@@ -19,6 +19,7 @@ function toApi(r, relatedIds = [], statusHistory = []) {
     cluster: r.clusterId ?? null, // computed by the network service; null until it has run
     clusterLabel: r.clusterLabel ?? null,
     type: r.type,
+    priority: r.priority ?? null,
     relatedIds,
     statusHistory,
   };
@@ -74,7 +75,9 @@ async function nextReqId(projectId) {
   return `${prefix}${String(max + 1).padStart(2, '0')}`;
 }
 
-async function create(projectId, body, user) {
+// opts.skipNetwork: the caller refreshes the network itself afterwards (approving a requirement candidate does one single update).
+// opts.triggeringSignal: { signalId, text } recorded on the REQUIREMENT_CREATED ledger entry.
+async function create(projectId, body, user, { skipNetwork = false, triggeringSignal = null } = {}) {
   const { cluster, ...rest } = body;
   const doc = await Requirement.create({
     ...rest, projectId, reqId: await nextReqId(projectId), groupId: cluster || '',
@@ -83,8 +86,9 @@ async function create(projectId, body, user) {
   await ledger.appendLedgerEntry({
     projectId, eventType: 'REQUIREMENT_CREATED', reqId: doc.reqId, requirementTitle: doc.title,
     previousStatus: null, newStatus: 'Confirmed', actor: user.email,
+    ...(triggeringSignal ? { triggeringSignal: triggeringSignal.text, triggeringSignalId: triggeringSignal.signalId } : {}),
   });
-  await network.onRequirementChanged(projectId, doc.reqId, user);
+  if (!skipNetwork) await network.onRequirementChanged(projectId, doc.reqId, user);
   return toApi((await Requirement.findOne({ projectId, reqId: doc.reqId }).lean()));
 }
 

@@ -99,6 +99,7 @@ GET /api/v1/projects/:projectId/live-state          requirements with status, ro
 GET /api/v1/projects/:projectId/network             nodes and links
 GET /api/v1/projects/:projectId/ledger              ledger entries
 GET /api/v1/projects/:projectId/schedule-baseline
+GET /api/v1/projects/:projectId/requirement-candidates?status=pending   possible new requirements waiting for a PM (read-only; any member)
 ```
 
 They live in `backend/src/modules/integration` and call the other modules' services.
@@ -188,6 +189,16 @@ POST /api/v1/projects/:projectId/network/recompute    # PM only: full recompute
 
 Limits: on a complete similarity graph Pathfinder returns about n - 1 edges (a spanning structure), so it shows the strongest links, not every related pair.
 Recomputation is serialized per project inside one backend process only. The link/cluster writes and the ledger entry are not one transaction. See the evaluation for how closely the result matches the scenario's `group_id` key (it is modest).
+
+### Possible new requirements (requirement candidates)
+
+A signal that looks like a **new** requirement (no existing requirement covers it, and it is not a repeat of other signals) becomes a *requirement candidate* that a PM must approve. The classifier is **not** retrained or changed: the detector (`backend/src/modules/signals/newRequirement.js`, pure and unit-tested) sits on top of its label, its confidence and the matcher's similarities, inside the shared decision step, so preview, create, extract, bulk and review all use it.
+
+- **Rule.** Candidate only if the label is Expectation, confidence >= `NEW_REQ_MIN_CONFIDENCE` (70), the signal is not seeded, AND the top similarity is below `NEW_REQ_SIM_LOW` (0.35), or below `NEW_REQ_SIM_HIGH` (0.50) with at least one *novel token* (a content word in no requirement and in at most 2 earlier signals of the project; reason `new terms: koko`). A candidate signal is **always pending** (`new-requirement`), never auto-accepted, and changes nothing until a PM acts.
+- **Grouping.** The text is embedded (`/embed`, one batched call per document); cosine >= `NEW_REQ_GROUP_SIM` (0.60) to a pending candidate's centroid attaches it as more evidence; >= `NEW_REQ_SUPPRESS_SIM` (0.80) to a rejected candidate stores the signal as pending with reason "similar to a rejected candidate" and no candidate (hidden from the default signal list; `?includeSuppressed=true` shows it).
+- **Constants** are optional env vars with defaults (not required in `.env`), in `newRequirementConstants.js`, with a tuning log.
+- **Endpoints.** `GET /projects/:projectId/requirement-candidates?status=` (any member), `POST /projects/:projectId/requirement-candidates/:candidateId/review` (PM only): `approve` (creates the requirement through the normal path: next free id, `REQUIREMENT_CREATED` ledger entry with the first evidence signal, then every evidence signal is accepted and mapped to it), `merge` (`mergeIntoRequirementId`), `reject`. Each action claims the candidate atomically from `pending` (concurrent calls: one wins, the rest get 409), runs at most **one** network update (one `NETWORK_UPDATE` ledger entry), and writes a feedback document of kind `requirement-candidate` (never part of the retraining export). Approving lowers the alignment score until a new baseline is frozen.
+- **Evaluation.** `npm run newreq:evaluate` (see `docs/new_requirement_detection.md`). Run it inside the test container: `docker compose --profile localdb --profile test run --rm backend-test node src/scripts/newRequirementEvaluate.js --splits=dev`.
 
 ## PLACEHOLDER ledger (read this)
 

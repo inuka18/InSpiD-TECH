@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { fetchSignals } from "../services/signalsService";
 
-export function useSignals(projectId) {
+// includeSuppressed: the feed also needs repeats of rejected candidates (it hides them behind a toggle).
+export function useSignals(projectId, { includeSuppressed = false } = {}) {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -10,7 +11,7 @@ export function useSignals(projectId) {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    fetchSignals(projectId)
+    fetchSignals(projectId, { includeSuppressed })
       .then((res) => {
         if (!cancelled) setData(res);
       })
@@ -23,7 +24,7 @@ export function useSignals(projectId) {
     return () => {
       cancelled = true;
     };
-  }, [projectId]);
+  }, [projectId, includeSuppressed]);
 
   useEffect(() => reload(), [reload]);
 

@@ -9,6 +9,7 @@ import { Badge } from "../../../components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../components/ui/tabs";
 import { ClassificationBadge } from "./ClassificationBadge";
+import { NewRequirementTag } from "./NewRequirementTag";
 import { StatusBadge } from "./StatusBadge";
 import { bulkSubmitSignals, extractSignals } from "../../../services/signalsService";
 import { cn } from "../../../lib/utils";
@@ -24,6 +25,7 @@ const reasonText = {
   "low-similarity": "match similarity too low to apply automatically",
   "proposes-drop": "it would drop a requirement",
   "none-confident": "no signal",
+  "new-requirement": "possible new requirement: a PM must approve it as a candidate",
 };
 
 // Upload a document, find the signals in it, review them, and save the approved ones through the normal signal flow.
@@ -82,8 +84,8 @@ export function UploadDocumentDialog({ projectId, requirements = [], onDone }) {
         documentDate: documentDate || undefined,
       });
       setExtracted(res);
-      // Signals are checked by default, segments with no signal are not.
-      setSelected(new Set(res.segments.filter((s) => s.label !== "None").map((s) => s.index)));
+      // Signals are checked by default; segments with no signal and possible new requirements (they need approval) are not.
+      setSelected(new Set(res.segments.filter((s) => s.label !== "None" && !s.newRequirement?.isCandidate).map((s) => s.index)));
       setMatchChoice(Object.fromEntries(res.segments.map((s) => [s.index, s.match?.requirementId ?? NO_MATCH])));
       setForceConfirmed(false);
       setStage("results");
@@ -294,6 +296,7 @@ export function UploadDocumentDialog({ projectId, requirements = [], onDone }) {
                             <td className="max-w-md px-2 py-2">
                               {s.speakerLabel && <span className="mr-1.5 text-[11px] font-medium text-muted-foreground">{s.speakerLabel}:</span>}
                               <span className="text-foreground/90">{s.text}</span>
+                              {s.newRequirement?.isCandidate && <NewRequirementTag nr={s.newRequirement} className="mt-1 block" />}
                             </td>
                             <td className="whitespace-nowrap px-2 py-2">
                               <ClassificationBadge classification={s.label} />
@@ -330,6 +333,10 @@ export function UploadDocumentDialog({ projectId, requirements = [], onDone }) {
                                 <span className="text-xs text-muted-foreground">No signal</span>
                               ) : changed ? (
                                 <Badge variant="outline" className="text-[10px]">Match changed</Badge>
+                              ) : s.newRequirement?.isCandidate ? (
+                                <span title={reasonText["new-requirement"]}>
+                                  <Badge variant="outline" className="border-primary/40 text-[10px] text-primary">Needs approval</Badge>
+                                </span>
                               ) : s.wouldAutoApply ? (
                                 <Badge variant="success" className="text-[10px]">Auto-apply</Badge>
                               ) : (

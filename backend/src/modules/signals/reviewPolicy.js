@@ -9,13 +9,16 @@ const toConfidencePct = (p) => Math.max(0, Math.min(100, Math.round(Number(p) * 
  * was matched by similarity rather than given explicitly, similarity >= autoApplyMinSimilarity), and the proposed
  * status is not a move into Dropped. A "None" signal has nothing to apply, so it is accepted
  * (as "no effect") when confidence >= threshold; a low-confidence None stays pending for a PM.
+ * A possible new requirement (signals/newRequirement.js) is always pending, reason 'new-requirement'.
  * Everything else is pending and changes nothing until a PM accepts it.
  * @returns {{ reviewStatus: 'accepted'|'pending', autoAccepted: boolean, reason: string }}
  */
-function decideReview({ label, confidence, matched, dropProposed, threshold, matchMethod, similarity, autoApplyMinSimilarity }) {
+function decideReview({ label, confidence, matched, dropProposed, threshold, matchMethod, similarity, autoApplyMinSimilarity, newRequirement = false }) {
   const accepted = (reason) => ({ reviewStatus: 'accepted', autoAccepted: true, reason });
   const pending = (reason) => ({ reviewStatus: 'pending', autoAccepted: false, reason });
   if (!label) return pending('unclassified');
+  // A possible NEW requirement is never auto-accepted and never changes anything until a PM acts on its candidate.
+  if (newRequirement) return pending('new-requirement');
   const confident = confidence >= threshold;
   if (label === 'None') return confident ? accepted('none-confident') : pending('low-confidence');
   if (!confident) return pending('low-confidence');

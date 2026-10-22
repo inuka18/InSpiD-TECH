@@ -81,6 +81,7 @@ describe('POST /projects/:projectId/signals (stubbed ai client, *_test database)
   it('similarity below MATCH_MIN_SIMILARITY (0.30): stored unmapped and pending', async () => {
     await h.addRequirement();
     h.ai.similarity = 0.29;
+    h.ai.label = 'Constraint'; // (a confident Expectation this far from every requirement is a possible NEW requirement instead: see requirementCandidates.test.js)
     const r = await post({ source: 'Teams', text: 'The new vendor contract must not change.' });
     assert.equal(r.status, 201);
     assert.equal(r.data.match.requirementId, null);

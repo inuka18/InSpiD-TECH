@@ -4,9 +4,11 @@ import { CheckCircle2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { RequirementsTable } from "./components/RequirementsTable";
 import { SignalFeed } from "./components/SignalFeed";
+import { CandidatesPanel } from "./components/CandidatesPanel";
 import { RequirementDetailPanel } from "./components/RequirementDetailPanel";
 import { useRequirements } from "../../hooks/useRequirements";
 import { useSignals } from "../../hooks/useSignals";
+import { useCandidates } from "../../hooks/useCandidates";
 import { useActiveProject } from "../../hooks/useActiveProject";
 import { useRole, ROLES } from "../../context/RoleContext";
 
@@ -15,7 +17,8 @@ export function RequirementsPage() {
   const { activeProjectId } = useActiveProject();
   const { role } = useRole();
   const { data: requirements, loading: reqLoading, error: reqError, reload: reloadRequirements } = useRequirements(activeProjectId);
-  const { data: signals, loading: sigLoading, error: sigError, reload: reloadSignals } = useSignals(activeProjectId);
+  const { data: signals, loading: sigLoading, error: sigError, reload: reloadSignals } = useSignals(activeProjectId, { includeSuppressed: true });
+  const { data: candidates, loading: candLoading, error: candError, reload: reloadCandidates } = useCandidates(activeProjectId);
   const [toast, setToast] = useState(null);
 
   useEffect(() => {
@@ -34,9 +37,11 @@ export function RequirementsPage() {
   const refreshAfterSignalChange = useCallback(() => {
     reloadSignals();
     reloadRequirements();
-  }, [reloadSignals, reloadRequirements]);
+    reloadCandidates(); // a new signal can create or extend a candidate
+  }, [reloadSignals, reloadRequirements, reloadCandidates]);
 
-  const activeTab = searchParams.get("tab") === "signals" ? "signals" : "list";
+  const tabParam = searchParams.get("tab");
+  const activeTab = tabParam === "signals" || tabParam === "candidates" ? tabParam : "list";
   const reviewParam = searchParams.get("review");
   const presetReview = ["pending", "accepted", "rejected"].includes(reviewParam) ? reviewParam : undefined;
   const activeReqId = searchParams.get("req");
@@ -105,6 +110,12 @@ export function RequirementsPage() {
         <TabsList>
           <TabsTrigger value="list">Requirements List</TabsTrigger>
           <TabsTrigger value="signals">Signal Feed</TabsTrigger>
+          <TabsTrigger value="candidates" className="gap-1.5">
+            New requirement candidates
+            <span className="rounded-full bg-primary/10 px-1.5 text-[10px] font-semibold text-primary" aria-label={`${candidates.length} waiting`}>
+              {candidates.length}
+            </span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="list">
@@ -135,6 +146,19 @@ export function RequirementsPage() {
             highlightSignalId={highlightSignalId}
             presetFilters={presetFilters}
             onClearPresetFilters={clearPresetFilters}
+          />
+        </TabsContent>
+
+        <TabsContent value="candidates">
+          <CandidatesPanel
+            candidates={candidates}
+            loading={candLoading}
+            error={candError}
+            onRetry={reloadCandidates}
+            requirements={requirements}
+            projectId={activeProjectId}
+            isPM={role === ROLES.PM}
+            onChanged={refreshAfterSignalChange}
           />
         </TabsContent>
       </Tabs>

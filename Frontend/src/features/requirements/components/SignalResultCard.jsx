@@ -3,6 +3,7 @@ import { Badge } from "../../../components/ui/badge";
 import { ClassificationBadge } from "./ClassificationBadge";
 import { ConfidenceMeter } from "./ConfidenceMeter";
 import { StatusBadge } from "./StatusBadge";
+import { NewRequirementTag } from "./NewRequirementTag";
 import { cn } from "../../../lib/utils";
 
 // Plain-English reason a signal goes to a PM instead of being applied automatically.
@@ -16,6 +17,10 @@ function reasonText(r) {
       return `the match similarity is below ${r.autoApplyMinSimilarity} (the minimum for applying a match automatically)`;
     case "proposes-drop":
       return "it would drop a requirement, which always needs a PM decision";
+    case "new-requirement":
+      return "it may be a new requirement that no existing requirement covers, so a PM must approve it as a candidate";
+    case "similar-to-rejected":
+      return "it repeats a requirement candidate a PM already rejected";
     case "unclassified":
       return "the classifier was unavailable";
     case "concurrent-update":
@@ -111,6 +116,23 @@ export function SignalResultCard({ result, requirements = [], onClose }) {
           )}
         </div>
       </div>
+
+      {result.newRequirement?.isCandidate && (
+        <div className="space-y-1 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+          <NewRequirementTag nr={result.newRequirement} />
+          <p className="text-xs text-muted-foreground">
+            {result.newRequirement.suppressed
+              ? "Stored, but not added to a candidate: it is very similar to one a PM rejected."
+              : result.newRequirement.joinsCandidateId
+                ? `${preview ? "Would be added" : "Added"} as more evidence to candidate ${result.newRequirement.joinsCandidateId}.`
+                : result.newRequirement.candidateId
+                  ? `New candidate ${result.newRequirement.candidateId} created. A PM approves it in the "New requirement candidates" tab.`
+                  : "Would become a new requirement candidate that a PM must approve."}
+            {result.newRequirement.closestRequirementId &&
+              ` Closest: ${result.newRequirement.closestRequirementId}${result.newRequirement.similarity != null ? ` (${result.newRequirement.similarity.toFixed(2)})` : ""}.`}
+          </p>
+        </div>
+      )}
 
       <div className="space-y-1.5 border-t border-border pt-3">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Proposed status</p>

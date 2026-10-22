@@ -1,0 +1,61 @@
+nr_id,project_id,source,author_role,text,is_new_requirement,split,batch
+NR-001,SYS-RET,Standup,Product Manager,For standup: The business wants a loyalty points programme where customers earn points on every order.,1,dev,N
+NR-002,SYS-RET,Standup,DevOps Engineer,"Update from me: Shoppers want to narrow results by brand and rating, not just category.",0,test,N
+NR-003,SYS-ULP,Standup,QA Engineer,The registrar wants an alumni mentoring directory linked to the portal.,1,test,N
+NR-004,SYS-ULP,Slack,Team Lead,Students are asking for a peer tutoring marketplace where seniors can offer help sessions.,1,test,N
+NR-005,SYS-MBA,Email,Developer,Hello all. Customers hope to unlock the app with their fingerprint instead of a PIN. Regards.,0,test,N
+NR-006,SYS-HMS,Teams,Product Manager,Nurses need to see which beds are free on each ward.,0,test,N
+NR-007,SYS-MBA,Standup,Developer,Update from me: Business customers need to approve payments with two signatories.,1,test,N
+NR-008,SYS-HMS,Email,UX Designer,Hi team. The blood bank wants stock levels and expiry dates tracked in the system. Thanks.,1,dev,N
+NR-009,SYS-MBA,Slack,Team Lead,Heads up: Customers keep asking whether they can set up a joint account with a family member.,1,test,N
+NR-010,SYS-MBA,Email,UX Designer,Hello all. The bank would like a voice assistant so customers can check balances by speaking. Regards.,1,test,N
+NR-011,SYS-RET,Jira Comment,Security Engineer,Updating the ticket: Sellers have asked for a way to offer gift wrapping on selected items.,1,test,N
+NR-012,SYS-ULP,Teams,Business Analyst,The careers office wants students to upload CVs and apply for internships through the portal.,1,dev,N
+NR-013,SYS-ULP,Email,DevOps Engineer,Hello all. Lecturers expect students to upload assignments with a clear deadline. Regards.,0,test,N
+NR-014,SYS-ULP,Standup,Project Manager,The faculty wants a research project allocation tool for final-year students.,1,dev,N
+NR-015,SYS-ULP,Teams,Business Analyst,Lecturers expect to mark with rubrics and write feedback.,0,test,N
+NR-016,SYS-HMS,Slack,Product Manager,The ward sisters would like a visitor management feature to record who visits which patient.,1,dev,N
+NR-017,SYS-ULP,Email,Business Analyst,Hi team. Students hope to watch recorded lectures on their phones. Thanks.,0,dev,N
+NR-018,SYS-ULP,Teams,UX Designer,From today's call: Everyone should sign in with their university account.,0,test,N
+NR-019,SYS-RET,Slack,Developer,The team is hoping sellers can upload stock in bulk from a spreadsheet.,0,test,N
+NR-020,SYS-RET,Slack,Developer,Heads up: Customers want to compare two or three products side by side before buying.,1,test,N
+NR-021,SYS-HMS,Standup,Product Manager,Patients should be able to request a copy of their medical records online.,1,test,N
+NR-022,SYS-RET,Email,Security Engineer,Hi team. Operations would like a click and collect option from our partner stores. Thanks.,1,dev,N
+NR-023,SYS-HMS,Slack,Business Analyst,fyi: The pharmacy wants stock to drop automatically when a prescription is dispensed.,0,dev,N
+NR-024,SYS-RET,Standup,UX Designer,Update from me: Customers expect their cart to still be there when they switch from phone to laptop.,0,dev,N
+NR-025,SYS-MBA,Email,Team Lead,Hello all. The bank is counting on push alerts for every debit and credit. Regards.,0,test,N
+NR-026,SYS-ULP,Email,Business Analyst,Hi team. Parents of scholarship students would like read-only access to progress reports. Thanks.,1,dev,N
+NR-027,SYS-RET,Slack,QA Engineer,Customers keep asking if they can pay in instalments through Koko at checkout.,1,test,N
+NR-028,SYS-RET,Slack,DevOps Engineer,Heads up: Marketing is hoping shoppers can search for products by uploading a photo.,1,dev,N
+NR-029,SYS-RET,Standup,Security Engineer,For standup: Support wants returns to be requested straight from the order page.,0,dev,N
+NR-030,SYS-MBA,Teams,Security Engineer,People expect to pay utility bills and schedule monthly payments in the app.,0,test,N
+NR-031,SYS-ULP,Jira Comment,Developer,Students want to enrol in modules online during the registration window.,0,test,N
+NR-032,SYS-ULP,Standup,Team Lead,Update from me: Lecturers hope to run live polls during lectures from the portal.,1,test,N
+NR-033,SYS-MBA,Standup,Security Engineer,Customers want to move money between their own accounts instantly.,0,dev,N
+NR-034,SYS-ULP,Email,Developer,Hi team. Students want to book time with their academic advisor online. Thanks.,0,dev,N
+NR-035,SYS-MBA,Teams,QA Engineer,From today's call: Marketing is hoping the app can offer travel insurance at the point of a card purchase.,1,dev,N
+NR-036,SYS-HMS,Standup,Security Engineer,For standup: Reception hopes walk-in patients can be queued with a display showing who is next.,0,dev,N
+NR-037,SYS-MBA,Teams,QA Engineer,Customers expect to see 12 months of transactions and download statements.,0,dev,N
+NR-038,SYS-HMS,Slack,Product Manager,Patients want to change or cancel their appointment online without phoning.,0,test,N
+NR-039,SYS-RET,Standup,Team Lead,It would help if customers could talk to a chatbot to ask about their orders.,1,dev,N
+NR-040,SYS-HMS,Standup,Developer,Administrators want a reminder when a staff member's professional registration is about to expire.,1,dev,N
+NR-041,SYS-RET,Slack,QA Engineer,Heads up: Customers want to see where their parcel is without calling us.,0,dev,N
+NR-042,SYS-MBA,Standup,DevOps Engineer,Users want to block a lost card straight away from the app.,0,test,N
+NR-043,SYS-ULP,Email,Business Analyst,Hello all. Lecturers are hoping for automatic captions on every lecture recording. Regards.,1,test,N
+NR-044,SYS-RET,Email,UX Designer,Hello all. Customers would like to choose a delivery time window when they check out. Regards.,0,test,N
+NR-045,SYS-HMS,Slack,Team Lead,Doctors are hoping the system can transcribe their consultation notes from voice.,1,test,N
+NR-046,SYS-RET,Standup,DevOps Engineer,People are asking to share their saved items with friends.,0,test,N
+NR-047,SYS-MBA,Jira Comment,Project Manager,Updating the ticket: Customers want to donate to registered charities directly from the app.,1,dev,N
+NR-048,SYS-HMS,Jira Comment,Security Engineer,Updating the ticket: The hospital wants an ambulance dispatch and tracking screen for emergency arrivals.,1,test,N
+NR-049,SYS-ULP,Standup,Business Analyst,Update from me: The exams office wants clashes detected automatically when exams are scheduled.,0,dev,N
+NR-050,SYS-RET,Standup,Project Manager,For standup: Finance asked for an invoice PDF to be emailed automatically after every purchase.,1,test,N
+NR-051,SYS-HMS,Slack,Business Analyst,fyi: Managers would like a dashboard of admissions and waiting times.,0,test,N
+NR-052,SYS-MBA,Slack,Developer,Customers are asking for a way to split a restaurant bill with friends inside the app.,1,dev,N
+NR-053,SYS-HMS,Email,Developer,Hello all. Doctors expect to block time for surgery and leave in their own calendar. Regards.,0,dev,N
+NR-054,SYS-MBA,Standup,UX Designer,Product wants customers to be able to buy and sell shares from the app.,1,dev,N
+NR-055,SYS-HMS,Jira Comment,Project Manager,Updating the ticket: Billing staff expect claims to be created from the recorded treatments.,0,test,N
+NR-056,SYS-MBA,Standup,QA Engineer,For standup: Wealth advisers would like customers to book a call with a financial adviser from the app.,1,test,N
+NR-057,SYS-MBA,Slack,Developer,Heads up: Customers ask for fixed deposits that renew automatically.,0,dev,N
+NR-058,SYS-HMS,Standup,Security Engineer,Update from me: The kitchen team needs a diet and meal ordering feature for inpatients.,1,dev,N
+NR-059,SYS-ULP,Slack,Project Manager,Heads up: The hostel office wants room allocation requests handled in the portal.,1,dev,N
+NR-060,SYS-HMS,Jira Comment,DevOps Engineer,Management expects a patient satisfaction survey to be sent after every discharge.,1,test,N

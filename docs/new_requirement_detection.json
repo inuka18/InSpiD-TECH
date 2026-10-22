@@ -1,0 +1,877 @@
+{
+  "generatedAt": "2026-10-22T08:46:17.923Z",
+  "database": "inspid_test",
+  "splits": [
+    "dev",
+    "test"
+  ],
+  "constants": {
+    "NEW_REQ_MIN_CONFIDENCE": 70,
+    "NEW_REQ_SIM_LOW": 0.35,
+    "NEW_REQ_SIM_HIGH": 0.5,
+    "NEW_REQ_NOVEL_MAX_SIGNALS": 2
+  },
+  "bySplit": {
+    "dev": {
+      "withNovelTokens": {
+        "n": 28,
+        "tp": 13,
+        "fp": 0,
+        "fn": 3,
+        "tn": 12,
+        "precision": 1,
+        "recall": 0.8125,
+        "f1": 0.896551724137931
+      },
+      "onlyRuleA": {
+        "n": 28,
+        "tp": 1,
+        "fp": 0,
+        "fn": 15,
+        "tn": 12,
+        "precision": 1,
+        "recall": 0.0625,
+        "f1": 0.11764705882352941
+      }
+    },
+    "test": {
+      "withNovelTokens": {
+        "n": 32,
+        "tp": 10,
+        "fp": 0,
+        "fn": 6,
+        "tn": 16,
+        "precision": 1,
+        "recall": 0.625,
+        "f1": 0.7692307692307693
+      },
+      "onlyRuleA": {
+        "n": 32,
+        "tp": 0,
+        "fp": 0,
+        "fn": 16,
+        "tn": 16,
+        "precision": null,
+        "recall": 0,
+        "f1": null
+      }
+    }
+  },
+  "wrongDecisions": {
+    "withNovelTokens": [
+      {
+        "id": "NR-021",
+        "split": "test",
+        "projectId": "SYS-HMS",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 100,
+        "similarity": 0.58744,
+        "closestRequirementId": "HMS-R01",
+        "novelTokens": [
+          "copy",
+          "medical",
+          "records"
+        ],
+        "rule": null,
+        "text": "Patients should be able to request a copy of their medical records online."
+      },
+      {
+        "id": "NR-045",
+        "split": "test",
+        "projectId": "SYS-HMS",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 72,
+        "similarity": 0.550359,
+        "closestRequirementId": "HMS-R13",
+        "novelTokens": [
+          "transcribe",
+          "voice"
+        ],
+        "rule": null,
+        "text": "Doctors are hoping the system can transcribe their consultation notes from voice."
+      },
+      {
+        "id": "NR-007",
+        "split": "test",
+        "projectId": "SYS-MBA",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 39,
+        "similarity": 0.405534,
+        "closestRequirementId": "MBA-R07",
+        "novelTokens": [],
+        "rule": null,
+        "text": "Update from me: Business customers need to approve payments with two signatories."
+      },
+      {
+        "id": "NR-028",
+        "split": "dev",
+        "projectId": "SYS-RET",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 95,
+        "similarity": 0.584264,
+        "closestRequirementId": "RET-R21",
+        "novelTokens": [
+          "shoppers",
+          "uploading",
+          "photo"
+        ],
+        "rule": null,
+        "text": "Heads up: Marketing is hoping shoppers can search for products by uploading a photo."
+      },
+      {
+        "id": "NR-039",
+        "split": "dev",
+        "projectId": "SYS-RET",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 99,
+        "similarity": 0.512077,
+        "closestRequirementId": "RET-R24",
+        "novelTokens": [
+          "help",
+          "talk",
+          "chatbot"
+        ],
+        "rule": null,
+        "text": "It would help if customers could talk to a chatbot to ask about their orders."
+      },
+      {
+        "id": "NR-003",
+        "split": "test",
+        "projectId": "SYS-ULP",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 56,
+        "similarity": 0.391575,
+        "closestRequirementId": "ULP-R01",
+        "novelTokens": [],
+        "rule": null,
+        "text": "The registrar wants an alumni mentoring directory linked to the portal."
+      },
+      {
+        "id": "NR-026",
+        "split": "dev",
+        "projectId": "SYS-ULP",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 69,
+        "similarity": 0.612075,
+        "closestRequirementId": "ULP-R16",
+        "novelTokens": [],
+        "rule": null,
+        "text": "Hi team. Parents of scholarship students would like read-only access to progress reports. Thanks."
+      },
+      {
+        "id": "NR-032",
+        "split": "test",
+        "projectId": "SYS-ULP",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 81,
+        "similarity": 0.53059,
+        "closestRequirementId": "ULP-R18",
+        "novelTokens": [
+          "polls"
+        ],
+        "rule": null,
+        "text": "Update from me: Lecturers hope to run live polls during lectures from the portal."
+      },
+      {
+        "id": "NR-043",
+        "split": "test",
+        "projectId": "SYS-ULP",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 51,
+        "similarity": 0.477726,
+        "closestRequirementId": "ULP-R13",
+        "novelTokens": [],
+        "rule": null,
+        "text": "Hello all. Lecturers are hoping for automatic captions on every lecture recording. Regards."
+      }
+    ],
+    "onlyRuleA": [
+      {
+        "id": "NR-016",
+        "split": "dev",
+        "projectId": "SYS-HMS",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 95,
+        "similarity": 0.485622,
+        "closestRequirementId": "HMS-R14",
+        "novelTokens": [
+          "sisters",
+          "visitor",
+          "visits"
+        ],
+        "rule": null,
+        "text": "The ward sisters would like a visitor management feature to record who visits which patient."
+      },
+      {
+        "id": "NR-021",
+        "split": "test",
+        "projectId": "SYS-HMS",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 100,
+        "similarity": 0.58744,
+        "closestRequirementId": "HMS-R01",
+        "novelTokens": [
+          "copy",
+          "medical",
+          "records"
+        ],
+        "rule": null,
+        "text": "Patients should be able to request a copy of their medical records online."
+      },
+      {
+        "id": "NR-040",
+        "split": "dev",
+        "projectId": "SYS-HMS",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 94,
+        "similarity": 0.453373,
+        "closestRequirementId": "HMS-R09",
+        "novelTokens": [
+          "administrators",
+          "member",
+          "professional",
+          "expire"
+        ],
+        "rule": null,
+        "text": "Administrators want a reminder when a staff member's professional registration is about to expire."
+      },
+      {
+        "id": "NR-045",
+        "split": "test",
+        "projectId": "SYS-HMS",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 72,
+        "similarity": 0.550359,
+        "closestRequirementId": "HMS-R13",
+        "novelTokens": [
+          "transcribe",
+          "voice"
+        ],
+        "rule": null,
+        "text": "Doctors are hoping the system can transcribe their consultation notes from voice."
+      },
+      {
+        "id": "NR-048",
+        "split": "test",
+        "projectId": "SYS-HMS",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 92,
+        "similarity": 0.451027,
+        "closestRequirementId": "HMS-R03",
+        "novelTokens": [
+          "ambulance",
+          "dispatch",
+          "tracking",
+          "arrivals"
+        ],
+        "rule": null,
+        "text": "Updating the ticket: The hospital wants an ambulance dispatch and tracking screen for emergency arrivals."
+      },
+      {
+        "id": "NR-058",
+        "split": "dev",
+        "projectId": "SYS-HMS",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 83,
+        "similarity": 0.432176,
+        "closestRequirementId": "HMS-R02",
+        "novelTokens": [
+          "kitchen",
+          "diet",
+          "meal",
+          "ordering",
+          "inpatients"
+        ],
+        "rule": null,
+        "text": "Update from me: The kitchen team needs a diet and meal ordering feature for inpatients."
+      },
+      {
+        "id": "NR-060",
+        "split": "test",
+        "projectId": "SYS-HMS",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 98,
+        "similarity": 0.468419,
+        "closestRequirementId": "HMS-R18",
+        "novelTokens": [
+          "satisfaction",
+          "survey",
+          "sent"
+        ],
+        "rule": null,
+        "text": "Management expects a patient satisfaction survey to be sent after every discharge."
+      },
+      {
+        "id": "NR-007",
+        "split": "test",
+        "projectId": "SYS-MBA",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 39,
+        "similarity": 0.405534,
+        "closestRequirementId": "MBA-R07",
+        "novelTokens": [],
+        "rule": null,
+        "text": "Update from me: Business customers need to approve payments with two signatories."
+      },
+      {
+        "id": "NR-009",
+        "split": "test",
+        "projectId": "SYS-MBA",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 91,
+        "similarity": 0.364413,
+        "closestRequirementId": "MBA-R12",
+        "novelTokens": [
+          "whether",
+          "joint",
+          "family",
+          "member"
+        ],
+        "rule": null,
+        "text": "Heads up: Customers keep asking whether they can set up a joint account with a family member."
+      },
+      {
+        "id": "NR-010",
+        "split": "test",
+        "projectId": "SYS-MBA",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 94,
+        "similarity": 0.419743,
+        "closestRequirementId": "MBA-R17",
+        "novelTokens": [
+          "voice",
+          "assistant",
+          "balances",
+          "speaking"
+        ],
+        "rule": null,
+        "text": "Hello all. The bank would like a voice assistant so customers can check balances by speaking. Regards."
+      },
+      {
+        "id": "NR-035",
+        "split": "dev",
+        "projectId": "SYS-MBA",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 85,
+        "similarity": 0.478432,
+        "closestRequirementId": "MBA-R19",
+        "novelTokens": [
+          "offer",
+          "travel",
+          "insurance",
+          "point",
+          "purchase"
+        ],
+        "rule": null,
+        "text": "From today's call: Marketing is hoping the app can offer travel insurance at the point of a card purchase."
+      },
+      {
+        "id": "NR-047",
+        "split": "dev",
+        "projectId": "SYS-MBA",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 100,
+        "similarity": 0.414158,
+        "closestRequirementId": "MBA-R33",
+        "novelTokens": [
+          "donate",
+          "charities",
+          "directly"
+        ],
+        "rule": null,
+        "text": "Updating the ticket: Customers want to donate to registered charities directly from the app."
+      },
+      {
+        "id": "NR-052",
+        "split": "dev",
+        "projectId": "SYS-MBA",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 99,
+        "similarity": 0.390421,
+        "closestRequirementId": "MBA-R08",
+        "novelTokens": [
+          "split",
+          "restaurant",
+          "friends"
+        ],
+        "rule": null,
+        "text": "Customers are asking for a way to split a restaurant bill with friends inside the app."
+      },
+      {
+        "id": "NR-054",
+        "split": "dev",
+        "projectId": "SYS-MBA",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 100,
+        "similarity": 0.490697,
+        "closestRequirementId": "MBA-R08",
+        "novelTokens": [
+          "sell",
+          "shares"
+        ],
+        "rule": null,
+        "text": "Product wants customers to be able to buy and sell shares from the app."
+      },
+      {
+        "id": "NR-056",
+        "split": "test",
+        "projectId": "SYS-MBA",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 100,
+        "similarity": 0.435392,
+        "closestRequirementId": "MBA-R08",
+        "novelTokens": [
+          "wealth",
+          "advisers",
+          "book",
+          "financial",
+          "adviser"
+        ],
+        "rule": null,
+        "text": "For standup: Wealth advisers would like customers to book a call with a financial adviser from the app."
+      },
+      {
+        "id": "NR-001",
+        "split": "dev",
+        "projectId": "SYS-RET",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 99,
+        "similarity": 0.409082,
+        "closestRequirementId": "RET-R17",
+        "novelTokens": [
+          "loyalty",
+          "points",
+          "programme",
+          "earn"
+        ],
+        "rule": null,
+        "text": "For standup: The business wants a loyalty points programme where customers earn points on every order."
+      },
+      {
+        "id": "NR-011",
+        "split": "test",
+        "projectId": "SYS-RET",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 94,
+        "similarity": 0.416238,
+        "closestRequirementId": "RET-R14",
+        "novelTokens": [
+          "offer",
+          "wrapping",
+          "selected"
+        ],
+        "rule": null,
+        "text": "Updating the ticket: Sellers have asked for a way to offer gift wrapping on selected items."
+      },
+      {
+        "id": "NR-020",
+        "split": "test",
+        "projectId": "SYS-RET",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 99,
+        "similarity": 0.436841,
+        "closestRequirementId": "RET-R11",
+        "novelTokens": [
+          "compare",
+          "side",
+          "buying"
+        ],
+        "rule": null,
+        "text": "Heads up: Customers want to compare two or three products side by side before buying."
+      },
+      {
+        "id": "NR-022",
+        "split": "dev",
+        "projectId": "SYS-RET",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 98,
+        "similarity": 0.399387,
+        "closestRequirementId": "RET-R22",
+        "novelTokens": [
+          "click",
+          "collect",
+          "partner",
+          "stores"
+        ],
+        "rule": null,
+        "text": "Hi team. Operations would like a click and collect option from our partner stores. Thanks."
+      },
+      {
+        "id": "NR-027",
+        "split": "test",
+        "projectId": "SYS-RET",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 93,
+        "similarity": 0.391165,
+        "closestRequirementId": "RET-R17",
+        "novelTokens": [
+          "instalments",
+          "through",
+          "koko"
+        ],
+        "rule": null,
+        "text": "Customers keep asking if they can pay in instalments through Koko at checkout."
+      },
+      {
+        "id": "NR-028",
+        "split": "dev",
+        "projectId": "SYS-RET",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 95,
+        "similarity": 0.584264,
+        "closestRequirementId": "RET-R21",
+        "novelTokens": [
+          "shoppers",
+          "uploading",
+          "photo"
+        ],
+        "rule": null,
+        "text": "Heads up: Marketing is hoping shoppers can search for products by uploading a photo."
+      },
+      {
+        "id": "NR-039",
+        "split": "dev",
+        "projectId": "SYS-RET",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 99,
+        "similarity": 0.512077,
+        "closestRequirementId": "RET-R24",
+        "novelTokens": [
+          "help",
+          "talk",
+          "chatbot"
+        ],
+        "rule": null,
+        "text": "It would help if customers could talk to a chatbot to ask about their orders."
+      },
+      {
+        "id": "NR-050",
+        "split": "test",
+        "projectId": "SYS-RET",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 99,
+        "similarity": 0.392726,
+        "closestRequirementId": "RET-R24",
+        "novelTokens": [
+          "invoice",
+          "emailed",
+          "automatically",
+          "purchase"
+        ],
+        "rule": null,
+        "text": "For standup: Finance asked for an invoice PDF to be emailed automatically after every purchase."
+      },
+      {
+        "id": "NR-003",
+        "split": "test",
+        "projectId": "SYS-ULP",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 56,
+        "similarity": 0.391575,
+        "closestRequirementId": "ULP-R01",
+        "novelTokens": [],
+        "rule": null,
+        "text": "The registrar wants an alumni mentoring directory linked to the portal."
+      },
+      {
+        "id": "NR-004",
+        "split": "test",
+        "projectId": "SYS-ULP",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 90,
+        "similarity": 0.488902,
+        "closestRequirementId": "ULP-R05",
+        "novelTokens": [
+          "peer",
+          "tutoring",
+          "marketplace",
+          "seniors",
+          "offer",
+          "sessions"
+        ],
+        "rule": null,
+        "text": "Students are asking for a peer tutoring marketplace where seniors can offer help sessions."
+      },
+      {
+        "id": "NR-012",
+        "split": "dev",
+        "projectId": "SYS-ULP",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 96,
+        "similarity": 0.452787,
+        "closestRequirementId": "ULP-R02",
+        "novelTokens": [
+          "careers",
+          "apply",
+          "internships",
+          "through"
+        ],
+        "rule": null,
+        "text": "The careers office wants students to upload CVs and apply for internships through the portal."
+      },
+      {
+        "id": "NR-014",
+        "split": "dev",
+        "projectId": "SYS-ULP",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 88,
+        "similarity": 0.482929,
+        "closestRequirementId": "ULP-R02",
+        "novelTokens": [
+          "faculty",
+          "research",
+          "project",
+          "allocation",
+          "tool",
+          "final",
+          "year"
+        ],
+        "rule": null,
+        "text": "The faculty wants a research project allocation tool for final-year students."
+      },
+      {
+        "id": "NR-026",
+        "split": "dev",
+        "projectId": "SYS-ULP",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 69,
+        "similarity": 0.612075,
+        "closestRequirementId": "ULP-R16",
+        "novelTokens": [],
+        "rule": null,
+        "text": "Hi team. Parents of scholarship students would like read-only access to progress reports. Thanks."
+      },
+      {
+        "id": "NR-032",
+        "split": "test",
+        "projectId": "SYS-ULP",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 81,
+        "similarity": 0.53059,
+        "closestRequirementId": "ULP-R18",
+        "novelTokens": [
+          "polls"
+        ],
+        "rule": null,
+        "text": "Update from me: Lecturers hope to run live polls during lectures from the portal."
+      },
+      {
+        "id": "NR-043",
+        "split": "test",
+        "projectId": "SYS-ULP",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 51,
+        "similarity": 0.477726,
+        "closestRequirementId": "ULP-R13",
+        "novelTokens": [],
+        "rule": null,
+        "text": "Hello all. Lecturers are hoping for automatic captions on every lecture recording. Regards."
+      },
+      {
+        "id": "NR-059",
+        "split": "dev",
+        "projectId": "SYS-ULP",
+        "truth": 1,
+        "predicted": 0,
+        "kind": "missed (FN)",
+        "label": "Expectation",
+        "confidence": 88,
+        "similarity": 0.401039,
+        "closestRequirementId": "ULP-R09",
+        "novelTokens": [
+          "hostel",
+          "allocation",
+          "handled"
+        ],
+        "rule": null,
+        "text": "Heads up: The hostel office wants room allocation requests handled in the portal."
+      }
+    ]
+  },
+  "specificity": {
+    "overall": {
+      "expectations": 583,
+      "flaggedWithNovelTokens": 47,
+      "flaggedOnlyRuleA": 7,
+      "shareWithNovelTokens": 0.08061749571183534,
+      "shareOnlyRuleA": 0.012006861063464836
+    },
+    "perProject": [
+      {
+        "projectId": "SYS-HMS",
+        "expectations": 136,
+        "flaggedWithNovelTokens": 8,
+        "flaggedOnlyRuleA": 0,
+        "shareWithNovelTokens": 0.058823529411764705,
+        "shareOnlyRuleA": 0
+      },
+      {
+        "projectId": "SYS-MBA",
+        "expectations": 175,
+        "flaggedWithNovelTokens": 12,
+        "flaggedOnlyRuleA": 3,
+        "shareWithNovelTokens": 0.06857142857142857,
+        "shareOnlyRuleA": 0.017142857142857144
+      },
+      {
+        "projectId": "SYS-RET",
+        "expectations": 149,
+        "flaggedWithNovelTokens": 14,
+        "flaggedOnlyRuleA": 3,
+        "shareWithNovelTokens": 0.09395973154362416,
+        "shareOnlyRuleA": 0.020134228187919462
+      },
+      {
+        "projectId": "SYS-ULP",
+        "expectations": 123,
+        "flaggedWithNovelTokens": 13,
+        "flaggedOnlyRuleA": 1,
+        "shareWithNovelTokens": 0.10569105691056911,
+        "shareOnlyRuleA": 0.008130081300813009
+      }
+    ],
+    "perSplit": [
+      {
+        "split": "train",
+        "expectations": 385,
+        "flaggedWithNovelTokens": 26,
+        "flaggedOnlyRuleA": 2,
+        "shareWithNovelTokens": 0.06753246753246753,
+        "shareOnlyRuleA": 0.005194805194805195
+      },
+      {
+        "split": "val",
+        "expectations": 86,
+        "flaggedWithNovelTokens": 8,
+        "flaggedOnlyRuleA": 2,
+        "shareWithNovelTokens": 0.09302325581395349,
+        "shareOnlyRuleA": 0.023255813953488372
+      },
+      {
+        "split": "test",
+        "expectations": 112,
+        "flaggedWithNovelTokens": 13,
+        "flaggedOnlyRuleA": 3,
+        "shareWithNovelTokens": 0.11607142857142858,
+        "shareOnlyRuleA": 0.026785714285714284
+      }
+    ]
+  }
+}

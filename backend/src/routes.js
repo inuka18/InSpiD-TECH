@@ -13,6 +13,7 @@ const scoped = (path, router) => v1.use(`/projects/:projectId/${path}`, requireA
 scoped('team', require('./modules/team/routes'));
 scoped('requirements', require('./modules/requirements/routes'));
 scoped('signals', require('./modules/signals/routes'));
+scoped('requirement-candidates', require('./modules/requirement-candidates/routes'));
 scoped('feedback', require('./modules/feedback/routes'));
 scoped('ledger', require('./modules/ledger/routes'));
 scoped('network', require('./modules/network/routes'));

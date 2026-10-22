@@ -6,10 +6,11 @@ import { api } from "../lib/apiClient";
 
 const base = (projectId) => `/projects/${encodeURIComponent(projectId)}/signals`;
 
-export async function fetchSignals(projectId) {
+// includeSuppressed: also return repeats of a rejected requirement candidate (hidden by default; the feed has a toggle).
+export async function fetchSignals(projectId, { includeSuppressed = false } = {}) {
   let signals;
   if (projectId) {
-    signals = await api(base(projectId));
+    signals = await api(`${base(projectId)}${includeSuppressed ? "?includeSuppressed=true" : ""}`);
   } else {
     const projects = await api("/projects");
     signals = (await Promise.all(projects.map((p) => api(base(p.id))))).flat();
@@ -62,4 +63,20 @@ export async function extractSignals(projectId, { file, text, name, source, auth
 // -> { documentId, name, summary: { applied, pending, noChange, failed }, results: [{ index, text, status, signalId, ..., error? }] }
 export async function bulkSubmitSignals(projectId, body) {
   return api(`${base(projectId)}/bulk`, { method: "POST", body });
+}
+
+// ---- requirement candidates: possible NEW requirements found in signals (nothing changes until a PM decides)
+// Every preview / extract / bulk / create answer carries newRequirement: { isCandidate, reason, closestRequirementId, similarity,
+// novelTokens, joinsCandidateId, candidateId?, suppressed? }; signals carry candidateId, suppressed and newRequirement.
+const candBase = (projectId) => `/projects/${encodeURIComponent(projectId)}/requirement-candidates`;
+
+// -> [{ id: "RC-0001", title, description, type, status, closestRequirementId, closestSimilarity, novelTokens, mentions, evidence: [...] }]
+export async function fetchCandidates(projectId, status) {
+  return api(`${candBase(projectId)}${status ? `?status=${encodeURIComponent(status)}` : ""}`);
+}
+
+// PM only. body: { action: "approve" | "merge" | "reject", title?, description?, type?, priority?, mergeIntoRequirementId?, note? }
+// -> { candidate, requirement (approve), signals, statusChanges, ledgerEntries, networkUpdated, message }
+export async function reviewCandidate(projectId, candidateId, body) {
+  return api(`${candBase(projectId)}/${encodeURIComponent(candidateId)}/review`, { method: "POST", body: clean(body) });
 }

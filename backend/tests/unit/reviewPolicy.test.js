@@ -64,3 +64,9 @@ test('the similarity floor does not hide other reasons, and does not apply to No
   assert.equal(decideReview({ ...base, matchMethod: 'auto', similarity: 0.1, autoApplyMinSimilarity: 0.4, confidence: 50 }).reason, 'low-confidence');
   assert.equal(decideReview({ label: 'None', confidence: 95, matched: false, threshold: 90, matchMethod: 'auto', similarity: 0, autoApplyMinSimilarity: 0.4 }).reviewStatus, 'accepted');
 });
+
+test('a possible new requirement is always pending ("new-requirement"), even when it would be auto-accepted', () => {
+  const r = decideReview({ ...base, matchMethod: 'auto', similarity: 0.45, autoApplyMinSimilarity: 0.4, confidence: 99, newRequirement: true });
+  assert.deepEqual(r, { reviewStatus: 'pending', autoAccepted: false, reason: 'new-requirement' });
+  assert.equal(decideReview({ ...base, matchMethod: 'auto', similarity: 0.45, autoApplyMinSimilarity: 0.4, confidence: 99 }).reviewStatus, 'accepted');
+});

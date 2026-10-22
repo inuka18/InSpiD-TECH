@@ -11,6 +11,7 @@ const createRequirementBody = z.object({
   cluster: z.string().trim().max(80).optional(),
   granularity: z.enum(GRANULARITIES).default('Sprint Commitment'),
   resourceRole: z.string().trim().max(80).optional(),
+  priority: z.enum(['High', 'Medium', 'Low']).optional(),
 });
 
 // Status is NOT editable here: only the status engine changes it (TODO).

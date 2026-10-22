@@ -11,6 +11,9 @@ const { createWithSeqId } = require('./ids');
 const { finalizeSignal } = require('./finalize');
 const { segmentDocument, SegmentLimitError } = require('./segmentation');
 const { extractTextFromFile } = require('./documentText');
+const { detectNewRequirement } = require('./newRequirement');
+const C = require('./newRequirementConstants');
+const grouping = require('../requirement-candidates/grouping');
 
 // Seeded = loaded by the seed. Rows seeded before the `seeded` flag existed are recognised by their dataset `split`.
 const isSeeded = (s) => s.seeded === true || Boolean(s.split);
@@ -41,11 +44,22 @@ const toApi = (s) => ({
   reviewAction: s.reviewAction ?? null,
   statusNotReversed: s.statusNotReversed === true,
   sourceDocument: s.sourceDocument?.id ? { id: s.sourceDocument.id, name: s.sourceDocument.name ?? null } : null,
+  candidateId: s.candidateId ?? null,
+  suppressed: s.suppressed === true,
+  newRequirement: s.newRequirement?.isCandidate || s.suppressed
+    ? {
+      isCandidate: s.newRequirement?.isCandidate === true, reason: s.newRequirement?.reason ?? null,
+      closestRequirementId: s.newRequirement?.closestRequirementId ?? null, similarity: s.newRequirement?.similarity ?? null,
+      novelTokens: s.newRequirement?.novelTokens ?? [],
+    }
+    : null,
 });
 
 // Newest first, like a live feed.
-async function list(projectId, { reviewStatus, requirementId } = {}) {
+// Signals suppressed by a rejected candidate are hidden unless includeSuppressed is true.
+async function list(projectId, { reviewStatus, requirementId, includeSuppressed } = {}) {
   const q = { projectId };
+  if (!includeSuppressed) q.suppressed = { $ne: true };
   if (reviewStatus) q.reviewStatus = reviewStatus;
   if (requirementId) q.reqId = requirementId;
   return (await Signal.find(q).sort({ timestamp: -1 }).lean()).map(toApi);
@@ -74,9 +88,10 @@ function rankedToMatch(ranked, reqs) {
 /**
  * THE shared decision step (mapping thresholds -> status engine -> review policy). Preview, create, extract and bulk
  * all call this one function, so the rules live in exactly one place.
- * @param {object} p  text, ai { label, confidence (0-1), model_version }, requirement (lean doc or null), match, degraded, message
+ * @param {object} p  text, ai { label, confidence (0-1), model_version }, requirement (lean doc or null), match, degraded, message,
+ *                    tokenStats (from grouping.loadTokenStats; without it the new-requirement detector is skipped)
  */
-function decideAnalysis({ text, ai, requirement = null, match = null, degraded = false, message = null }) {
+function decideAnalysis({ text, ai, requirement = null, match = null, degraded = false, message = null, tokenStats = null }) {
   const threshold = config.autoAcceptConfidence;
   const a = {
     threshold, label: CLASSIFICATIONS.includes(ai?.label) ? ai.label : null, confidence: ai ? toConfidencePct(ai.confidence) : null,
@@ -85,9 +100,16 @@ function decideAnalysis({ text, ai, requirement = null, match = null, degraded =
   if (a.label && a.label !== 'None' && requirement) {
     a.engine = proposeStatus({ label: a.label, text, currentStatus: requirement.liveStatus });
   }
+  // Is it a possible NEW requirement? (new signals are never seeded). Needs the matcher's ranking, so not when matching failed.
+  a.newRequirement = tokenStats && !degraded
+    ? detectNewRequirement({
+      label: a.label, confidence: a.confidence, text, matches: match?.alternatives ?? [], tokenStats, manualMatch: match?.method === 'manual',
+    })
+    : null;
   a.policy = decideReview({
     label: a.label, confidence: a.confidence, matched: !!requirement, dropProposed: a.engine?.dropProposed ?? false, threshold,
     matchMethod: match?.method, similarity: match?.similarity, autoApplyMinSimilarity: config.autoApplyMinSimilarity,
+    newRequirement: a.newRequirement?.isCandidate === true,
   });
   return a;
 }
@@ -111,6 +133,7 @@ async function analyze(projectId, body) {
   let match = null;
   let degraded = false;
   let message = null;
+  let tokenStats = null;
   if (label && label !== 'None') {
     if (body.requirementId) {
       requirement = await Requirement.findOne({ projectId, reqId: body.requirementId }).lean();
@@ -118,6 +141,7 @@ async function analyze(projectId, body) {
       match = { requirementId: requirement.reqId, similarity: null, method: 'manual', alternatives: [] };
     } else {
       const reqs = await Requirement.find({ projectId }).sort({ reqId: 1 }).lean();
+      if (label === 'Expectation' && toConfidencePct(ai.confidence) >= C.NEW_REQ_MIN_CONFIDENCE) tokenStats = await grouping.loadTokenStats(projectId, reqs);
       if (reqs.length) {
         try {
           ({ match, requirement } = rankedToMatch(await aiClient.match(body.text, candidatesOf(reqs), 3), reqs));
@@ -129,10 +153,20 @@ async function analyze(projectId, body) {
       }
     }
   }
-  return decideAnalysis({ text: body.text, ai, requirement, match, degraded, message });
+  return decideAnalysis({ text: body.text, ai, requirement, match, degraded, message, tokenStats });
 }
 
-function answer(a, { signal = null, applied = false, statusChange = null, ledgerEntry = null, preview = false, wouldApply = undefined } = {}) {
+// The newRequirement block of preview / create / extract / bulk answers. joinsCandidateId = an EXISTING pending candidate it joins
+// (or would join); candidateId = the candidate the saved signal ended up in (create / bulk only).
+function newRequirementBlock(nr, extra = {}) {
+  return {
+    isCandidate: nr?.isCandidate === true, reason: extra.reason ?? nr?.reason ?? null, closestRequirementId: nr?.closestRequirementId ?? null,
+    similarity: nr?.similarity ?? null, novelTokens: nr?.novelTokens ?? [], joinsCandidateId: extra.joinsCandidateId ?? null,
+    ...(extra.candidateId !== undefined ? { candidateId: extra.candidateId } : {}), ...(extra.suppressed ? { suppressed: true } : {}),
+  };
+}
+
+function answer(a, { signal = null, applied = false, statusChange = null, ledgerEntry = null, preview = false, wouldApply = undefined, newRequirement = undefined } = {}) {
   return {
     signal,
     classification: { label: a.label, confidence: a.confidence, modelVersion: a.modelVersion },
@@ -150,6 +184,7 @@ function answer(a, { signal = null, applied = false, statusChange = null, ledger
     message: a.message,
     preview,
     degraded: a.degraded,
+    newRequirement: newRequirement ?? newRequirementBlock(a.newRequirement),
   };
 }
 
@@ -164,12 +199,31 @@ async function preview(projectId, body) {
   const projected = would
     ? await finalizeSignal({ projectId, signal: { text: body.text }, label: a.label, requirementId: a.requirement.reqId, dryRun: true })
     : null;
-  return answer(a, { preview: true, wouldApply: would, statusChange: projected?.statusChange ?? null });
+  let joins = {};
+  if (a.newRequirement?.isCandidate) {
+    const [vector] = (await grouping.embedTexts([body.text])) ?? [];
+    if (vector) [joins] = await grouping.previewJoins(projectId, [vector]);
+  }
+  return answer(a, {
+    preview: true, wouldApply: would, statusChange: projected?.statusChange ?? null,
+    newRequirement: newRequirementBlock(a.newRequirement, joins?.suppressed ? { suppressed: true, reason: 'similar to a rejected candidate' } : { joinsCandidateId: joins?.joinsCandidateId }),
+  });
 }
 
 // ---------------------------------------------------------------- saving a signal (POST /signals, bulk)
 // Saves the analysed signal and, when the review policy auto-accepts it, finalises it (status, history, ledger).
-async function createFromAnalysis(projectId, body, user, a, { sourceDocument = null } = {}) {
+// opts.vector: the embedding of the text when the caller already has it (bulk embeds all candidate-looking items in one call).
+async function createFromAnalysis(projectId, body, user, a, { sourceDocument = null, vector = undefined } = {}) {
+  // A possible new requirement joins / creates a candidate, or is suppressed by a rejected one. Decided before saving.
+  const nrDet = a.newRequirement?.isCandidate ? a.newRequirement : null;
+  let group = null;
+  if (nrDet) {
+    const v = vector !== undefined ? vector : (await grouping.embedTexts([body.text]))?.[0] ?? null;
+    vector = v;
+    group = await grouping.decideGroup(projectId, v);
+    if (group.action === 'suppress') a.policy = { reviewStatus: 'pending', autoAccepted: false, reason: 'similar-to-rejected' };
+    else if (group.action === 'ungrouped') a.message = 'The text could not be embedded, so this possible new requirement was not added to a candidate. A PM can still review the signal.';
+  }
   const auto = a.policy.autoAccepted;
   const signal = await createWithSeqId(Signal, 'signalId', 'SC-', (signalId) => ({
     projectId, signalId, source: body.source, authorRole: body.authorRole || user.jobTitle || 'Unspecified',
@@ -178,7 +232,11 @@ async function createFromAnalysis(projectId, body, user, a, { sourceDocument = n
     reqId: a.requirement?.reqId ?? null, matchMethod: a.match?.method ?? null, matchSimilarity: a.match?.similarity ?? null,
     matchAlternatives: a.match?.alternatives ?? [], proposedStatus: a.engine?.proposedStatus ?? null,
     reviewStatus: auto ? 'accepted' : 'pending', seeded: false, sourceDocument,
+    newRequirement: nrDet ? { ...nrDet, reason: group?.action === 'suppress' ? 'similar to a rejected candidate' : nrDet.reason } : null,
+    suppressed: group?.action === 'suppress',
   }));
+  let candidateId = null;
+  if (nrDet) candidateId = await grouping.applyGroup(projectId, signal.toObject(), vector, group, nrDet);
 
   let applied = false;
   let statusChange = null;
@@ -197,7 +255,10 @@ async function createFromAnalysis(projectId, body, user, a, { sourceDocument = n
   }
   a.policy = finalReview;
   const stored = await Signal.findById(signal._id).lean();
-  return answer(a, { signal: toApi(stored), applied, statusChange, ledgerEntry });
+  const newRequirement = nrDet
+    ? newRequirementBlock(nrDet, { candidateId, joinsCandidateId: group.action === 'attach' ? candidateId : null, suppressed: group.action === 'suppress', reason: group.action === 'suppress' ? 'similar to a rejected candidate' : undefined })
+    : undefined;
+  return answer(a, { signal: toApi(stored), applied, statusChange, ledgerEntry, newRequirement });
 }
 
 async function create(projectId, body, user) {
@@ -240,11 +301,23 @@ async function extract(projectId, input) {
     signalIdx.forEach((i, k) => ranked.set(i, lists[k] ?? []));
   }
 
-  const out = segments.map((seg, i) => {
+  // Earlier segments count as earlier signals for the novel-token rule, exactly as bulk will see them.
+  const tokenStats = signalIdx.length ? await grouping.loadTokenStats(projectId, reqs) : null;
+  const analyses = segments.map((seg, i) => {
     const ai = classified[i];
     const isSignal = signalIdx.includes(i);
     const { match, requirement } = isSignal && ranked.has(i) ? rankedToMatch(ranked.get(i), reqs) : { match: null, requirement: null };
-    const a = decideAnalysis({ text: seg.text, ai, requirement, match });
+    const a = decideAnalysis({ text: seg.text, ai, requirement, match, tokenStats });
+    tokenStats?.add(seg.text);
+    return { seg, a, match };
+  });
+  // ONE /embed call for all candidate-looking segments, to tell which pending candidate each would join (read only).
+  const candIdx = analyses.map((x, i) => i).filter((i) => analyses[i].a.newRequirement?.isCandidate);
+  const vectors = await grouping.embedTexts(candIdx.map((i) => analyses[i].seg.text));
+  const joins = vectors ? await grouping.previewJoins(projectId, vectors) : [];
+  const out = analyses.map(({ seg, a, match }, i) => {
+    const k = candIdx.indexOf(i);
+    const j = k >= 0 ? joins[k] : null;
     return {
       index: seg.index, line: seg.line, text: seg.text, speakerLabel: seg.speakerLabel,
       label: a.label, confidence: a.confidence,
@@ -252,6 +325,7 @@ async function extract(projectId, input) {
       proposedStatus: a.engine?.proposedStatus ?? null,
       wouldAutoApply: wouldAutoApply(a),
       reviewReason: a.policy.reason,
+      newRequirement: newRequirementBlock(a.newRequirement, j?.suppressed ? { suppressed: true, reason: 'similar to a rejected candidate' } : { joinsCandidateId: j?.joinsCandidateId }),
     };
   });
   return {
@@ -259,6 +333,7 @@ async function extract(projectId, input) {
     modelVersion: classified[0]?.model_version ?? null,
     segments: out,
     counts: { total: out.length, signals: signalIdx.length, none: out.length - signalIdx.length },
+    newRequirementCount: out.filter((o) => o.newRequirement.isCandidate).length,
   };
 }
 
@@ -282,9 +357,18 @@ async function bulk(projectId, body, user) {
     needMatch.forEach((i, k) => ranked.set(i, lists[k] ?? []));
   }
 
+  // Items that could be a possible new requirement (Expectation, confident, no explicit requirement, matcher below SIM_HIGH):
+  // embedded in ONE call up front, so the loop below only reads the vectors. (A superset: the real decision is made per item.)
+  const maybeNew = items.map((it, i) => i).filter((i) => !items[i].requirementId && classified[i].label === 'Expectation'
+    && toConfidencePct(classified[i].confidence) >= C.NEW_REQ_MIN_CONFIDENCE && !((ranked.get(i)?.[0]?.similarity ?? 0) >= C.NEW_REQ_SIM_HIGH));
+  const embedded = maybeNew.length ? await grouping.embedTexts(maybeNew.map((i) => items[i].text)) : [];
+  const vectorOf = new Map(maybeNew.map((i, k) => [i, embedded ? embedded[k] : null]));
+  const tokenStats = maybeNew.length ? await grouping.loadTokenStats(projectId, reqs) : null;
+
   const sourceDocument = { id: documentId, name };
   const results = [];
   const summary = { applied: 0, pending: 0, noChange: 0, failed: 0 };
+  let newRequirementCount = 0;
   for (let i = 0; i < items.length; i += 1) {
     const it = items[i];
     try {
@@ -303,21 +387,23 @@ async function bulk(projectId, body, user) {
           if (requirement) requirement = await Requirement.findOne({ projectId, reqId: requirement.reqId }).lean();
         }
       }
-      const a = decideAnalysis({ text: it.text, ai, requirement, match });
-      const res = await createFromAnalysis(projectId, { text: it.text, source, authorRole, timestamp }, user, a, { sourceDocument });
+      const a = decideAnalysis({ text: it.text, ai, requirement, match, tokenStats });
+      tokenStats?.add(it.text);
+      const res = await createFromAnalysis(projectId, { text: it.text, source, authorRole, timestamp }, user, a, { sourceDocument, vector: vectorOf.has(i) ? vectorOf.get(i) : undefined });
       const status = classOf(res);
       summary[status] += 1;
+      if (res.newRequirement?.isCandidate) newRequirementCount += 1;
       results.push({
         index: i, text: it.text, status, signalId: res.signal.id, label: res.classification.label, confidence: res.classification.confidence,
         requirementId: res.match?.requirementId ?? null, reviewStatus: res.reviewStatus, reviewReason: res.reviewReason,
-        statusChange: res.statusChange, message: res.message,
+        statusChange: res.statusChange, message: res.message, newRequirement: res.newRequirement,
       });
     } catch (err) {
       summary.failed += 1;
       results.push({ index: i, text: it.text, status: 'failed', error: err instanceof AppError ? err.message : 'Could not save this item' });
     }
   }
-  return { documentId, name, results, summary };
+  return { documentId, name, results, summary, newRequirementCount };
 }
 
 // ---------------------------------------------------------------- PM review (+ feedback)
@@ -379,13 +465,15 @@ async function review(projectId, signalId, body, user) {
       feedback: {
         projectId, signalId, text: s.text, source: s.source, authorRole: s.authorRole, modelLabel: s.modelLabel ?? s.label ?? null,
         modelVersion: s.modelVersion ?? null, modelConfidence: s.confidence ?? null, finalLabel: action === 'reject' ? null : finalLabel,
-        action, reviewerId: user.email, signalSeeded: seeded,
+        action, reviewerId: user.email, signalSeeded: seeded, kind: 'signal',
       },
     });
   } catch (err) {
     await Signal.updateOne({ _id: claimed._id }, { $set: { reviewStatus: 'pending', reviewedBy: null, reviewedAt: null, reviewAction: null, label: s.label, reqId: s.reqId ?? null } });
     throw err; // the signal is pending again
   }
+  // Reviewed on its own (mapped to a requirement, or rejected): it stops being evidence for its pending candidate.
+  if (pending && s.candidateId) await grouping.detachSignal(projectId, s.candidateId, signalId);
   const latest = await Signal.findById(claimed._id).lean();
 
   const notReversed = feedbackOnly && s.applied === true;
@@ -410,7 +498,7 @@ const normText = (t) => String(t).toLowerCase().split(/\s+/).filter(Boolean).joi
 // Columns text,label,source,role: the format `training.train --extra-data` expects. Accept/correct rows only,
 // de-duplicated by text (the latest decision wins). Seeded signals are dataset text and are left out.
 async function exportFeedbackCsv(projectId) {
-  const rows = await Feedback.find({ projectId, action: { $in: ['accept', 'correct'] }, finalLabel: { $ne: null }, signalSeeded: { $ne: true } })
+  const rows = await Feedback.find({ projectId, kind: { $ne: 'requirement-candidate' }, action: { $in: ['accept', 'correct'] }, finalLabel: { $ne: null }, signalSeeded: { $ne: true } })
     .sort({ createdAt: 1, _id: 1 }).lean();
   const latest = new Map();
   for (const r of rows) latest.set(normText(r.text), r);

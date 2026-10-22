@@ -95,6 +95,29 @@ const signal = {
     reviewAction: { type: 'string', nullable: true, enum: ['accept', 'reject', 'correct'] },
     statusNotReversed: { type: 'boolean', description: 'A PM rejected/corrected this signal AFTER its status change was applied. The status change and ledger entry were NOT reversed.' },
     sourceDocument: { type: 'object', nullable: true, description: 'The uploaded document this signal came from (the file itself is not stored)', properties: { id: { type: 'string', description: 'sha256 of the document text' }, name: str } },
+    candidateId: { type: 'string', nullable: true, description: 'The requirement candidate (RC-0001) this signal is evidence for' },
+    suppressed: { type: 'boolean', description: 'A repeat of a REJECTED candidate: stored and pending, but hidden from the default list unless includeSuppressed=true' },
+    newRequirement: { type: 'object', nullable: true, description: 'Set when the detector flagged the signal (or suppressed it)', properties: { isCandidate: { type: 'boolean' }, reason: str, closestRequirementId: { type: 'string', nullable: true }, similarity: { type: 'number', nullable: true }, novelTokens: arr(str) } },
+  },
+};
+const newRequirementBlock = {
+  type: 'object', description: 'Possible NEW requirement (signals/newRequirement.js). A candidate signal is always pending (reviewReason "new-requirement"); nothing changes until a PM acts on its candidate.',
+  properties: {
+    isCandidate: { type: 'boolean' }, reason: { type: 'string', nullable: true, description: '"no close requirement" | "new terms: koko" | "similar to a rejected candidate"' },
+    closestRequirementId: { type: 'string', nullable: true }, similarity: { type: 'number', nullable: true }, novelTokens: arr(str),
+    joinsCandidateId: { type: 'string', nullable: true, description: 'An existing pending candidate this signal joins (or would join in a preview / extract)' },
+    candidateId: { type: 'string', nullable: true, description: 'create / bulk only: the candidate the saved signal ended up in' },
+    suppressed: { type: 'boolean', description: 'Similar to a rejected candidate: stored, but no candidate was created or extended' },
+  },
+};
+const candidate = {
+  type: 'object',
+  properties: {
+    id: { type: 'string', example: 'RC-0001' }, projectId: str, title: str, description: str, type: { type: 'string', enum: ['FR', 'NFR'] },
+    status: { type: 'string', enum: ['pending', 'approved', 'merged', 'rejected'] },
+    closestRequirementId: { type: 'string', nullable: true }, closestSimilarity: { type: 'number', nullable: true }, novelTokens: arr(str), mentions: { type: 'integer' },
+    evidence: arr({ type: 'object', properties: { signalId: str, text: str, source: str, authorRole: str, timestamp: str, similarity: { type: 'number' } } }),
+    createdRequirementId: { type: 'string', nullable: true }, mergedInto: { type: 'string', nullable: true }, decidedBy: { type: 'string', nullable: true }, decidedAt: { type: 'string', nullable: true }, createdAt: str,
   },
 };
 const matchResult = {
@@ -115,7 +138,7 @@ const ingestResult = {
     autoAcceptThreshold: { type: 'integer' }, matchMinSimilarity: { type: 'number', description: 'Below this no requirement is proposed (unmapped)' },
     autoApplyMinSimilarity: { type: 'number', description: 'A similarity-matched signal below this stays pending, with the proposed requirement shown' },
     statusChange: { type: 'object', nullable: true, properties: { from: statusEnum, to: statusEnum } }, ledgerEntry: { ...ledgerEntry, nullable: true },
-    message: { type: 'string', nullable: true }, preview: { type: 'boolean' }, degraded: { type: 'boolean' },
+    message: { type: 'string', nullable: true }, preview: { type: 'boolean' }, degraded: { type: 'boolean' }, newRequirement: newRequirementBlock,
   },
 };
 const ingestBody = {
@@ -166,7 +189,7 @@ module.exports = {
     },
 
     '/projects/{projectId}/signals': {
-      get: op('signals', 'Signal feed, newest first', { data: arr(signal), query: [{ name: 'reviewStatus', in: 'query', schema: { type: 'string', enum: ['pending', 'accepted', 'rejected'] } }, { name: 'requirementId', in: 'query', schema: str }] }),
+      get: op('signals', 'Signal feed, newest first', { data: arr(signal), query: [{ name: 'reviewStatus', in: 'query', schema: { type: 'string', enum: ['pending', 'accepted', 'rejected'] } }, { name: 'requirementId', in: 'query', schema: str }, { name: 'includeSuppressed', in: 'query', schema: { type: 'boolean' }, description: 'Include repeats of a rejected requirement candidate (hidden by default)' }] }),
       post: op('signals', 'Ingest a signal: classify, map to a requirement, apply the status rule if safe, log to the ledger', {
         body: ingestBody, data: ingestResult,
         description: 'Any project member. Flow: /classify -> (None: stop) -> map to a requirement (requirementId, else /match; below MATCH_MIN_SIMILARITY = unmapped) -> status engine -> review policy. '
@@ -242,6 +265,22 @@ module.exports = {
         description: 'accept: applies the pending status change and ledger entry (seeded signals only get reviewStatus updated). reject: no status effect. correct: re-runs the status rule with the corrected label and/or requirement. '
           + 'IMPORTANT - signals that were already AUTO-ACCEPTED can still be rejected or corrected, but ONLY AS FEEDBACK: the status change and ledger entry they caused are NOT reversed. The response then has statusNotReversed: true and says so in message. A compensating correction ledger entry is the planned proper fix. '
           + '409 if the signal was already reviewed by a PM.',
+      }),
+    },
+
+    '/projects/{projectId}/requirement-candidates': {
+      get: op('requirement-candidates', 'Possible new requirements found in signals (any project member; also the read contract for other components)', {
+        query: [{ name: 'status', in: 'query', schema: { type: 'string', enum: ['pending', 'approved', 'merged', 'rejected'] } }], data: arr(candidate),
+        description: 'A candidate is a signal (or several similar ones) that no existing requirement covers. The centroid used for grouping is never returned. Nothing changes in the requirements until a PM reviews the candidate.',
+      }),
+    },
+    '/projects/{projectId}/requirement-candidates/{candidateId}/review': {
+      post: op('requirement-candidates', 'Approve (create a requirement), merge into an existing requirement, or reject a candidate', {
+        roles: 'PM', params: [param('candidateId', 'RC-0001')],
+        body: { type: 'object', required: ['action'], properties: { action: { type: 'string', enum: ['approve', 'merge', 'reject'] }, title: str, description: str, type: { type: 'string', enum: ['FR', 'NFR'] }, priority: { type: 'string', enum: ['High', 'Medium', 'Low'] }, mergeIntoRequirementId: { type: 'string', description: 'required for merge' }, note: str } },
+        data: { type: 'object', properties: { candidate, requirement: { type: 'object', nullable: true }, signals: arr({ type: 'object' }), statusChanges: arr({ type: 'object' }), ledgerEntries: arr(ledgerEntry), networkUpdated: { type: 'boolean' }, networkLedgerEntry: { type: 'object', nullable: true }, message: str } },
+        description: 'The candidate is claimed atomically from pending, so concurrent calls cannot create two requirements (409 ALREADY_DECIDED for the loser). approve: creates the requirement through the normal create path (next free id, REQUIREMENT_CREATED ledger entry with the first evidence signal as trigger), then finalises every evidence signal as an accepted Expectation of it. merge: maps the evidence signals to mergeIntoRequirementId and finalises them. reject: signals are rejected, no status effect. '
+          + 'approve and merge run ONE network update afterwards (at most one NETWORK_UPDATE ledger entry). Every action writes a feedback document (kind "requirement-candidate"; never part of the retraining export). The alignment score drops after an approve until a new baseline is frozen.',
       }),
     },
 

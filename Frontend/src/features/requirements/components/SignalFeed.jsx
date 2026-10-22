@@ -21,6 +21,7 @@ import { Skeleton } from "../../../components/ui/skeleton";
 import { Badge } from "../../../components/ui/badge";
 import { ClassificationBadge } from "./ClassificationBadge";
 import { ConfidenceMeter } from "./ConfidenceMeter";
+import { NewRequirementTag } from "./NewRequirementTag";
 import { SignalSubmitPanel } from "./SignalSubmitPanel";
 import { UploadDocumentDialog } from "./UploadDocumentDialog";
 import { CLASSIFICATIONS } from "../../../data/mockSignals";
@@ -76,6 +77,7 @@ export function SignalFeed({
   const [sourceFilter, setSourceFilter] = useState("all");
   const [reviewFilter, setReviewFilter] = useState(presetReview ?? "all");
   const [dateRange, setDateRange] = useState(null); // { from, to } as "YYYY-MM-DD", or null
+  const [showSuppressed, setShowSuppressed] = useState(false); // repeats of a rejected requirement candidate
   const [busyId, setBusyId] = useState(null);
   const [correcting, setCorrecting] = useState(null); // { id, label, requirementId }
   const [notice, setNotice] = useState(null); // { tone: "ok" | "warn" | "error", text }
@@ -114,7 +116,9 @@ export function SignalFeed({
   }, [highlightSignalId, loading]);
 
   const requirementById = useMemo(() => new Map(requirements.map((r) => [r.id, r])), [requirements]);
-  const pendingCount = useMemo(() => signals.filter((s) => s.reviewStatus === "pending").length, [signals]);
+  const suppressedCount = useMemo(() => signals.filter((s) => s.suppressed).length, [signals]);
+  // Suppressed repeats are not counted as pending and are hidden unless the toggle is on.
+  const pendingCount = useMemo(() => signals.filter((s) => s.reviewStatus === "pending" && !s.suppressed).length, [signals]);
 
   const clearFilters = () => {
     setClassFilter("all");
@@ -125,6 +129,7 @@ export function SignalFeed({
 
   const filtered = useMemo(() => {
     return signals
+      .filter((s) => showSuppressed || !s.suppressed)
       .filter((s) => (reviewFilter === "all" ? true : s.reviewStatus === reviewFilter))
       .filter((s) => (classFilter === "all" ? true : s.classification === classFilter))
       .filter((s) => (sourceFilter === "all" ? true : s.source === sourceFilter))
@@ -134,7 +139,7 @@ export function SignalFeed({
         const q = search.toLowerCase();
         return s.text.toLowerCase().includes(q) || (s.channel ?? "").toLowerCase().includes(q);
       });
-  }, [signals, search, classFilter, sourceFilter, reviewFilter, dateRange]);
+  }, [signals, search, classFilter, sourceFilter, reviewFilter, dateRange, showSuppressed]);
 
   const presetActive = classFilter !== "all" || sourceFilter !== "all" || Boolean(dateRange);
   const availableSources = useMemo(() => SOURCE_ORDER.filter((src) => signals.some((s) => s.source === src)), [signals]);
@@ -251,6 +256,13 @@ export function SignalFeed({
         })}
       </div>
 
+      {suppressedCount > 0 && (
+        <label className="flex w-fit items-center gap-2 text-xs text-muted-foreground">
+          <input type="checkbox" checked={showSuppressed} onChange={(e) => setShowSuppressed(e.target.checked)} className="h-3.5 w-3.5 accent-primary" />
+          Show suppressed ({suppressedCount}): repeats of a rejected requirement candidate
+        </label>
+      )}
+
       {presetActive && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-primary">
           <Filter className="h-3.5 w-3.5 shrink-0" />
@@ -364,6 +376,18 @@ export function SignalFeed({
                     {isRejected && (
                       <Badge variant="danger" className="text-[10px]">
                         Rejected
+                      </Badge>
+                    )}
+                    {signal.suppressed ? (
+                      <Badge variant="secondary" className="text-[10px]" title="Very similar to a requirement candidate a PM rejected, so no candidate was created">
+                        Suppressed: similar to a rejected candidate
+                      </Badge>
+                    ) : (
+                      <NewRequirementTag nr={signal.newRequirement} />
+                    )}
+                    {signal.candidateId && !signal.suppressed && (
+                      <Badge variant="outline" className="font-mono text-[10px]" title="Evidence for this requirement candidate">
+                        {signal.candidateId}
                       </Badge>
                     )}
                     {signal.applied && (

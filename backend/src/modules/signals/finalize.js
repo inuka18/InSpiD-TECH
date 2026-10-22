@@ -67,9 +67,10 @@ async function projectEffect({ projectId, reqId, signal, label }) {
  * @param {string}  p.actor        who the ledger entry is attributed to ("auto-accept" or a user's email)
  * @param {boolean} p.dryRun       preview: project the effect, write nothing
  * @param {object}  p.feedback     feedback document to store after the effect (PM review actions); ignored on dryRun
+ * @param {boolean} p.deferNetwork  skip the per-signal network update (the caller does one batch update afterwards)
  * @returns {Promise<{ applied: boolean, statusChange, ledgerEntry, proposedStatus, resultingStatus, feedbackSaved: boolean }>}
  */
-async function finalizeSignal({ projectId, signal, label, requirementId, actor, dryRun = false, feedback = null }) {
+async function finalizeSignal({ projectId, signal, label, requirementId, actor, dryRun = false, feedback = null, deferNetwork = false }) {
   const out = { applied: false, statusChange: null, ledgerEntry: null, proposedStatus: null, resultingStatus: null, feedbackSaved: false };
 
   if (label && label !== 'None' && requirementId) {
@@ -82,7 +83,8 @@ async function finalizeSignal({ projectId, signal, label, requirementId, actor, 
         await Signal.updateOne({ _id: signal._id }, { $set: { applied: true, resultingStatus: out.resultingStatus, proposedStatus: out.proposedStatus } });
       }
       // Never fails the signal (onSignalApplied catches everything); seeded signals are skipped inside.
-      await network.onSignalApplied({ projectId, signal, requirementId, actor });
+      // deferNetwork: the caller finalises several signals and runs ONE network update afterwards (network.onSignalsApplied).
+      if (!deferNetwork) await network.onSignalApplied({ projectId, signal, requirementId, actor });
     }
   }
 
