@@ -69,7 +69,7 @@ export function CalendarView({ projectId, project, onOpenDay }) {
   }, [projectId, project?.startDate]);
 
 
-  const tasks = useMemo(() => flattenTasks(phases), [phases]);
+  const tasks = useMemo(() => flattenTasks(phases), [phases, settings]);
   const leaveByDate = useMemo(() => {
     const entries = new Map();
     const addLeave = (date, name, label) => {
@@ -93,6 +93,9 @@ export function CalendarView({ projectId, project, onOpenDay }) {
   const anchorMonth = monthAnchor.getMonth();
   const monthLabel = monthAnchor.toLocaleDateString(undefined, { month: "long", year: "numeric" });
   const sprint = project?.activeSprint;
+  const sprintStartDate = sprint ? new Date(sprint.startDate) : null;
+  const sprintEndDate = sprintStartDate ? addDays(sprintStartDate, Number(settings.sprintDays ?? 10) - 1) : null;
+  if (sprintEndDate) sprintEndDate.setHours(23, 59, 59, 999);
 
   const tasksForDay = (day) =>
     tasks.filter((t) => {
@@ -200,8 +203,8 @@ export function CalendarView({ projectId, project, onOpenDay }) {
           // but the calendar deliberately avoids rendering a task list.
           const dayTasks = inMonth ? tasksForDay(day) : [];
           const milestoneCount = dayTasks.filter((task) => task.milestone).length;
-          const inSprint = sprint && day >= new Date(sprint.startDate) && day <= new Date(sprint.endDate);
-          const sprintStart = sprint && isSameDay(day, new Date(sprint.startDate));
+          const inSprint = sprint && day >= sprintStartDate && day <= sprintEndDate;
+          const sprintStart = sprint && isSameDay(day, sprintStartDate);
           const leaves = leaveByDate.get(dateKey(day)) ?? [];
 
           return (

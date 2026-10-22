@@ -13,11 +13,10 @@ import { getTeamForProject, getTeamMemberById } from "../../../data/mockTeam";
 import { ROLES, useRole } from "../../../context/RoleContext";
 import { useScheduleHistory } from "../context/ScheduleHistoryContext";
 import { addWorkingMinutes, normalizeWorkingStart, useWorkCalendar } from "../context/WorkCalendarContext";
+import { getTaskEffortMinutes, getTaskRemainingEffortMinutes } from "../lib/requirementPlanner";
 import { cn } from "../../../lib/utils";
-import { formatShortDate, isLate, statusBadgeVariant, statusLabel, taskAssigneeIds } from "../lib/scheduleUtils";
+import { formatShortDate, isLate, statusLabel, taskAssigneeIds } from "../lib/scheduleUtils";
 
-export const WORKDAY_MINUTES = 480;
-const MINUTES_PER_POINT = 240;
 const ROLE_ALIASES = { "Mobile Developer": "Frontend Developer", "Product Manager": "Project Manager" };
 const STATUS_DOT = {
   "not-started": "bg-slate-400",
@@ -25,11 +24,16 @@ const STATUS_DOT = {
   review: "bg-amber-500",
   done: "bg-emerald-500",
 };
+const TASK_STATUSES = [
+  { value: "not-started", label: "Not started" },
+  { value: "in-progress", label: "In progress" },
+  { value: "review", label: "In review" },
+  { value: "done", label: "Done" },
+];
 const initialsFor = (name) => name.split(" ").map((part) => part[0]).join("").toUpperCase();
-const estimateMinutes = (task) => task.durationMinutes ?? Math.max(1, task.storyPoints ?? 1) * MINUTES_PER_POINT;
 const durationLabel = (minutes) => `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
-const durationHours = (task) => Math.floor(estimateMinutes(task) / 60);
-const durationMinutesPart = (task) => estimateMinutes(task) % 60;
+const durationHours = (task, settings) => Math.floor(getTaskEffortMinutes(task, settings) / 60);
+const durationMinutesPart = (task, settings) => getTaskEffortMinutes(task, settings) % 60;
 
 function workingMinutesInTimeline(start, end, settings) {
   const cursor = new Date(start);
@@ -85,10 +89,22 @@ export function TaskAssignmentList({ tasks = [], onSelectTask, isPM }) {
     return team.filter((person) => person.jobTitle === matchingRole);
   };
   const updateTask = (task, update, label) => {
-    const previous = { assigneeId: task.assigneeId, assigneeIds: task.assigneeIds, durationMinutes: task.durationMinutes, start: task.start, end: task.end, assignmentMode: task.assignmentMode };
+    const previous = { assigneeId: task.assigneeId, assigneeIds: task.assigneeIds, durationMinutes: task.durationMinutes, start: task.start, end: task.end, assignmentMode: task.assignmentMode, status: task.status, progress: task.progress, plannedSprintNumber: task.plannedSprintNumber, remainingDurationMinutes: task.remainingDurationMinutes };
     Object.assign(task, update);
     pushHistory(label, () => Object.assign(task, previous));
     setRevision((value) => value + 1);
+  };
+  const manuallySetStatus = (task, nextStatus) => {
+    if (!canEdit || !TASK_STATUSES.some((item) => item.value === nextStatus) || task.status === nextStatus) return;
+    const existingProgress = Number(task.progress);
+    const progress = nextStatus === "done"
+      ? 100
+      : nextStatus === "not-started"
+        ? 0
+        : Number.isFinite(existingProgress) && existingProgress > 0 && existingProgress < 100
+          ? existingProgress
+          : nextStatus === "review" ? 90 : 50;
+    updateTask(task, { status: nextStatus, progress, remainingDurationMinutes: undefined }, `Changed status for "${task.name}" to ${statusLabel({ status: nextStatus })}`);
   };
   const manuallyAssign = (task, memberId) => {
     if (task.status === "done") return;
@@ -113,7 +129,7 @@ export function TaskAssignmentList({ tasks = [], onSelectTask, isPM }) {
     }));
     const snapshot = editable.map((task) => ({ task, assigneeId: task.assigneeId, assigneeIds: task.assigneeIds, durationMinutes: task.durationMinutes, start: task.start, end: task.end, assignmentMode: task.assignmentMode }));
     [...editable].sort((a, b) => Number(b.critical) - Number(a.critical) || (b.storyPoints ?? 0) - (a.storyPoints ?? 0)).forEach((task) => {
-      const minutes = estimateMinutes(task);
+      const minutes = getTaskEffortMinutes(task, workCalendar);
       const timelineMinutes = workingMinutesInTimeline(task.start, task.end, workCalendar);
       const candidates = relevantPeople(task)
         .filter((person) => !capacityByMember.get(person.id)?.offToday && (remaining.get(person.id) ?? 0) > 0)
@@ -184,8 +200,8 @@ export function TaskAssignmentList({ tasks = [], onSelectTask, isPM }) {
                     {canEdit && !isCompleted && <select aria-label={`Change assignees for ${task.name}`} onClick={(event) => event.stopPropagation()} onChange={(event) => { manuallyAssign(task, event.target.value); event.target.value = ""; }} defaultValue="" className="mt-2 h-7 max-w-full rounded-md border border-input bg-background px-2 text-[10px] text-muted-foreground"><option value="" disabled>Manage team</option>{peopleForRole.map((person) => <option key={person.id} value={person.id} disabled={capacityByMember.get(person.id)?.offToday}>{taskAssigneeIds(task).includes(person.id) ? `Remove ${person.name}` : `Add ${person.name}`}{capacityByMember.get(person.id)?.offToday ? " · unavailable" : ""}</option>)}</select>}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3.5 align-top"><div className={cn("flex items-center gap-2 text-xs font-medium", late ? "text-red-600 dark:text-red-400" : "text-foreground")}><CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />{formatShortDate(task.start)}</div><p className={cn("mt-1.5 pl-[22px] text-[11px]", late ? "text-red-600/80 dark:text-red-400/80" : "text-muted-foreground")}>to {formatShortDate(task.end)}{late && <span className="ml-1 font-semibold">· Late</span>}</p></td>
-                  <td className="px-4 py-3.5 align-top"><div className="flex items-center gap-1.5"><Clock3 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /><Input aria-label={`Effort hours for ${task.name}`} type="number" min="0" step="1" value={durationHours(task)} onClick={(event) => event.stopPropagation()} onChange={(event) => manuallySetDuration(task, event.target.value, durationMinutesPart(task))} disabled={!editable} className="h-8 w-14 px-1.5 text-center text-xs" /><span className="text-[10px] text-muted-foreground">h</span><Input aria-label={`Effort minutes for ${task.name}`} type="number" min="0" max="59" step="1" value={durationMinutesPart(task)} onClick={(event) => event.stopPropagation()} onChange={(event) => manuallySetDuration(task, durationHours(task), event.target.value)} disabled={!editable} className="h-8 w-12 px-1 text-center text-xs" /><span className="text-[10px] text-muted-foreground">m</span></div><p className="mt-1.5 pl-5 text-[10px] text-muted-foreground">{durationLabel(estimateMinutes(task))} total</p></td>
-                  <td className="px-4 py-3.5 align-top"><Badge variant={statusBadgeVariant(task)} className="whitespace-nowrap bg-opacity-80"><span className={cn("h-1.5 w-1.5 rounded-full", STATUS_DOT[task.status] ?? "bg-muted-foreground")} />{statusLabel(task)}</Badge></td>
+                  <td className="px-4 py-3.5 align-top"><div className="flex items-center gap-1.5"><Clock3 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /><Input aria-label={`Effort hours for ${task.name}`} type="number" min="0" step="1" value={durationHours(task, workCalendar)} onClick={(event) => event.stopPropagation()} onChange={(event) => manuallySetDuration(task, event.target.value, durationMinutesPart(task, workCalendar))} disabled={!editable} className="h-8 w-14 px-1.5 text-center text-xs" /><span className="text-[10px] text-muted-foreground">h</span><Input aria-label={`Effort minutes for ${task.name}`} type="number" min="0" max="59" step="1" value={durationMinutesPart(task, workCalendar)} onClick={(event) => event.stopPropagation()} onChange={(event) => manuallySetDuration(task, durationHours(task, workCalendar), event.target.value)} disabled={!editable} className="h-8 w-12 px-1 text-center text-xs" /><span className="text-[10px] text-muted-foreground">m</span></div><p className="mt-1.5 pl-5 text-[10px] text-muted-foreground">{durationLabel(getTaskEffortMinutes(task, workCalendar))} estimate · {durationLabel(getTaskRemainingEffortMinutes(task, workCalendar))} remaining</p></td>
+                  <td className="px-4 py-3.5 align-top"><div className="flex items-center gap-1.5"><i className={cn("h-2 w-2 shrink-0 rounded-full", STATUS_DOT[task.status] ?? "bg-muted-foreground")} /><select aria-label={`Update status for ${task.name}`} value={task.status} disabled={!canEdit} onClick={(event) => event.stopPropagation()} onChange={(event) => manuallySetStatus(task, event.target.value)} className="h-8 min-w-28 rounded-md border border-input bg-background px-2 text-xs font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-60">{TASK_STATUSES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></div></td>
                   <td className="px-4 py-3.5 align-top"><div className="flex items-center justify-between gap-2"><span className={cn("text-xs font-semibold tabular-nums", late ? "text-red-600 dark:text-red-400" : "text-foreground")}>{progress}%</span>{progress === 100 ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> : <span className="text-[10px] text-muted-foreground">complete</span>}</div><div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted"><div className={cn("h-full rounded-full transition-[width]", progressColor)} style={{ width: `${progress}%` }} /></div></td>
                 </tr>
               );

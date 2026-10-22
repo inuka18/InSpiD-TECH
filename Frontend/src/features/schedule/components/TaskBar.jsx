@@ -18,14 +18,14 @@ export function TaskBar({ task, rangeStart, rangeEnd, onClick, draggable, onResc
   const baseWidth = Math.max(baseRight - baseLeft, 0.5);
   const progressWidth = Math.min(Math.max(task.progress || 0, 0), 100);
   const barColor = isLate(task)
-    ? "bg-[#c74848]"
+    ? "bg-gradient-to-r from-rose-500 to-red-700"
     : task.status === "done"
-    ? "bg-[#2e8067]"
+    ? "bg-gradient-to-r from-emerald-500 to-emerald-700"
     : task.status === "review"
-      ? "bg-[#b7791f]"
+      ? "bg-gradient-to-r from-amber-400 to-amber-600"
       : task.status === "in-progress"
-        ? "bg-[#426fba]"
-        : "bg-[#7b8798]";
+        ? "bg-gradient-to-r from-blue-500 to-blue-700"
+        : "bg-gradient-to-r from-slate-400 to-slate-500";
 
   // Vertical positions relative to row height
   const baselineTop = Math.round(rowHeight * 0.13);
@@ -89,8 +89,8 @@ export function TaskBar({ task, rangeStart, rangeEnd, onClick, draggable, onResc
         aria-label={`${task.name}, ${task.progress || 0}% complete`}
         title={`${task.name} · ${task.progress || 0}% complete · ${new Date(task.start).toLocaleDateString()} – ${new Date(task.end).toLocaleDateString()}`}
         className={cn(
-          "absolute flex items-center overflow-hidden rounded-md border border-white/25 text-left text-[10px] font-semibold leading-none tracking-[0.01em] text-white ring-1 ring-inset ring-black/10 shadow-[0_1px_3px_rgb(16_24_40_/_16%)] transition-[filter,box-shadow,transform] duration-150",
-          !isDragging && "hover:z-10 hover:brightness-105 hover:shadow-[0_3px_8px_rgb(16_24_40_/_22%)]",
+          "absolute flex items-center overflow-hidden rounded-full border border-white/35 text-left text-[10px] font-semibold leading-none tracking-[0.01em] text-white ring-1 ring-inset ring-black/10 shadow-[0_2px_5px_rgb(16_24_40_/_18%)] transition-[filter,box-shadow,transform] duration-150",
+          !isDragging && "hover:z-10 hover:brightness-110 hover:shadow-[0_4px_10px_rgb(16_24_40_/_24%)]",
           isDragging ? "z-20 cursor-grabbing shadow-lg opacity-90" : draggable ? "cursor-grab" : "cursor-pointer",
           barColor
         )}

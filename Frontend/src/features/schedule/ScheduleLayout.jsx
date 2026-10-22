@@ -68,7 +68,7 @@ function ScheduleLayoutInner() {
                   <CalendarRange className="h-4 w-4" />
                   Sprint Planner
                 </Button>
-                {plannerOpen && <SprintPlanner projectId={activeProject?.id} onClose={() => setPlannerOpen(false)} />}
+                {plannerOpen && <SprintPlanner projectId={activeProject?.id} projectStart={activeProject?.activeSprint?.startDate ?? activeProject?.startDate} firstSprintNumber={activeProject?.activeSprint?.number ?? 1} onClose={() => setPlannerOpen(false)} />}
               </div>
             )}
             <Button

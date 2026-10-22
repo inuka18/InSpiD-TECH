@@ -85,14 +85,48 @@ export function workingDaysBetween(start, end, workdays) {
 
 export function recalculateTasksForWorkCalendar(phases, previousSettings, nextSettings) {
   const snapshots = [];
-  phases.flatMap((phase) => phase.tasks).forEach((task) => {
+  const tasks = phases.flatMap((phase) => phase.tasks ?? []).sort((a, b) => new Date(a.start) - new Date(b.start));
+  const tasksById = new Map(tasks.map((task) => [task.id, task]));
+  const scheduledEnds = new Map();
+  const orderedTasks = [];
+  const visited = new Set();
+  const visiting = new Set();
+  const visit = (task) => {
+    if (visited.has(task.id) || visiting.has(task.id)) return;
+    visiting.add(task.id);
+    const dependencyIds = task.dependencies?.length
+      ? task.dependencies.map((dependency) => typeof dependency === "string" ? dependency : dependency.id ?? dependency.predecessorId)
+      : (task.dependencyDetails ?? []).map((dependency) => dependency.predecessorId);
+    dependencyIds.map((id) => tasksById.get(id)).filter(Boolean).forEach(visit);
+    visiting.delete(task.id);
+    visited.add(task.id);
+    orderedTasks.push(task);
+  };
+  tasks.forEach(visit);
+  tasks.filter((task) => task.status === "done").forEach((task) => scheduledEnds.set(task.id, task.end));
+
+  orderedTasks.forEach((task) => {
     if (task.status === "done") return;
     snapshots.push({ task, start: task.start, end: task.end, durationMinutes: task.durationMinutes });
-    const effort = task.durationMinutes ?? workingDaysBetween(task.start, task.end, previousSettings.workdays) * previousSettings.hoursPerDay * 60;
-    const nextStart = nextWorkingStart(task.start, nextSettings);
+    const effort = Number(task.durationMinutes)
+      || Number(task.estimatedEffortHours) * 60
+      || Number(task.durationDays) * previousSettings.hoursPerDay * 60
+      || workingDaysBetween(task.start, task.end, previousSettings.workdays) * previousSettings.hoursPerDay * 60;
+    const dependencyIds = task.dependencies?.length
+      ? task.dependencies.map((dependency) => typeof dependency === "string" ? dependency : dependency.id ?? dependency.predecessorId)
+      : (task.dependencyDetails ?? []).map((dependency) => dependency.predecessorId);
+    const dependencyEnds = dependencyIds
+      .map((id) => scheduledEnds.get(id) ?? tasksById.get(id)?.end)
+      .filter(Boolean)
+      .map((end) => new Date(end));
+    const dependencyFinish = dependencyEnds.length
+      ? new Date(Math.max(...dependencyEnds.map((date) => date.getTime())))
+      : null;
+    const nextStart = normalizeWorkingStart(dependencyFinish ?? task.start, nextSettings);
     task.durationMinutes = effort;
     task.start = nextStart.toISOString();
     task.end = addWorkingMinutes(nextStart, effort, nextSettings).toISOString();
+    scheduledEnds.set(task.id, task.end);
   });
   return snapshots;
 }

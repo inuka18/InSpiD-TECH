@@ -14,6 +14,7 @@ import {
 import { useScheduleHistory } from "../context/ScheduleHistoryContext";
 import { cn } from "../../../lib/utils";
 import { useWorkCalendar, workingDaysBetween } from "../context/WorkCalendarContext";
+import { getTaskEffortMinutes } from "../lib/requirementPlanner";
 
 const HEADER_H = 48;
 const PHASE_H  = 32;
@@ -191,9 +192,11 @@ function GanttBody({
 
           if (row.type === "requirement") {
             const isCollapsed = collapsed.has(row.id);
+            const requirementHours = row.tasks.reduce((sum, task) => sum + getTaskEffortMinutes(task, workCalendar), 0) / 60;
             return <button key={row.id} type="button" onClick={() => toggleCollapsed(row.id)} className="flex h-8 w-full items-center gap-2 border-t border-border/60 bg-slate-50/80 px-3 pl-8 text-left text-[10px] font-semibold text-foreground outline-none hover:bg-slate-100/80 dark:bg-slate-900/30 dark:hover:bg-slate-900/50">
               {isCollapsed ? <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />}
               <span className="truncate font-mono text-[9px] text-primary">{row.requirementId}</span><span className="truncate">{row.title}</span>
+              <span className="shrink-0 rounded bg-sky-100 px-1.5 py-0.5 text-[9px] font-semibold tabular-nums text-sky-800 dark:bg-sky-900/40 dark:text-sky-200">{requirementHours.toFixed(1)}h</span>
               <span className="ml-auto shrink-0 rounded-full border border-border/70 bg-background px-2 py-0.5 text-[9px] font-medium text-muted-foreground">{row.tasks.length}</span>
             </button>;
           }
@@ -519,7 +522,7 @@ export function GanttChart({ phases, rangeStart, rangeEnd, onSelectTask, onSelec
     });
     return { rowMeta: meta, timelineHeight: y };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phases, rangeStart, rangeEnd, collapsed, pxPerDay, renderTick, groupByRequirement, groupByPhaseRequirement]);
+  }, [phases, rangeStart, rangeEnd, collapsed, pxPerDay, renderTick, groupByRequirement, groupByPhaseRequirement, workCalendar]);
 
   const dependencyLines = [];
   rowMeta.forEach((toPos, taskId) => {

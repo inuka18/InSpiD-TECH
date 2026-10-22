@@ -31,17 +31,18 @@ export function ProjectTimelinePage() {
   const isPM = role === ROLES.PM;
   const [selectedTask, setSelectedTask] = useState(null);
   const [selectedCapacity, setSelectedCapacity] = useState(null);
-  const [pxPerDay, setPxPerDay] = useState(10);
+  const [pxPerDay, setPxPerDay] = useState(MAX_PX_PER_DAY);
   const [compareOpen, setCompareOpen] = useState(false);
   const allTasks = useMemo(() => flattenTasks(phases), [phases]);
   const sprintPhases = useMemo(() => {
     if (!allTasks.length) return [];
-    const projectStart = new Date(Math.min(...allTasks.map((task) => new Date(task.start).getTime())));
+    const activeStart = activeProject?.activeSprint?.startDate ? new Date(activeProject.activeSprint.startDate) : null;
+    const projectStart = activeStart ?? new Date(Math.min(...allTasks.map((task) => new Date(task.start).getTime())));
     const projectEnd = new Date(Math.max(...allTasks.map((task) => new Date(task.end).getTime())));
     projectStart.setHours(9, 0, 0, 0);
-    const activeStart = activeProject?.activeSprint?.startDate ? new Date(activeProject.activeSprint.startDate) : null;
+    if (activeStart) activeStart.setHours(9, 0, 0, 0);
     const calendarSpan = Number(settings.sprintDays ?? 10);
-    const activeWindowNumber = activeStart ? Math.floor((activeStart.getTime() - projectStart.getTime()) / (calendarSpan * 24 * 60 * 60 * 1000)) + 1 : null;
+    const firstSprintNumber = activeProject?.activeSprint?.number ?? 1;
     const sprints = [];
     let start = projectStart;
     let number = 1;
@@ -51,16 +52,18 @@ export function ProjectTimelinePage() {
       const nextStart = addDays(start, calendarSpan);
       nextStart.setHours(9, 0, 0, 0);
       const isActive = activeStart && activeStart >= start && activeStart < nextStart;
-      const sprintNumber = activeWindowNumber
-        ? activeProject.activeSprint.number + number - activeWindowNumber
-        : number;
+      const sprintNumber = firstSprintNumber + number - 1;
       const sprintTasks = allTasks.filter((task) => {
+        const assignedSprint = Number.isInteger(task.plannedSprintNumber)
+          ? task.plannedSprintNumber
+          : task.status === "done" && Number.isInteger(task.sprintNumber) ? task.sprintNumber : null;
+        if (assignedSprint !== null) return assignedSprint === Math.max(1, sprintNumber);
         const taskStart = new Date(task.start);
         return taskStart >= start && taskStart < nextStart;
       });
       if (sprintTasks.length) sprints.push({
         id: `project-sprint-${number}`,
-        name: isActive ? activeProject.activeSprint.name : `Sprint ${Math.max(1, sprintNumber)}`,
+        name: `${isActive ? activeProject.activeSprint.name : `Sprint ${Math.max(1, sprintNumber)}`} · ${calendarSpan} days`,
         start: start.toISOString(),
         end: end.toISOString(),
         tasks: sprintTasks,
@@ -73,13 +76,14 @@ export function ProjectTimelinePage() {
 
   const { rangeStart, rangeEnd } = useMemo(() => {
     if (phases.length === 0) return { rangeStart: null, rangeEnd: null };
-    const starts = phases.map((p) => new Date(p.start));
-    const ends = phases.map((p) => new Date(p.end));
+    const phaseTasks = phases.flatMap((phase) => phase.tasks ?? []);
+    const starts = [...phases.map((p) => new Date(p.start)), ...phaseTasks.map((task) => new Date(task.start))];
+    const ends = [...phases.map((p) => new Date(p.end)), ...phaseTasks.map((task) => new Date(task.end))];
     return {
       rangeStart: new Date(Math.min(...starts)),
       rangeEnd: new Date(Math.max(...ends)),
     };
-  }, [phases]);
+  }, [phases, settings]);
 
   if (!loading && phases.length === 0) {
     return <EmptyState icon={Route} title="No project timeline yet" description="No phases have been scheduled for this project." />;
@@ -103,6 +107,8 @@ export function ProjectTimelinePage() {
               size="sm"
               onClick={() => setPxPerDay((v) => Math.max(MIN_PX_PER_DAY, v - ZOOM_STEP))}
               disabled={pxPerDay <= MIN_PX_PER_DAY}
+              aria-label="Zoom out"
+              title="Zoom out"
             >
               <ZoomOut className="h-4 w-4" />
             </Button>
@@ -111,6 +117,8 @@ export function ProjectTimelinePage() {
               size="sm"
               onClick={() => setPxPerDay((v) => Math.min(MAX_PX_PER_DAY, v + ZOOM_STEP))}
               disabled={pxPerDay >= MAX_PX_PER_DAY}
+              aria-label="Zoom in"
+              title="Zoom in"
             >
               <ZoomIn className="h-4 w-4" />
             </Button>

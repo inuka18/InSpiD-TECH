@@ -21,6 +21,7 @@ import { useRole, ROLES } from "../../context/RoleContext";
 import { useScheduleHistory } from "./context/ScheduleHistoryContext";
 import { useGaps } from "../../hooks/useGaps";
 import { usePropagationRuns } from "../../hooks/usePropagationRuns";
+import { useWorkCalendar } from "./context/WorkCalendarContext";
 import {
   flattenTasks,
   varianceDays,
@@ -64,6 +65,7 @@ export function ScheduleOverviewPage() {
   const { role } = useRole();
   const isPM = role === ROLES.PM;
   const { data: phases, loading } = useSchedulePhases(activeProjectId);
+  const { settings: workCalendar } = useWorkCalendar();
   const { pushHistory, saveVersion, versions } = useScheduleHistory();
   const { data: gaps } = useGaps(activeProjectId);
   const { data: impactRuns } = usePropagationRuns(activeProjectId);
@@ -71,6 +73,9 @@ export function ScheduleOverviewPage() {
   const [listDrill, setListDrill] = useState(null);
   const [toast, setToast]         = useState(null);
   const [, bump]                  = useState(0);
+  const [selectedVersionId, setSelectedVersionId] = useState(null);
+  const projectVersions = versions.filter((version) => version.projectId === activeProjectId);
+  const selectedVersion = projectVersions.find((version) => version.id === selectedVersionId);
 
   useEffect(() => {
     if (!toast) return;
@@ -78,7 +83,7 @@ export function ScheduleOverviewPage() {
     return () => clearTimeout(timer);
   }, [toast]);
 
-  const tasks = useMemo(() => flattenTasks(phases), [phases]);
+  const tasks = useMemo(() => flattenTasks(phases), [phases, workCalendar]);
 
   // ── KPI row ──────────────────────────────────────────────────────────────
   const totalTasks = tasks.length;
@@ -100,6 +105,7 @@ export function ScheduleOverviewPage() {
       setToast("No redistributable slack found.");
       return;
     }
+    saveVersion("Before buffer re-optimization", tasks, activeProjectId);
     const snapshots  = [];
     const donorNames = new Set();
     behindNow.forEach((t, i) => {
@@ -115,7 +121,6 @@ export function ScheduleOverviewPage() {
         t.bufferDonor = prevBufferDonor;
       });
     });
-    saveVersion(`Re-optimized ${snapshots.length} critical task(s)`, tasks);
     bump((n) => n + 1);
     setToast(
       `Re-optimized: ${snapshots.length} critical task(s) pulled in by 1 day (${snapshots.length}d recovered), buffer sourced from ${[...donorNames].join(", ")}.`
@@ -127,9 +132,14 @@ export function ScheduleOverviewPage() {
   const weekPool   = tasks.filter((t) => overlapsRange(t, weekStart, weekEnd));
   const sprint     = activeProject?.activeSprint;
   const sprintStart = sprint ? new Date(sprint.startDate) : null;
-  const sprintEnd   = sprint ? new Date(sprint.endDate)   : null;
+  const sprintEnd   = sprint ? endOfDay(addDays(sprintStart, Number(workCalendar.sprintDays ?? 10) - 1)) : null;
   const sprintPool  = sprint
-    ? tasks.filter((t) => overlapsRange(t, sprintStart, sprintEnd))
+    ? tasks.filter((task) => {
+      const assignedSprint = Number.isInteger(task.plannedSprintNumber)
+        ? task.plannedSprintNumber
+        : task.status === "done" && Number.isInteger(task.sprintNumber) ? task.sprintNumber : null;
+      return assignedSprint === null ? overlapsRange(task, sprintStart, sprintEnd) : assignedSprint === sprint.number;
+    })
     : [];
   const levels = [
     buildLevel("day",     "Day",     dayPool, formatShortDate(overviewDate)),
@@ -199,8 +209,14 @@ export function ScheduleOverviewPage() {
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="flex-row items-start justify-between gap-3 space-y-0"><div><CardTitle className="text-base">Schedule versions</CardTitle><CardDescription>Save a version before or after applying a re-optimization.</CardDescription></div><Button size="sm" onClick={() => saveVersion("Manual schedule snapshot", tasks)}><Save className="h-4 w-4" />Save version</Button></CardHeader>
-            <CardContent className="space-y-2">{versions.length ? versions.slice(0, 3).map((version) => <div key={version.id} className="flex items-center justify-between rounded-lg border border-border p-3"><div><p className="text-sm font-medium">{version.label}</p><p className="text-xs text-muted-foreground">{new Date(version.createdAt).toLocaleString()} · {version.taskCount} tasks</p></div><Badge variant="outline">{version.id}</Badge></div>) : <p className="py-4 text-center text-sm text-muted-foreground">No saved versions yet. Save the current schedule before re-optimizing.</p>}</CardContent>
+            <CardHeader className="flex-row items-start justify-between gap-3 space-y-0"><div><CardTitle className="text-base">Schedule versions</CardTitle><CardDescription>Original plan dates stay fixed. Save and inspect snapshots of the current schedule.</CardDescription></div><Button size="sm" disabled={!isPM || tasks.length === 0} onClick={() => { const version = saveVersion("Manual schedule snapshot", tasks, activeProjectId); setSelectedVersionId(version.id); setToast(`Saved ${version.label} with ${version.taskCount} tasks.`); }}><Save className="h-4 w-4" />Save version</Button></CardHeader>
+            <CardContent className="space-y-2">
+              {projectVersions.length ? <div className="max-h-64 space-y-2 overflow-y-auto pr-1">{projectVersions.map((version) => <div key={version.id} className={`flex items-center justify-between gap-3 rounded-lg border p-3 ${selectedVersionId === version.id ? "border-primary/40 bg-primary/[0.04]" : "border-border"}`}><div className="min-w-0"><p className="truncate text-sm font-medium">{version.label}</p><p className="text-xs text-muted-foreground">{new Date(version.createdAt).toLocaleString()} · {version.taskCount} tasks</p></div><Button variant={selectedVersionId === version.id ? "secondary" : "outline"} size="sm" onClick={() => setSelectedVersionId(selectedVersionId === version.id ? null : version.id)}>{selectedVersionId === version.id ? "Hide" : "View"}</Button></div>)}</div> : <p className="py-4 text-center text-sm text-muted-foreground">No saved versions for this project. Save the current schedule to keep a snapshot.</p>}
+              {selectedVersion && <div className="mt-3 overflow-hidden rounded-lg border border-border">
+                <div className="border-b border-border bg-muted/30 px-3 py-2"><p className="text-xs font-semibold">{selectedVersion.label}</p><p className="text-[10px] text-muted-foreground">Saved {new Date(selectedVersion.createdAt).toLocaleString()}</p></div>
+                <div className="max-h-72 overflow-auto"><table className="w-full min-w-[570px] text-left text-[10px]"><thead className="sticky top-0 bg-card text-muted-foreground"><tr>{["Task", "Start", "Finish", "Status", "Progress"].map((heading) => <th key={heading} className="border-b border-border px-2.5 py-2 font-semibold">{heading}</th>)}</tr></thead><tbody>{selectedVersion.snapshot.map((task) => <tr key={task.id} className="border-b border-border/60 last:border-0"><td className="max-w-40 px-2.5 py-2"><p className="truncate font-medium text-foreground" title={task.name}>{task.name ?? task.id}</p><p className="font-mono text-[9px] text-muted-foreground">{task.id}</p></td><td className="whitespace-nowrap px-2.5 py-2">{formatShortDate(task.start)}</td><td className="whitespace-nowrap px-2.5 py-2">{formatShortDate(task.end)}</td><td className="whitespace-nowrap px-2.5 py-2">{task.status}</td><td className="px-2.5 py-2 tabular-nums">{task.progress ?? 0}%</td></tr>)}</tbody></table></div>
+              </div>}
+            </CardContent>
           </Card>
           <RootCausePanel
             tasks={tasks}

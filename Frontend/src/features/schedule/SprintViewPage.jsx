@@ -48,8 +48,13 @@ export function SprintViewPage() {
 
   const sprintTasks = useMemo(() => {
     if (!sprintStart || !sprintEnd) return [];
-    return flattenTasks(phases).filter((t) => overlapsRange(t, sprintStart, sprintEnd));
-  }, [phases, sprintStart, sprintEnd]);
+    return flattenTasks(phases).filter((task) => {
+      const assignedSprint = Number.isInteger(task.plannedSprintNumber)
+        ? task.plannedSprintNumber
+        : task.status === "done" && Number.isInteger(task.sprintNumber) ? task.sprintNumber : null;
+      return assignedSprint === null ? overlapsRange(task, sprintStart, sprintEnd) : assignedSprint === sprintNumber;
+    });
+  }, [phases, sprintStart, sprintEnd, sprintNumber, settings]);
   const delayedTasks = sprintTasks.filter(isAtRisk);
   const peopleCount = new Set(sprintTasks.flatMap(taskAssigneeIds)).size;
 
@@ -69,7 +74,7 @@ export function SprintViewPage() {
             <div>
               <CardTitle className="text-base">{sprintLabel}</CardTitle>
               <CardDescription>
-                {formatShortDate(sprintStart)} – {formatShortDate(sprintEnd)}
+                {formatShortDate(sprintStart)} – {formatShortDate(sprintEnd)} · {sprintLengthDays} calendar days
               </CardDescription>
             </div>
             <div className="flex shrink-0 items-center gap-1.5">

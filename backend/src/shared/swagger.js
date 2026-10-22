@@ -324,6 +324,33 @@ module.exports = {
       }),
     },
 
+    '/projects/{projectId}/schedule': { get: op('schedule', 'Schedule phases, tasks, and project work calendar') },
+    '/projects/{projectId}/schedule/tasks': {
+      get: op('schedule', 'List project schedule tasks'),
+      post: op('schedule', 'Create a schedule task', { roles: 'PM', body: { type: 'object', required: ['taskId', 'name', 'estimateMinutes', 'start', 'end'], properties: { taskId: str, requirementId: str, name: str, estimateMinutes: { type: 'integer', minimum: 1 }, start: str, end: str, assigneeIds: arr(str), dependencies: arr(str) } } }),
+    },
+    '/projects/{projectId}/schedule/tasks/import': { post: op('schedule', 'Import up to 500 tasks without overwriting existing tasks (PM only)', { roles: 'PM', body: { type: 'object', required: ['tasks'], properties: { tasks: arr({ type: 'object', required: ['taskId', 'name', 'estimateMinutes', 'start', 'end'], properties: { taskId: str, requirementId: str, name: str, estimateMinutes: { type: 'integer', minimum: 1 }, start: str, end: str, assigneeIds: arr(str), dependencies: arr(str) } }) } } }) },
+    '/projects/{projectId}/schedule/tasks/{taskId}': {
+      patch: op('schedule', 'Update a schedule task', { params: [param('taskId', 'RET-T01')], body: { type: 'object', properties: { name: str, estimateMinutes: { type: 'integer' }, status: { type: 'string', enum: ['not-started', 'in-progress', 'review', 'done'] }, progress: { type: 'number', minimum: 0, maximum: 100 }, assigneeIds: arr(str), start: str, end: str, dependencies: arr(str) } } }),
+      delete: op('schedule', 'Delete a schedule task', { roles: 'PM', params: [param('taskId', 'RET-T01')] }),
+    },
+    '/projects/{projectId}/schedule/settings': {
+      get: op('schedule', 'Read sprint and working-calendar settings'),
+      put: op('schedule', 'Update sprint and working-calendar settings', { roles: 'PM', body: { type: 'object', required: ['workdays', 'hoursPerDay', 'sprintDays'], properties: { workdays: arr({ type: 'integer', minimum: 0, maximum: 6 }), hoursPerDay: { type: 'number', minimum: 1, maximum: 24 }, startHour: { type: 'integer', minimum: 0, maximum: 23 }, sprintDays: { type: 'integer', minimum: 1, maximum: 60 }, projectStart: str, firstSprintNumber: { type: 'integer', minimum: 1 } } } }),
+    },
+    '/projects/{projectId}/schedule/plan/preview': { post: op('schedule', 'Preview task-level sprint assignments and dates') },
+    '/projects/{projectId}/schedule/plan/apply': { post: op('schedule', 'Apply the sprint plan and save a pre-change version', { roles: 'PM' }) },
+    '/projects/{projectId}/schedule/leaves/preview': { post: op('schedule', 'Preview leave impact and same-role task backups', { body: { type: 'object', required: ['memberId', 'leaveDate', 'leaveType'], properties: { memberId: str, leaveDate: str, leaveType: { type: 'string', enum: ['full-day', 'half-day', 'custom'] }, customHours: { type: 'number', minimum: 0.5, maximum: 24 } } } }) },
+    '/projects/{projectId}/schedule/leaves': {
+      get: op('schedule', 'List scheduled leave entries'),
+      post: op('schedule', 'Apply leave impact to unfinished tasks', { roles: 'PM', body: { type: 'object', required: ['memberId', 'leaveDate', 'leaveType'], properties: { memberId: str, leaveDate: str, leaveType: { type: 'string', enum: ['full-day', 'half-day', 'custom'] }, customHours: { type: 'number', minimum: 0.5, maximum: 24 } } } }),
+    },
+    '/projects/{projectId}/schedule/versions': {
+      get: op('schedule', 'List saved schedule versions'),
+      post: op('schedule', 'Save a schedule version', { roles: 'PM', body: { type: 'object', properties: { label: { type: 'string', maxLength: 120 } } } }),
+    },
+    '/projects/{projectId}/schedule/versions/{versionId}': { get: op('schedule', 'View a saved schedule snapshot', { params: [param('versionId', '66a123456789012345678901')] }) },
+
     '/projects/{projectId}/live-state': { get: op('integration', 'Current requirements with status, role, granularity', { description: INTEGRATION_NOTE }) },
     '/projects/{projectId}/network': {
       get: op('integration', 'Requirements network: nodes, computed links and clusters', {

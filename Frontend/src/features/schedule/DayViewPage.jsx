@@ -18,6 +18,7 @@ import { useSchedulePhases } from "../../hooks/useSchedulePhases";
 import { useResourceCapacity } from "../../hooks/useResourceCapacity";
 import { useScheduleView } from "../../hooks/useScheduleView";
 import { getTeamMemberById } from "../../data/mockTeam";
+import { useWorkCalendar } from "./context/WorkCalendarContext";
 import {
   flattenTasks,
   isTaskActiveOn,
@@ -39,6 +40,7 @@ function initialsFor(name) {
 export function DayViewPage() {
   const { activeProject, activeProjectId } = useScheduleView();
   const { data: phases, loading } = useSchedulePhases(activeProjectId);
+  const { settings: workCalendar } = useWorkCalendar();
   const { data: capacity } = useResourceCapacity(activeProjectId);
   const [viewDate, setViewDate] = useState(() => new Date(activeProject?.activeSprint?.startDate ?? TODAY));
   const [selectedTask, setSelectedTask] = useState(null);
@@ -70,7 +72,7 @@ export function DayViewPage() {
 
   const dayTasks = useMemo(
     () => flattenTasks(phases).filter((t) => isTaskActiveOn(t, viewDate)),
-    [phases, viewDate]
+    [phases, viewDate, workCalendar]
   );
   const delayedTasks = dayTasks.filter(isAtRisk);
   const peopleCount = new Set(dayTasks.flatMap(taskAssigneeIds)).size;

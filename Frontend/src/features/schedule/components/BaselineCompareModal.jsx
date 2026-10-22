@@ -2,9 +2,10 @@ import { useMemo, useState } from "react";
 import { CalendarClock, Diamond, X, ZoomIn, ZoomOut } from "lucide-react";
 import { createPortal } from "react-dom";
 import { getTeamMemberById } from "../../../data/mockTeam";
-import { formatShortDate, daysBetween } from "../lib/scheduleUtils";
+import { formatShortDate, daysBetween, addDays } from "../lib/scheduleUtils";
 import { Avatar, AvatarFallback } from "../../../components/ui/avatar";
 import { GanttChart } from "./GanttChart";
+import { useWorkCalendar } from "../context/WorkCalendarContext";
 
 function initialsFor(name) {
   return name.split(" ").map((p) => p[0]).join("").toUpperCase();
@@ -119,7 +120,8 @@ const ZOOM_STEP = 2;
 
 export function BaselineCompareModal({ open, onOpenChange, tasks = [], label = "", showGantt = true }) {
   const [activeTab, setActiveTab] = useState("timeline");
-  const [pxPerDay, setPxPerDay] = useState(10);
+  const [pxPerDay, setPxPerDay] = useState(MAX_PX_PER_DAY);
+  const { settings } = useWorkCalendar();
 
   // Group scoped tasks by phase
   const phases = useMemo(() => {
@@ -133,28 +135,49 @@ export function BaselineCompareModal({ open, onOpenChange, tasks = [], label = "
     return [...map.values()];
   }, [tasks]);
 
-  const plannedPhases = useMemo(
-    () => phases.map((phase) => ({
-      ...phase,
-      tasks: phase.tasks.map((task) => ({
-        ...task,
-        start: task.baselineStart,
-        end: task.baselineEnd,
-      })),
-    })),
-    [phases]
-  );
+  const plannedPhases = useMemo(() => {
+    if (!tasks.length) return [];
+    const sprintDays = Math.max(1, Number(settings.sprintDays) || 10);
+    const firstDate = new Date(Math.min(...tasks.map((task) => new Date(task.baselineStart).getTime())));
+    firstDate.setHours(9, 0, 0, 0);
+    const numberedSprints = tasks.map((task) => task.sprintNumber).filter(Number.isInteger);
+    const firstSprintNumber = numberedSprints.length ? Math.min(...numberedSprints) : 1;
+    const groups = new Map();
+
+    tasks.forEach((task) => {
+      const inferredNumber = Math.floor((new Date(task.baselineStart) - firstDate) / (sprintDays * 86400000)) + firstSprintNumber;
+      const sprintNumber = Number.isInteger(task.sprintNumber) ? task.sprintNumber : inferredNumber;
+      if (!groups.has(sprintNumber)) groups.set(sprintNumber, []);
+      groups.get(sprintNumber).push({ ...task, start: task.baselineStart, end: task.baselineEnd });
+    });
+
+    return [...groups.entries()].sort(([a], [b]) => a - b).map(([sprintNumber, sprintTasks]) => {
+      const start = addDays(firstDate, (sprintNumber - firstSprintNumber) * sprintDays);
+      const end = addDays(start, sprintDays - 1);
+      end.setHours(18, 0, 0, 0);
+      return {
+        id: `original-sprint-${sprintNumber}`,
+        name: `Sprint ${sprintNumber} · ${sprintDays} days`,
+        start: start.toISOString(),
+        end: end.toISOString(),
+        tasks: sprintTasks,
+      };
+    });
+  }, [tasks, settings.sprintDays]);
 
   // Range from baseline dates only
   const { rangeStart, rangeEnd } = useMemo(() => {
     if (tasks.length === 0) return { rangeStart: new Date(), rangeEnd: new Date() };
-    const dates = tasks.flatMap((t) => [new Date(t.baselineStart), new Date(t.baselineEnd)]);
+    const dates = [
+      ...tasks.flatMap((t) => [new Date(t.baselineStart), new Date(t.baselineEnd)]),
+      ...plannedPhases.flatMap((phase) => [new Date(phase.start), new Date(phase.end)]),
+    ];
     const min = new Date(Math.min(...dates));
     const max = new Date(Math.max(...dates));
     min.setDate(min.getDate() - 1);
     max.setDate(max.getDate() + 1);
     return { rangeStart: min, rangeEnd: max };
-  }, [tasks]);
+  }, [tasks, plannedPhases]);
 
   if (!open) return null;
 

@@ -17,7 +17,13 @@ const ScheduleHistoryContext = createContext(null);
 // now-reverted data, without every drag remounting the whole route.
 export function ScheduleHistoryProvider({ children }) {
   const [stack, setStack] = useState([]);
-  const [versions, setVersions] = useState([]);
+  const [versions, setVersions] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("schedule-versions-v1") ?? "[]");
+    } catch {
+      return [];
+    }
+  });
   const [refreshToken, setRefreshToken] = useState(0);
 
   const pushHistory = useCallback((label, restore) => {
@@ -34,9 +40,37 @@ export function ScheduleHistoryProvider({ children }) {
     });
   }, []);
 
-  const saveVersion = useCallback((label, tasks) => {
-    const snapshot = tasks.map((task) => ({ id: task.id, start: task.start, end: task.end, assigneeId: task.assigneeId, assigneeIds: task.assigneeIds, status: task.status }));
-    setVersions((prev) => [{ id: `schedule-v${prev.length + 1}`, label, createdAt: new Date().toISOString(), taskCount: snapshot.length, snapshot }, ...prev].slice(0, 10));
+  const saveVersion = useCallback((label, tasks, projectId) => {
+    const snapshot = tasks.map((task) => ({
+      id: task.id,
+      name: task.name,
+      start: task.start,
+      end: task.end,
+      baselineStart: task.baselineStart,
+      baselineEnd: task.baselineEnd,
+      assigneeId: task.assigneeId,
+      assigneeIds: task.assigneeIds,
+      status: task.status,
+      progress: task.progress,
+      durationMinutes: task.durationMinutes,
+      plannedSprintNumber: task.plannedSprintNumber,
+      critical: task.critical,
+    }));
+    const inferredProjectId = projectId ?? tasks[0]?.projectId ?? (tasks[0]?.id?.includes("-mp-") ? "proj-meridianpay" : "proj-novacart");
+    const version = {
+      id: `schedule-${Date.now()}`,
+      projectId: inferredProjectId,
+      label,
+      createdAt: new Date().toISOString(),
+      taskCount: snapshot.length,
+      snapshot,
+    };
+    setVersions((prev) => {
+      const next = [version, ...prev].slice(0, 50);
+      try { localStorage.setItem("schedule-versions-v1", JSON.stringify(next)); } catch { /* storage may be unavailable */ }
+      return next;
+    });
+    return version;
   }, []);
 
   const value = useMemo(
