@@ -6,6 +6,7 @@ import { RequirementsTable } from "./components/RequirementsTable";
 import { SignalFeed } from "./components/SignalFeed";
 import { CandidatesPanel } from "./components/CandidatesPanel";
 import { RequirementDetailPanel } from "./components/RequirementDetailPanel";
+import { DetectRequirementsDialog } from "./components/DetectRequirementsDialog";
 import { useRequirements } from "../../hooks/useRequirements";
 import { useSignals } from "../../hooks/useSignals";
 import { useCandidates } from "../../hooks/useCandidates";
@@ -20,6 +21,22 @@ export function RequirementsPage() {
   const { data: signals, loading: sigLoading, error: sigError, reload: reloadSignals } = useSignals(activeProjectId, { includeSuppressed: true });
   const { data: candidates, loading: candLoading, error: candError, reload: reloadCandidates } = useCandidates(activeProjectId);
   const [toast, setToast] = useState(null);
+  const isPM = role === ROLES.PM;
+  // ?import=1 (for example right after creating a project) opens the SRS import dialog; the parameter is removed again on close.
+  const [importOpen, setImportOpen] = useState(searchParams.get("import") === "1" && isPM);
+  useEffect(() => {
+    if (searchParams.get("import") === "1" && isPM) setImportOpen(true);
+  }, [searchParams, isPM]);
+  const changeImportOpen = useCallback((next) => {
+    setImportOpen(next);
+    if (!next) {
+      setSearchParams((prev) => {
+        const n = new URLSearchParams(prev);
+        n.delete("import");
+        return n;
+      });
+    }
+  }, [setSearchParams]);
 
   useEffect(() => {
     if (!toast) return;
@@ -27,10 +44,10 @@ export function RequirementsPage() {
     return () => clearTimeout(timer);
   }, [toast]);
 
-  // New requirements change the computed clusters of the others, so reload the whole list from the API.
-  const handleRequirementsCreated = useCallback(({ requirements: created, fileName }) => {
+  // The import builds the network and its clusters on the server, so reload the whole list from the API.
+  const handleImported = useCallback((res) => {
     reloadRequirements();
-    setToast(`${created.length} requirement${created.length === 1 ? "" : "s"} added from ${fileName}.`);
+    setToast(`${res.created} requirement${res.created === 1 ? "" : "s"} imported.`);
   }, [reloadRequirements]);
 
   // A submitted or reviewed signal can change requirement statuses (and the ledger, which reloads when opened).
@@ -126,8 +143,8 @@ export function RequirementsPage() {
             onRetry={reloadRequirements}
             onSelectRequirement={selectRequirement}
             projectId={activeProjectId}
-            isPM={role === ROLES.PM}
-            onRequirementsCreated={handleRequirementsCreated}
+            isPM={isPM}
+            onOpenImport={() => changeImportOpen(true)}
           />
         </TabsContent>
 
@@ -162,6 +179,16 @@ export function RequirementsPage() {
           />
         </TabsContent>
       </Tabs>
+
+      {isPM && (
+        <DetectRequirementsDialog
+          projectId={activeProjectId}
+          existingCount={requirements.length}
+          open={importOpen}
+          onOpenChange={changeImportOpen}
+          onImported={handleImported}
+        />
+      )}
 
       <RequirementDetailPanel
         requirementId={activeReqId}

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Loader2 } from "lucide-react";
+import { CheckCircle2, FileUp, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
 import {
@@ -16,6 +16,7 @@ import { Input } from "../../../components/ui/input";
 import { Textarea } from "../../../components/ui/textarea";
 import { Label } from "../../../components/ui/label";
 import { useProject } from "../../../context/ProjectContext";
+import { SrsTemplateLink } from "../../requirements/components/SrsTemplateLink";
 
 const EMPTY_FORM = { name: "", description: "" };
 
@@ -26,6 +27,7 @@ export function CreateProjectDialog() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [createdId, setCreatedId] = useState(null); // set after creating: offers the SRS import
 
   const set = (key) => (e) => setForm((prev) => ({ ...prev, [key]: e.target.value }));
 
@@ -37,8 +39,8 @@ export function CreateProjectDialog() {
     try {
       const created = await addProject(form);
       setForm(EMPTY_FORM);
-      setOpen(false);
-      if (created) navigate(`/projects/${created.id}`);
+      if (created) setCreatedId(created.id);
+      else setOpen(false);
     } catch (err) {
       setError(err.message || "Could not create the project.");
     } finally {
@@ -46,8 +48,18 @@ export function CreateProjectDialog() {
     }
   };
 
+  const close = (next) => {
+    setOpen(next);
+    if (!next) setCreatedId(null);
+  };
+  const goTo = (suffix) => {
+    const id = createdId;
+    close(false);
+    navigate(`/projects/${id}${suffix}`);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={close}>
       <DialogTrigger asChild>
         <Button>
           <Plus className="h-4 w-4" />
@@ -55,6 +67,25 @@ export function CreateProjectDialog() {
         </Button>
       </DialogTrigger>
       <DialogContent>
+        {createdId ? (
+          <>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2"><CheckCircle2 className="h-5 w-5 text-status-confirmed-fg" />Project created</DialogTitle>
+              <DialogDescription>
+                Next, give it its first requirements. Import them from an SRS document: a filled-in template is read exactly, and the requirement network and the Initial baseline are built right after.
+              </DialogDescription>
+            </DialogHeader>
+            <SrsTemplateLink>Download the SRS template</SrsTemplateLink>
+            <div className="flex flex-wrap justify-end gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={() => goTo("")}>Open the project</Button>
+              <Button type="button" onClick={() => goTo("/requirements/list?import=1")}>
+                <FileUp className="h-4 w-4" />
+                Import requirements from an SRS
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
         <DialogHeader>
           <DialogTitle>Create a new project</DialogTitle>
           <DialogDescription>
@@ -86,6 +117,10 @@ export function CreateProjectDialog() {
           <p className="text-xs text-muted-foreground">
             Start date and initial members are not stored yet. Add people from the project's Team page after creating it.
           </p>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+            Start from our SRS template to write the requirements:
+            <SrsTemplateLink />
+          </div>
 
           {error && (
             <p role="alert" className="rounded-lg border border-status-dropped-fg/30 bg-status-dropped-bg px-3 py-2 text-sm text-status-dropped-fg">
@@ -105,6 +140,8 @@ export function CreateProjectDialog() {
             </Button>
           </div>
         </form>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -41,21 +41,18 @@ export async function fetchResourceRoles(projectId) {
   return [...new Set(reqs.map((r) => r.resourceRole).filter(Boolean))].sort();
 }
 
-// PM-only: DetectRequirementsDialog's confirm step. One POST /requirements per approved item (sequentially, so the
-// network recomputation on the server never overlaps). The backend writes the "Requirement Created" and
-// network-update ledger entries itself. The detected `cluster` is NOT sent: the backend would store it as the
-// CSV group_id, and clusters are computed from the texts instead.
-export async function createRequirementsFromSRS({ projectId, items }) {
-  const created = [];
-  for (const item of items) {
-    const body = {
-      title: item.title,
-      description: item.description,
-      type: item.category === "Non-Functional" ? "NFR" : "FR",
-      granularity: "Sprint Commitment",
-    };
-    if (item.resourceRole && item.resourceRole !== "Unassigned") body.resourceRole = item.resourceRole;
-    created.push(await api(`/projects/${encodeURIComponent(projectId)}/requirements`, { method: "POST", body }));
-  }
-  return created;
+// ---- SRS import (PM only). The preview saves nothing; the confirm creates the requirements, builds the network and the Initial baseline.
+// previewSrs -> { documentName, documentId, method: "template" | "heuristic", methodNote, warnings, existingRequirements, duplicates,
+//   candidates: [{ sourceId, title, description, type: "FR" | "NFR", featureArea, priority, verification, confidence: null | "medium" | "low",
+//                  warnings, placeholders, duplicateOf, selected }] }
+export async function previewSrs(projectId, file) {
+  const form = new FormData();
+  form.append("file", file, file.name);
+  return api(`/projects/${encodeURIComponent(projectId)}/requirements/import-srs/preview`, { method: "POST", body: form });
+}
+
+// body: { documentId, documentName, items: [{ sourceId, title, description, type, featureArea, priority }], force? }
+// -> { created, skipped, failed, ids, firstError, skippedItems, network: { updated, links, clusters } | { updated: false, message }, baselineCreated, alreadyImported? }
+export async function confirmSrsImport(projectId, body) {
+  return api(`/projects/${encodeURIComponent(projectId)}/requirements/import-srs/confirm`, { method: "POST", body });
 }

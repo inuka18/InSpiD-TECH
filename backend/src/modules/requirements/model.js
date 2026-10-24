@@ -24,6 +24,7 @@ const requirementSchema = new mongoose.Schema(
     embeddingTextHash: { type: String, default: null }, // sha1 of the text the embedding was computed from
     signalProfile: { type: signalProfileSchema, select: false, default: undefined }, // hidden like the embedding; null until a signal is applied
     granularity: { type: String, enum: GRANULARITIES },
+    sourceDocument: { type: new mongoose.Schema({ name: String, sourceId: String }, { _id: false }), default: undefined }, // set when imported from an SRS: { name, sourceId }
     priority: { type: String, enum: ['High', 'Medium', 'Low'] }, // optional; set when a requirement candidate is approved
     initialStatus: { type: String, enum: STATUSES, default: 'Confirmed' },
     finalStatus: { type: String, enum: STATUSES }, // from the CSV, kept for evaluating the status engine

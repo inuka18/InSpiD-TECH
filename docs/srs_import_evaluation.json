@@ -1,0 +1,496 @@
+{
+  "generatedAt": "2026-10-22T14:26:44.751Z",
+  "database": "inspid_test",
+  "imports": [
+    {
+      "file": "SRS_Online_Retail_Platform_Sample.docx",
+      "method": "template",
+      "previewCandidates": 31,
+      "selectedByDefault": 31,
+      "fr": 24,
+      "nfr": 7,
+      "placeholders": 0,
+      "warnings": [],
+      "imported": 31,
+      "created": 31,
+      "failed": 0,
+      "skipped": 0,
+      "firstError": null,
+      "ids": [
+        "SRS1-R01",
+        "SRS1-R31"
+      ],
+      "network": {
+        "updated": true,
+        "requirements": 31,
+        "links": 30,
+        "clusters": 6
+      },
+      "baselineCreated": true,
+      "ledger": {
+        "REQUIREMENT_CREATED": 31,
+        "NETWORK_UPDATE": 1,
+        "BASELINE_CREATED": 1
+      },
+      "nodes": 31,
+      "links": 30,
+      "timings": {
+        "previewMs": 201,
+        "confirmMs": 2765,
+        "getNetworkMs": 31
+      },
+      "clusters": [
+        {
+          "cluster": "cluster-3 Cluster 3 (product, filters)",
+          "size": 4,
+          "sample": [
+            "Product search with filters",
+            "Home page recommendations",
+            "Product reviews and ratings",
+            "Product image upload and moderation"
+          ]
+        },
+        {
+          "cluster": "cluster-2 Cluster 2 (account, cards)",
+          "size": 5,
+          "sample": [
+            "Cart persistence across devices",
+            "Social account sign-in",
+            "Wishlist",
+            "Gift cards"
+          ]
+        },
+        {
+          "cluster": "cluster-4 Cluster 4 (payments, calculation)",
+          "size": 4,
+          "sample": [
+            "Card and wallet payments",
+            "Multi-currency pricing",
+            "Regional tax calculation",
+            "PCI-DSS compliant payments"
+          ]
+        },
+        {
+          "cluster": "cluster-1 Cluster 1 (order, seller)",
+          "size": 12,
+          "sample": [
+            "Order tracking page",
+            "Seller stock dashboard",
+            "Discount codes and promotions",
+            "Delivery slot selection"
+          ]
+        },
+        {
+          "cluster": "cluster-5 Cluster 5 (time, load)",
+          "size": 3,
+          "sample": [
+            "Returns and refunds",
+            "Search response time",
+            "Mobile page load time"
+          ]
+        },
+        {
+          "cluster": "cluster-6 Cluster 6 (storefront, accessibility)",
+          "size": 3,
+          "sample": [
+            "Multi-language storefront",
+            "Sale-event availability",
+            "Storefront accessibility"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "SRS_Hospital_Management_System_Sample.docx",
+      "method": "template",
+      "previewCandidates": 26,
+      "selectedByDefault": 26,
+      "fr": 20,
+      "nfr": 6,
+      "placeholders": 0,
+      "warnings": [],
+      "imported": 26,
+      "created": 26,
+      "failed": 0,
+      "skipped": 0,
+      "firstError": null,
+      "ids": [
+        "SRS2-R01",
+        "SRS2-R26"
+      ],
+      "network": {
+        "updated": true,
+        "requirements": 26,
+        "links": 25,
+        "clusters": 5
+      },
+      "baselineCreated": true,
+      "ledger": {
+        "REQUIREMENT_CREATED": 26,
+        "NETWORK_UPDATE": 1,
+        "BASELINE_CREATED": 1
+      },
+      "nodes": 26,
+      "links": 25,
+      "timings": {
+        "previewMs": 106,
+        "confirmMs": 1203,
+        "getNetworkMs": 30
+      },
+      "clusters": [
+        {
+          "cluster": "cluster-1 Cluster 1 (patient, appointment)",
+          "size": 14,
+          "sample": [
+            "Online appointment booking",
+            "Electronic patient record view",
+            "Lab results in patient portal",
+            "Prescription issuing"
+          ]
+        },
+        {
+          "cluster": "cluster-2 Cluster 2 (doctor, handover)",
+          "size": 5,
+          "sample": [
+            "Doctor schedule management",
+            "Shift handover notes",
+            "Theatre scheduling",
+            "Staff roster and leave"
+          ]
+        },
+        {
+          "cluster": "cluster-3 Cluster 3 (audit, bed)",
+          "size": 4,
+          "sample": [
+            "Billing and insurance claims",
+            "Bed management",
+            "Discharge summary generation",
+            "Record access audit log"
+          ]
+        },
+        {
+          "cluster": "cluster-4 Cluster 4 (availability, backup)",
+          "size": 2,
+          "sample": [
+            "System availability",
+            "Backup and disaster recovery"
+          ]
+        },
+        {
+          "cluster": "cluster-5 Cluster 5 (fhir, hl7)",
+          "size": 1,
+          "sample": [
+            "HL7 and FHIR integration"
+          ]
+        }
+      ]
+    }
+  ],
+  "cctnsFullImport": {
+    "imported": 115,
+    "created": 115,
+    "failed": 0,
+    "firstError": null,
+    "network": {
+      "updated": true,
+      "requirements": 115,
+      "links": 114,
+      "clusters": 8
+    },
+    "baselineCreated": true,
+    "nodes": 115,
+    "links": 114,
+    "timings": {
+      "confirmMs": 7298,
+      "getNetworkMs": 70
+    },
+    "clusters": [
+      {
+        "cluster": "cluster-3 Cluster 3 (solution, should)",
+        "size": 10,
+        "featureAreas": {
+          "Help Module": 2,
+          "Support Module": 5,
+          "Ease of Use": 1,
+          "Usability": 2
+        },
+        "sample": [
+          "The solution should provide detailed context-sensitive help material",
+          "The help should be accessible to the users",
+          "The solution should provide an interface"
+        ]
+      },
+      {
+        "cluster": "cluster-1 Cluster 1 (system, must)",
+        "size": 65,
+        "featureAreas": {
+          "Audit Module": 8,
+          "System Functionality": 22,
+          "Access Module": 10,
+          "Ease of Use": 8,
+          "Usability": 12,
+          "Performance and Scalability": 5
+        },
+        "sample": [
+          "An audit trail is a record of actions",
+          "Once the audit trail functionality has been activated",
+          "The System must maintain the audit trail"
+        ]
+      },
+      {
+        "cluster": "cluster-8 Cluster 8 (windows, opening)",
+        "size": 3,
+        "featureAreas": {
+          "System Functionality": 1,
+          "Usability": 2
+        },
+        "sample": [
+          "The system should run on multiple browsers",
+          "Avoiding opening unnecessary windows",
+          "Marking links opening new windows"
+        ]
+      },
+      {
+        "cluster": "cluster-2 Cluster 2 (text, providing)",
+        "size": 11,
+        "featureAreas": {
+          "Usability": 11
+        },
+        "sample": [
+          "Providing text equivalents for non-text media objects",
+          "Using appropriate formats, units of measurement or currency",
+          "Making text resizable by the user"
+        ]
+      },
+      {
+        "cluster": "cluster-4 Cluster 4 (navigation, links)",
+        "size": 8,
+        "featureAreas": {
+          "Usability": 8
+        },
+        "sample": [
+          "Making navigation self-descriptive",
+          "Showing users where they are",
+          "Offering alternative access paths"
+        ]
+      },
+      {
+        "cluster": "cluster-7 Cluster 7 (acceptable, avoided)",
+        "size": 4,
+        "featureAreas": {
+          "Usability": 4
+        },
+        "sample": [
+          "Minimizing navigation effort",
+          "Splash screens should be avoided unless they provide",
+          "Acceptable opening / download times"
+        ]
+      },
+      {
+        "cluster": "cluster-5 Cluster 5 (components, consistently)",
+        "size": 8,
+        "featureAreas": {
+          "Usability": 8
+        },
+        "sample": [
+          "Vertical scrolling should be minimized. This may be",
+          "Distinguishable within-page links",
+          "Avoiding link overload"
+        ]
+      },
+      {
+        "cluster": "cluster-6 Cluster 6 (downtime, system)",
+        "size": 6,
+        "featureAreas": {
+          "System Availability": 5,
+          "System Functionality": 1
+        },
+        "sample": [
+          "The System must be available to users",
+          "The planned downtime for the System must not",
+          "Unplanned downtime for the System must not exceed"
+        ]
+      }
+    ]
+  },
+  "heuristic": {
+    "SRS_Online_Retail_Platform_Sample.docx": {
+      "known": 31,
+      "found": 32,
+      "matched": 31,
+      "recall": 1,
+      "precision": 0.96875,
+      "wronglyKept": [
+        {
+          "text": "The system is accepted when every Must requirement has passed its verification, no critical defects remain ope",
+          "confidence": "medium"
+        }
+      ],
+      "missed": [],
+      "medium": 32,
+      "low": 0,
+      "typeCorrect": 31
+    },
+    "SRS_Hospital_Management_System_Sample.docx": {
+      "known": 26,
+      "found": 27,
+      "matched": 26,
+      "recall": 1,
+      "precision": 0.9629629629629629,
+      "wronglyKept": [
+        {
+          "text": "The system is accepted when every Must requirement has passed its verification, no critical defects remain ope",
+          "confidence": "medium"
+        }
+      ],
+      "missed": [],
+      "medium": 27,
+      "low": 0,
+      "typeCorrect": 26
+    },
+    "cctns": {
+      "rows": [
+        {
+          "section": "Help Module",
+          "expected": 2,
+          "found": 2,
+          "correct": 2,
+          "wronglyKept": 0,
+          "missed": 0,
+          "missingNumbers": [],
+          "medium": 2,
+          "low": 0,
+          "placeholders": 0
+        },
+        {
+          "section": "Support Module",
+          "expected": 5,
+          "found": 5,
+          "correct": 5,
+          "wronglyKept": 0,
+          "missed": 0,
+          "missingNumbers": [],
+          "medium": 5,
+          "low": 0,
+          "placeholders": 0
+        },
+        {
+          "section": "Audit Module",
+          "expected": 8,
+          "found": 8,
+          "correct": 8,
+          "wronglyKept": 0,
+          "missed": 0,
+          "missingNumbers": [],
+          "medium": 8,
+          "low": 0,
+          "placeholders": 0
+        },
+        {
+          "section": "Access Module",
+          "expected": 10,
+          "found": 10,
+          "correct": 10,
+          "wronglyKept": 0,
+          "missed": 0,
+          "missingNumbers": [],
+          "medium": 10,
+          "low": 0,
+          "placeholders": 0
+        },
+        {
+          "section": "Ease of Use",
+          "expected": 9,
+          "found": 9,
+          "correct": 9,
+          "wronglyKept": 0,
+          "missed": 0,
+          "missingNumbers": [],
+          "medium": 9,
+          "low": 0,
+          "placeholders": 0
+        },
+        {
+          "section": "Usability",
+          "expected": 47,
+          "found": 47,
+          "correct": 47,
+          "wronglyKept": 0,
+          "missed": 0,
+          "missingNumbers": [],
+          "medium": 46,
+          "low": 1,
+          "placeholders": 0
+        },
+        {
+          "section": "System Availability",
+          "expected": 5,
+          "found": 5,
+          "correct": 5,
+          "wronglyKept": 0,
+          "missed": 0,
+          "missingNumbers": [],
+          "medium": 5,
+          "low": 0,
+          "placeholders": 5
+        },
+        {
+          "section": "Performance and Scalability",
+          "expected": 5,
+          "found": 5,
+          "correct": 5,
+          "wronglyKept": 0,
+          "missed": 0,
+          "missingNumbers": [],
+          "medium": 5,
+          "low": 0,
+          "placeholders": 0
+        },
+        {
+          "section": "System Functionality",
+          "expected": 24,
+          "found": 24,
+          "correct": 24,
+          "wronglyKept": 0,
+          "missed": 0,
+          "missingNumbers": [],
+          "medium": 24,
+          "low": 0,
+          "placeholders": 0
+        }
+      ],
+      "expectedTotal": 115,
+      "foundTotal": 118,
+      "correct": 115,
+      "recall": 1,
+      "precision": 0.9745762711864406,
+      "extras": [
+        {
+          "section": "DESCRIPTION OF THE MODULES AND FUNCTIONAL REQUIREMENTS",
+          "confidence": "medium",
+          "text": "Registration Citizens can register their complaints with police and then based on the evidence, facts and following inve"
+        },
+        {
+          "section": "FUNCTIONAL ARCHITECTURE RECOMMENDATIONS",
+          "confidence": "low",
+          "text": "CCTNS Functional Architecture Overview The deployment of the application will be at state level and will be configured a"
+        },
+        {
+          "section": "FUNCTIONAL ARCHITECTURE RECOMMENDATIONS",
+          "confidence": "low",
+          "text": "The systems should be designed with the following broad guidelines:"
+        }
+      ],
+      "typeCounts": {
+        "FR": 17,
+        "NFR": 101
+      }
+    }
+  },
+  "cctnsDefaultSelection": {
+    "candidates": 118,
+    "selected": 1,
+    "placeholders": 5,
+    "low": 3
+  }
+}

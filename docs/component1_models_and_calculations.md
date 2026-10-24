@@ -20,7 +20,8 @@ Every formula and number below comes from the code (file names are given so you 
 14. [Ledger hash chain](#14-ledger-hash-chain)
 15. [Results in plain words](#15-results-in-plain-words)
 16. [All the numbers in one table](#16-all-the-numbers-in-one-table)
-17. [Honest limits](#17-honest-limits)
+17. [SRS import: how requirements are found in a document](#17-srs-import-how-requirements-are-found-in-a-document)
+18. [Honest limits](#18-honest-limits)
 
 ---
 
@@ -71,6 +72,7 @@ Computers cannot read words, so the system turns each message into **numbers** i
 | `robustness_test.csv` | 100 hand-written harder messages (50 `dev`, 50 `test`) | Checks the model on wording it never saw; **never trained on** |
 | `new_requirement_test.csv` | dev and test rows | Evaluates new-requirement detection |
 | `scenario_related_pairs.csv` | answer key of related requirement pairs | Used **only** to evaluate the network, never to build it |
+| `docs/samples/srs/` (two template SRS files, plus the public CCTNS PDF) | 31 + 26 known requirements, and 115 expected in CCTNS | Test the SRS import (section 17); no training |
 | `jira_cleaned.csv` | 18,683 public Jira texts | Weakly labelled; tested and found to hurt, so **not used for training** |
 
 Scenario split: **train 1,526, val 338, test 434** rows. Rows also carry a `batch` (A or B); batch A is the set used for tuning and the headline score.
@@ -516,6 +518,8 @@ This is a **tamper-evident log**, not yet a real blockchain: entries are flagged
 | Model D (both) | 0.897 and 0.714 | Best overall balance, and the simplest model within tolerance of the best |
 | Auto-accept at confidence >= 90 (dev) | 94% right on 41% of messages | Close to, but under, the 95% target |
 | New-requirement detection (dev / test) | precision 100%, recall 81.3% / 62.5% | Never raised a false alarm in the test sets, but misses some new requirements |
+| SRS import, template files | found all 31 and all 26 requirements (100%), 1 extra row each | A file that follows the template is read almost perfectly |
+| SRS import, CCTNS PDF (rules only) | found 118 for 115 expected: 100% found, 97.5% correct | Good, but the rules were written while looking at this file, so not a fair test |
 | Network vs the answer key | modest agreement | Good as a visual aid; not a proof of ground-truth structure |
 
 All test sets are small (50 to 106 rows), so differences under about 0.03 macro F1 are noise.
@@ -552,10 +556,89 @@ All test sets are small (50 to 106 rows), so differences under about 0.03 macro 
 | Alignment bands | >= 80 strong, 60-79 moderate, < 60 significant | same |
 | History window | 90 days, Asia/Colombo | same |
 | Document limits | 2 MB file, 300 segments, 100 per bulk save | signals module |
+| SRS confirm limit | 300 requirements per import | `requirements/schema.js` |
+| SRS double-click protection | same document and items within 10 minutes return the first result | `srsImport.js` |
+| SRS title length | text before a colon (8 words or fewer), otherwise the first 8 words | `srsParser.js` |
+| SRS pre-selection | only `medium` confidence rows, and never rows with `<xx>` placeholders | `srsParser.js` |
 
 ---
 
-## 17. Honest limits
+## 17. SRS import: how requirements are found in a document
+
+> **In simple words:** When a PM uploads an SRS (the document that lists what the system must do), the system has to pull the individual requirements out of
+> pages of text. It does this in one of two ways. If the file follows our **template**, the requirements sit in a table and the system simply reads the table, so it is
+> almost always right. If the file is **free text** (a PDF, a Word file written in any style), the system uses **simple "looks like a requirement" rules**. These rules are
+> **not machine learning**, so the system shows its confidence and lets the PM tick what to keep. After the PM confirms, the requirements are created and the
+> network map is built once, using the same similarity maths as sections 11 and 13.
+
+```mermaid
+flowchart TD
+    F["Uploaded file"] --> Q{"A .docx with a table whose header has<br/>ID, Title, Requirement statement?"}
+    Q -->|yes| TM["TEMPLATE MODE<br/>read each table row exactly"]
+    Q -->|no| RM["RULE-BASED MODE<br/>find requirement-like text"]
+    TM --> OUT["Candidate rows"]
+    RM --> OUT
+    OUT --> PM["PM review: pre-selected = medium confidence"]
+    PM --> CF["Confirm: create requirements,<br/>one network recompute, Initial baseline"]
+```
+
+### 17.1 Template mode (exact reading)
+- The file must be a `.docx` with a table whose first row contains the words **ID**, **Title** and **Requirement statement** (any capital letters). Optional columns: *Feature area, Priority, Verification*.
+- **FR or NFR?** (functional or non-functional) The heading above the table decides: a heading with "Non-functional" gives NFR, with "Functional" gives FR. If neither is there, the id prefix decides (`FR-...` or `NFR-...`).
+- **Placeholders** such as a statement starting with `[` or `The system shall [` are the empty template lines, so they are skipped.
+- **Priority** uses MoSCoW: Must becomes High, Should becomes Medium, Could and Won't become Low.
+- **Feature area** is kept only in the `groupId` answer-key field. It is never used to build clusters, so the map is still computed from the text alone.
+
+### 17.2 Rule-based mode (simple rules, no training)
+It looks for three kinds of text:
+1. **Numbered lists under a section heading** (wrapped lines and bullet sub-lists stay with their item; page headers and footers are removed).
+2. **Numbered requirement lines** like `FR-012 The system shall ...`.
+3. **Sentences with *shall, must, should* or *will*** and a subject.
+
+Headings, introductions and "Note that..." explanations are ignored.
+
+**Deciding FR or NFR:** first the nearest heading ("non-functional" gives NFR, "functional requirements" gives FR). Only if no heading helps do keyword rules apply
+(for example *performance, availability, security, response time, percent, seconds, compliance*).
+
+**Making a title:** the short phrase before a colon if it is 8 words or fewer; otherwise the first 8 words.
+
+**Confidence (a simple 2-level label, not a probability):**
+
+| Case | Confidence |
+|---|---|
+| A list item under a heading, or a sentence with *shall* / *must* | **medium** |
+| A list item with no modal verb, or a free sentence with only *should* / *will* | **low** |
+
+- Only **medium** rows are ticked by default. **Low** rows are shown but left unticked.
+- Rows that still contain a template blank such as `<xx>` are flagged and left unticked, because a number is missing.
+
+### 17.3 After the PM confirms
+1. Each ticked row becomes a requirement through the normal create path (so ids, ledger entries and history are all as usual).
+2. **Duplicates** are skipped (same source id or same normalised text), unless the PM forces it.
+3. **One** network recompute runs for the whole batch: embeddings are made in a batch (MiniLM), Pathfinder keeps the strongest links, clusters are cut to
+   k = clamp(round(sqrt(n)), 3, 8). This is the same maths as section 11, and it writes **one** `NETWORK_UPDATE` ledger entry instead of one per requirement.
+4. The **Initial baseline** is created if there is none, which gives alignment score = 100 at the start (section 13).
+
+**Why one recompute and not one per requirement?** Rebuilding the map 31 or 115 times would be slow and would fill the ledger with noise. Doing it once is faster
+(7.2 seconds for 115 requirements) and keeps the history clean.
+
+### 17.4 How well did it work?
+| File | Mode | Expected | Found | Result |
+|---|---|---|---|---|
+| Online Retail sample | template | 31 | 32 | all 31 found, 1 extra row, FR/NFR correct 31/31 |
+| Hospital sample | template | 26 | 27 | all 26 found, 1 extra row, FR/NFR correct 26/26 |
+| CCTNS PDF (public government document) | rule-based | 115 | 118 | all 115 found (recall 100%), 3 extra rows (precision 97.5%) |
+
+- The one extra row in each template sample is the sentence "The system is accepted when every Must requirement has passed its verification...", which looks like a requirement but is not.
+- The 3 extras in CCTNS are one introduction paragraph and two sentences outside the nine requirement sections.
+- Network built from the 115 CCTNS requirements: **114 links, 8 clusters**. The biggest cluster has 65 requirements (mixed topics), so that map looks crowded.
+
+**Important honesty note:** the rules were written while looking at the CCTNS text, so 115 out of 115 there is **not an independent test**. A document the rules have never seen
+will probably give lower scores. That is why the PM review table exists and why only `medium` rows are pre-ticked.
+
+---
+
+## 18. Honest limits
 
 > **In simple words:** No system is perfect. This list says clearly where ours can be wrong, so nobody trusts it more than it deserves.
 
@@ -567,3 +650,4 @@ All test sets are small (50 to 106 rows), so differences under about 0.03 macro 
 - Network constants are **a-priori**, not tuned, so they may not be optimal; on the scenario replay, signals made no clear difference to the network.
 - The ledger is a **hash chain placeholder**, not a blockchain.
 - Retraining is **manual** (export feedback, train, promote).
+- **SRS import** in rule-based mode is plain rules, not a model. It was developed while looking at the CCTNS document, so its 100% there is not an independent result, and a list of non-requirements under a list-introducing heading would be kept (the PM review catches it).

@@ -39,6 +39,8 @@ const requirement = {
     cluster: { type: 'string', nullable: true, description: 'COMPUTED cluster id (cluster-1, ...); null until the network has been computed. Never the CSV group_id.' },
     clusterLabel: { type: 'string', nullable: true, example: 'Cluster 2 (payments, wallet)' },
     type: { type: 'string', enum: ['FR', 'NFR'] },
+    priority: { type: 'string', nullable: true, enum: ['High', 'Medium', 'Low'], description: 'Optional. From the SRS priority on import (Must = High, Should = Medium, Could / Won\'t = Low) or set when a requirement candidate is approved' },
+    sourceDocument: { type: 'object', nullable: true, description: 'Set when imported from an SRS', properties: { name: str, sourceId: { type: 'string', nullable: true } } },
     relatedIds: { ...arr(str), description: 'Requirements linked to this one in the computed (Pathfinder) network' },
     statusHistory: arr({ type: 'object', properties: { status: statusEnum, timestamp: str, signal: str, signalId: str } }),
   },
@@ -183,6 +185,47 @@ module.exports = {
       post: op('requirements', 'Create a requirement', { roles: 'PM', body: { type: 'object', required: ['title'], properties: { title: str, description: str, type: str, cluster: str, granularity: granularityEnum, resourceRole: str } } }),
     },
     '/projects/{projectId}/requirements/clusters': { get: op('requirements', 'Distinct theme groups') },
+    '/projects/{projectId}/requirements/import-srs/preview': {
+      post: {
+        ...op('requirements', 'Read an SRS document and list the requirements it contains. Saves NOTHING.', {
+          roles: 'PM',
+          data: {
+            type: 'object',
+            properties: {
+              documentName: str, documentId: { type: 'string', description: 'sha256 of the file; send it back to /import-srs/confirm (it makes a double click harmless)' },
+              method: { type: 'string', enum: ['template', 'heuristic'], description: 'template = the requirement tables were read exactly; heuristic = RULE-BASED detection (simple keyword / numbering rules, NOT a trained model)' },
+              methodNote: str, warnings: arr(str), existingRequirements: { type: 'integer', description: 'How many requirements the project already has' },
+              duplicates: arr({ type: 'object', properties: { index: { type: 'integer' }, sourceId: str, requirementId: str } }),
+              candidates: arr({ type: 'object', properties: {
+                sourceId: str, title: str, description: str, type: { type: 'string', enum: ['FR', 'NFR'] }, featureArea: str, priority: { type: 'string', description: 'As written in the document (MoSCoW)' }, verification: str,
+                confidence: { type: 'string', nullable: true, enum: ['medium', 'low'], description: 'heuristic mode only' }, warnings: arr(str), placeholders: { type: 'boolean', description: 'contains template placeholders such as <xx>' },
+                duplicateOf: { type: 'string', nullable: true }, selected: { type: 'boolean', description: 'Suggested: template rows; heuristic rows only with medium confidence, no placeholders, not a duplicate' } } }),
+            },
+          },
+          description: 'multipart/form-data with the field "file": .docx, .md, .markdown, .txt or .pdf, 2 MB at most, processed in memory (content is never stored or logged). '
+            + 'TEMPLATE mode (.docx with a table whose header row has ID, Title and Requirement statement; also Feature area, Priority, Verification): rows under a heading containing "Non-functional" are NFR, under "Functional" FR, otherwise the ID prefix decides; placeholder rows ([...] or "The system shall [") are skipped. '
+            + 'HEURISTIC mode (everything else): numbered lists under section headings (wrapped lines and bullets stay with their item), numbered requirement lines, and sentences with shall / must / should / will plus a subject; FR/NFR from the nearest section heading first, keyword rules as a fallback; titles are the lead phrase before a colon (8 words or fewer) or the first 8 words; items with placeholders such as <xx> are flagged and not selected; "Note that" explanations are dropped. Max 300 candidates.',
+        }),
+        requestBody: { required: true, content: { 'multipart/form-data': { schema: { type: 'object', required: ['file'], properties: { file: { type: 'string', format: 'binary' } } } } } },
+      },
+    },
+    '/projects/{projectId}/requirements/import-srs/confirm': {
+      post: op('requirements', 'Create the chosen requirements, then build the network and the Initial baseline', {
+        roles: 'PM',
+        body: { type: 'object', required: ['documentId', 'documentName', 'items'], properties: {
+          documentId: { type: 'string', description: 'the documentId from the preview (sha256)' }, documentName: str, force: { type: 'boolean', description: 'also create items that duplicate existing requirements' },
+          items: { type: 'array', maxItems: 300, items: { type: 'object', required: ['title', 'type'], properties: { sourceId: str, title: str, description: str, type: { type: 'string', enum: ['FR', 'NFR'] }, featureArea: { type: 'string', description: 'stored ONLY as the existing groupId answer-key field; never used to form clusters' }, priority: { type: 'string', description: 'Must -> High, Should -> Medium, Could / Won\'t -> Low; empty = none' } } } },
+        } },
+        data: { type: 'object', properties: {
+          created: { type: 'integer' }, skipped: { type: 'integer' }, failed: { type: 'integer' }, ids: arr(str), skippedItems: arr({ type: 'object' }), firstError: { type: 'string', nullable: true },
+          network: { type: 'object', nullable: true, description: '{ updated, requirements, links, clusters } or { updated: false, message }' }, baselineCreated: { type: 'boolean' },
+          alreadyImported: { type: 'boolean', description: 'a repeat of the same import within 10 minutes (double click): the first result is returned and nothing is created' },
+        } },
+        description: 'Each requirement is created through the normal create path (status Confirmed, granularity Sprint Commitment, next free id of the project, one REQUIREMENT_CREATED ledger entry each, sourceDocument { name, sourceId }). '
+          + 'Duplicates of existing requirements (same source id or same normalised text) are skipped unless force is true. Then ONE network recompute (embeddings in batch, Pathfinder, clusters, a single NETWORK_UPDATE entry) runs and the Initial baseline is created when the project has none. '
+          + '502 and nothing saved when the AI service is down. If only the network step fails, the requirements stay saved and network.updated is false. One import runs at a time per project; the same documentId + items sent twice returns the first result.',
+      }),
+    },
     '/projects/{projectId}/requirements/{reqId}': {
       get: op('requirements', 'One requirement', { params: [param('reqId', 'RET-R01')], data: requirement }),
       patch: op('requirements', 'Edit title/description/cluster/granularity/resourceRole (not status)', { roles: 'PM', params: [param('reqId', 'RET-R01')], body: { type: 'object', properties: { title: str, description: str, cluster: str, granularity: granularityEnum, resourceRole: str } } }),

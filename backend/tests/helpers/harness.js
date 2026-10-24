@@ -27,6 +27,7 @@ async function start() {
   const { User } = require('../../src/modules/auth/model');
   const net = require('../../src/modules/network/model');
   require('../../src/modules/requirement-candidates/model');
+  require('../../src/modules/requirements/srsImport');
   await Promise.all([Project, Requirement, User, require('../../src/modules/ledger/model').LedgerEntry, net.Baseline, net.SignalEvidence, net.NetworkState].map((m) => m.init()));
 
   const server = await new Promise((resolve) => { const s = http.createServer(app).listen(0, () => resolve(s)); });
@@ -147,7 +148,7 @@ async function start() {
     aiClient.classify = original.classify;
     aiClient.match = original.match;
     aiClient.embed = original.embed;
-    const models = ['Signal', 'Feedback', 'Requirement', 'StatusHistory', 'LedgerEntry', 'RequirementLink', 'ManualLink', 'NetworkGroundTruth', 'SignalEvidence', 'Baseline', 'NetworkState', 'RequirementCandidate'].map((n) => mongoose.model(n));
+    const models = ['Signal', 'Feedback', 'Requirement', 'StatusHistory', 'LedgerEntry', 'RequirementLink', 'ManualLink', 'NetworkGroundTruth', 'SignalEvidence', 'Baseline', 'NetworkState', 'RequirementCandidate', 'SrsImport'].map((n) => mongoose.model(n));
     await Promise.all(models.map((m) => m.deleteMany({ projectId: { $in: [projectId, ...extraProjects] } })));
     await Promise.all([User.deleteMany({ _id: { $in: [pm.user._id, member.user._id, outsider.user._id] } }), Project.deleteMany({ projectId: { $in: [projectId, ...extraProjects] } })]);
     await new Promise((r) => server.close(r));

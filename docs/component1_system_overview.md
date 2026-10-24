@@ -29,6 +29,7 @@ usually not updated. Component 1 keeps the requirement list **live**:
 4. It records every change in a tamper-evident **ledger**.
 5. It builds a **requirements network map** (which requirements are related) and measures how far it **drifts** from an agreed baseline.
 6. It spots messages that describe a **brand-new requirement** and offers them to the PM.
+7. It can **import a project's first requirements from an SRS document** in one step, then builds the network map and the Initial baseline.
 
 The other three components (Gap Detection, Schedule Re-Optimization, Retrospective Intelligence) read Component 1's data through
 read-only integration endpoints.
@@ -142,7 +143,7 @@ decides. A `None` signal above the threshold is accepted with no effect.
 - One function, `finalizeSignal()` (`signals/finalize.js`), finalises every applied signal (status, history, ledger, feedback, network
   update) and is shared by preview, create, bulk and review.
 
-### 3.7 Document analysis (SRS, emails, meeting notes)
+### 3.7 Document analysis (emails, meeting notes, any text)
 - `POST /signals/extract`: upload `.txt`, `.md`, `.docx` or `.pdf` (2 MB max) or send JSON text.
 - **Segmentation** (`segmentation.js`, unit-tested): splits into statements; ignores email headers, greetings, sign-offs and short lines;
   turns a leading `Name:` into `speakerLabel`; removes duplicates; at most 300 segments (else 413).
@@ -151,6 +152,33 @@ decides. A `None` signal above the threshold is accepted with no effect.
   proposed status and `wouldAutoApply`. **Saves nothing.**
 - `POST /signals/bulk`: saves the approved items (max 100) in order through the normal flow, tags each with `sourceDocument`, and returns
   `{ applied, pending, noChange, failed }`. Re-using a `documentId` is a 409 unless `force: true`; if the ai-service is down nothing is saved.
+
+### 3.7b Import the first requirements from an SRS document (PM only)
+
+> **In simple words:** A new project starts with an empty requirements list. Instead of typing 30 or 100 requirements by hand, the PM uploads the
+> project's **SRS** (Software Requirements Specification, the document that lists what the system must do). The system reads it, shows a table of the
+> requirements it found, the PM ticks the ones to keep, and one click creates them all and draws the network map.
+
+- **Where:** Requirements, then **Import requirements from an SRS**. It is also offered right after creating a project and in the empty state of the list.
+  A ready-made **SRS template** (`Frontend/public/templates/SRS_Template.docx`) can be downloaded from the app.
+- **Files:** `.docx`, `.md`, `.txt` or `.pdf`, 2 MB at most, processed in memory (not stored, not logged).
+- **Two ways of reading the file:**
+  - **Template mode (exact).** If the file is a `.docx` using the template, the table is read exactly: columns *ID, Title, Requirement statement* (and optionally
+    *Feature area, Priority, Verification*). FR or NFR comes from the heading above the table ("Functional" or "Non-functional") or from the id prefix (FR-/NFR-).
+    Template placeholder rows are skipped. Priority is MoSCoW: Must becomes High, Should becomes Medium, Could and Won't become Low.
+  - **Rule-based mode (everything else).** For PDFs, free-form documents and plain text, simple rules look for numbered lists under section headings,
+    lines such as `FR-012 The system shall ...`, and sentences with *shall / must / should / will*. These are **rules, not a trained model**, so every row is
+    marked `medium` or `low` confidence, and **only `medium` rows are pre-selected**. The PM must review the table.
+- **Preview** (`POST /requirements/import-srs/preview`) saves nothing and returns the candidate table (title, statement, FR or NFR, priority, confidence, warnings).
+  Rows with template placeholders such as `<xx>` are flagged and left unselected.
+- **Confirm** (`POST /requirements/import-srs/confirm`, up to 300 items):
+  1. Creates each chosen requirement through the normal create path (status Confirmed, one `REQUIREMENT_CREATED` ledger entry each, `sourceDocument { name, sourceId }`).
+  2. Skips duplicates of existing requirements (same source id or same text) unless `force` is set.
+  3. Runs **one** network recompute (embeddings in a batch, Pathfinder, clusters) and writes **one** `NETWORK_UPDATE` ledger entry.
+  4. Creates the **Initial baseline** if the project has none, so the alignment score works straight away.
+- **Safety:** the import is PM-only; the ai-service being down is a 502 *before* anything is saved; only one import runs at a time per project; and the same
+  document and items sent again within 10 minutes (a double click) return the first result without creating anything twice.
+- **The "feature area" column** is stored only in the `groupId` answer-key field and is **never** used to form clusters.
 
 ### 3.8 Requirements management
 - List, get, **create** (PM) and **update** (PM) requirements, with auto-generated ids (`RET-R04` style), granularity, resource role (the most
@@ -376,6 +404,27 @@ flowchart LR
     EXP -->|"--extra-data"| TR
 ```
 
+### 4.8 SRS import
+
+```mermaid
+flowchart TD
+    U["PM uploads an SRS<br/>(.docx .md .txt .pdf)"] --> P["POST /requirements/import-srs/preview<br/>saves nothing"]
+    P --> T{"Is it a .docx<br/>using the template?"}
+    T -->|yes| TM["Template mode<br/>read the table exactly"]
+    T -->|no| RM["Rule-based mode<br/>numbered lists, 'shall' sentences"]
+    TM --> TB["Candidate table<br/>(title, statement, FR/NFR, priority, confidence)"]
+    RM --> TB
+    TB --> SEL["PM reviews and ticks rows<br/>(only 'medium' confidence pre-selected)"]
+    SEL --> C["POST /requirements/import-srs/confirm"]
+    C --> D{"Duplicate of an<br/>existing requirement?"}
+    D -->|"yes, and not force"| SK["Skip it"]
+    D -->|no| CR["Create requirement<br/>+ REQUIREMENT_CREATED ledger entry"]
+    CR --> NW["ONE network recompute<br/>embeddings, Pathfinder, clusters"]
+    NW --> L["ONE NETWORK_UPDATE ledger entry"]
+    L --> B["Create Initial baseline<br/>(if the project has none)"]
+    B --> OUT["Requirements list + network map are ready"]
+```
+
 ---
 
 ## 5. TF-IDF: where it is used
@@ -414,6 +463,7 @@ MongoDB collections (every document carries `projectId`):
 | `signal_evidence`, `network_state` | per-signal evidence rows, stale-network marker |
 | `baselines` | frozen link sets and requirement states |
 | `requirement_candidates` | possible new requirements and their evidence |
+| `srs_imports` | one row per SRS confirm (a lock and a 10-minute replay record, so a double click does not import twice) |
 | `feedback` | PM accept, reject, correct actions and candidate decisions |
 | `network_ground_truth` | answer key used only by the network evaluation script |
 
@@ -430,6 +480,7 @@ All under `/api/v1`, all JSON `{ success, data, error }`. "PM" means PM role onl
 | Team | `GET /team`, `POST /team` (PM), `DELETE /team/:userId` (PM) |
 | Requirements | `GET /requirements`, `GET /requirements/clusters`, `GET /requirements/:reqId`, `POST /requirements` (PM), `PATCH /requirements/:reqId` (PM) |
 | Signals | `GET /signals`, `GET /signals/:id`, `POST /signals`, `POST /signals/preview`, `POST /signals/extract`, `POST /signals/bulk`, `POST /signals/:id/review` (PM) |
+| SRS import | `POST /requirements/import-srs/preview` (PM), `POST /requirements/import-srs/confirm` (PM) |
 | Candidates | `GET /requirement-candidates?status=`, `POST /requirement-candidates/:id/review` (PM) |
 | Feedback | `GET /feedback/export` (PM) |
 | Ledger | `GET /ledger` (served by the integration module), `GET /ledger/verify`, `GET /ledger/requirements/:reqId` |
@@ -447,7 +498,7 @@ Under `Requirements Engine` in a project (`/projects/:projectId/requirements/...
 
 | Screen | Route | Features |
 |---|---|---|
-| Requirements | `list` | Requirements table and detail panel with status timeline; **Signal Feed** tab (submit signal, result cards, accept/reject/correct); **Candidates** tab; paste or upload (file or text) dialog; detect-requirements dialog |
+| Requirements | `list` | Requirements table and detail panel with status timeline; **Signal Feed** tab (submit signal, result cards, accept/reject/correct); **Candidates** tab; paste or upload (file or text) dialog; **Import requirements from an SRS** dialog (PM) with a downloadable SRS template |
 | Network map | `network-map` | Interactive map, cluster colours and labels, Pathfinder and manual edges, toolbar (zoom, fit), requirement detail panel, link details panel with evidence, manual link dialog |
 | Ledger | `ledger` | Ledger table, transaction detail modal, chain verification |
 | Alignment score | `alignment` | Score, band, trend chart, baseline strip |
@@ -472,6 +523,8 @@ Reports are regenerated by scripts; the numbers below are from the current files
 | Auto-accept precision at confidence >= 90 (dev) | 94% on 41% of predictions; **no threshold reached the 95% target**, so none is formally recommended | same |
 | New-requirement detection, dev | precision 100%, recall 81.3%, F1 0.897 | `docs/new_requirement_detection.md` |
 | New-requirement detection, test | precision 100%, recall 62.5%, F1 0.769 | same |
+| SRS import, template samples (Online Retail 31, Hospital 26) | all requirements found (recall 100%), 1 extra row kept in each, FR/NFR type correct 31/31 and 26/26 | `docs/srs_import_evaluation.md` |
+| SRS import, public CCTNS PDF (rule-based mode, 115 expected) | found 118, recall 100%, precision 97.5% (3 wrongly kept); 115 created, 114 links, 8 clusters | same |
 | Network vs `group_id` key | modest agreement; Pathfinder returns about n - 1 edges | `docs/network_evaluation.md` |
 | Signals' effect on the network | no clear difference on the less biased replay | `docs/network_evaluation.md` section 6 |
 
@@ -509,5 +562,8 @@ Demo logins are `pm.ret@inspid.test` (PM) and `developer.ret@inspid.test` (team 
 - Matching maps to the closest *existing* requirement; new-requirement detection reduces but does not remove this.
 - The classifier confidence is not a calibrated probability; no auto-accept threshold met the 95% precision target.
 - Retraining is manual (export feedback, train, promote); there is no automatic retraining.
+- SRS import, rule-based mode: it uses plain rules, not a trained model, and the rules were written while looking at the CCTNS text, so the 100% recall there is **not an independent test**; an unseen SRS will probably do worse. The two template samples were written by us.
+- SRS import: a numbered list of non-requirements under a heading that introduces a list would be kept, so the PM review step matters.
+- SRS import on a large document (115 requirements) gives one very big cluster (65 nodes), which makes the network map crowded; the layout was checked by calculation, not in a browser.
 - `schedule-baseline` in the integration contract is a stub.
 - Recomputation is serialized per project inside one backend process only.

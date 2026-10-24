@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Search, ListChecks, AlertCircle } from "lucide-react";
+import { Search, ListChecks, AlertCircle, UploadCloud } from "lucide-react";
+import { Button } from "../../../components/ui/button";
 import { EmptyState } from "../../../components/common/EmptyState";
 import { Input } from "../../../components/ui/input";
 import {
@@ -12,7 +13,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../components/ui/table";
 import { Skeleton } from "../../../components/ui/skeleton";
 import { StatusBadge } from "./StatusBadge";
-import { DetectRequirementsDialog } from "./DetectRequirementsDialog";
+import { SrsTemplateLink } from "./SrsTemplateLink";
 import { STATUSES } from "../../../data/mockRequirements";
 import { clusterMeta, clustersOf } from "../../../lib/clusters";
 import { formatRelativeTime } from "../../../lib/utils";
@@ -23,7 +24,7 @@ function lastUpdatedOf(req) {
   return history.length ? history[history.length - 1].timestamp : null;
 }
 
-export function RequirementsTable({ requirements, loading, error, onRetry, onSelectRequirement, projectId, isPM, onRequirementsCreated }) {
+export function RequirementsTable({ requirements, loading, error, onRetry, onSelectRequirement, projectId, isPM, onOpenImport }) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
@@ -78,8 +79,18 @@ export function RequirementsTable({ requirements, loading, error, onRetry, onSel
       <EmptyState
         icon={ListChecks}
         title="No requirements yet for this project."
-        description="Upload a Software Requirements Specification (SRS) document to detect the requirements themselves and establish this project's baseline. This is separate from the Signal Feed, which only tracks changes against requirements that already exist."
-        action={isPM ? <DetectRequirementsDialog projectId={projectId} onCreated={onRequirementsCreated} /> : null}
+        description="Import a Software Requirements Specification (SRS) to create this project's initial requirements, its requirement network and its Initial baseline. This is separate from the Signal Feed, which only tracks changes against requirements that already exist."
+        action={
+          <div className="flex flex-col items-center gap-3">
+            {isPM && (
+              <Button onClick={onOpenImport}>
+                <UploadCloud className="h-4 w-4" />
+                Import requirements from an SRS
+              </Button>
+            )}
+            <SrsTemplateLink />
+          </div>
+        }
       />
     );
   }
@@ -87,6 +98,12 @@ export function RequirementsTable({ requirements, loading, error, onRetry, onSel
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 md:flex-row md:items-center">
+        {isPM && (
+          <Button variant="outline" size="sm" onClick={onOpenImport} className="shrink-0 gap-1.5">
+            <UploadCloud className="h-4 w-4" />
+            Import from SRS
+          </Button>
+        )}
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input

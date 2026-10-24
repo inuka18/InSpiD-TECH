@@ -20,6 +20,7 @@ function toApi(r, relatedIds = [], statusHistory = []) {
     clusterLabel: r.clusterLabel ?? null,
     type: r.type,
     priority: r.priority ?? null,
+    sourceDocument: r.sourceDocument?.name ? { name: r.sourceDocument.name, sourceId: r.sourceDocument.sourceId ?? null } : null,
     relatedIds,
     statusHistory,
   };
