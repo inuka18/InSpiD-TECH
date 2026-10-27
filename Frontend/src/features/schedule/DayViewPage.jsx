@@ -141,7 +141,7 @@ export function DayViewPage() {
       />
       </div>
 
-      <TaskAssignmentList tasks={dayTasks} onSelectTask={setSelectedTask} />
+      <TaskAssignmentList tasks={dayTasks} onSelectTask={setSelectedTask} projectId={activeProjectId} />
 
       <Card className="hidden">
         <CardHeader>

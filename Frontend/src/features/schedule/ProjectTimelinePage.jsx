@@ -161,7 +161,7 @@ export function ProjectTimelinePage() {
         </div>
       )}
 
-      {allTasks.length > 0 && <TaskAssignmentList tasks={allTasks} onSelectTask={setSelectedTask} />}
+      {allTasks.length > 0 && <TaskAssignmentList tasks={allTasks} onSelectTask={setSelectedTask} projectId={activeProjectId} />}
 
       <VarianceDrillDownModal
         task={selectedTask?._causeList ? null : selectedTask}

@@ -131,7 +131,7 @@ export function SprintViewPage() {
           </div>
         )}
 
-        {!loading && <TaskAssignmentList tasks={sprintTasks} onSelectTask={setSelectedTask} />}
+        {!loading && <TaskAssignmentList tasks={sprintTasks} onSelectTask={setSelectedTask} projectId={activeProjectId} />}
 
       </div>
 

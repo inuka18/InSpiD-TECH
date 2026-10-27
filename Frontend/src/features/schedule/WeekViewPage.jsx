@@ -173,7 +173,7 @@ export function WeekViewPage() {
 
         {!loading && (
           <>
-            <TaskAssignmentList tasks={weekTasks} onSelectTask={setSelectedTask} />
+            <TaskAssignmentList tasks={weekTasks} onSelectTask={setSelectedTask} projectId={activeProjectId} />
 
             {leaveAssignments.length > 0 && <Card className="overflow-hidden border-amber-200/70">
               <CardHeader className="border-b border-amber-200/60 bg-amber-50/60 py-3 dark:bg-amber-950/15">

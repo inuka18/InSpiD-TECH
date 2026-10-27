@@ -741,13 +741,28 @@ export function getScheduleTaskById(projectId, taskId) {
 // on the board. Returns the same object reference that was pushed, so
 // the caller can immediately reference it (e.g. to open its detail view)
 // without a re-fetch.
-export function addTaskToProject(projectId, task) {
-  const projectEntry = mockSchedulePhases.find((p) => p.projectId === projectId);
-  if (!projectEntry) return null;
-  const phases = projectEntry.phases;
-  if (phases.length === 0) return null;
+export function addTaskToProject(projectId, task, phaseId) {
+  const projectPhases = projectId === RENT_EASE_PROJECT_ID
+    ? rentEasePhases
+    : mockSchedulePhases.find((p) => p.projectId === projectId)?.phases;
+  if (!projectPhases) return null;
+  if (projectPhases.length === 0) return null;
   const activePhase =
-    phases.find((phase) => new Date(phase.start) <= TODAY && TODAY <= new Date(phase.end)) ?? phases[phases.length - 1];
+    projectPhases.find((phase) => phase.id === phaseId)
+    ?? projectPhases.find((phase) => new Date(phase.start) <= TODAY && TODAY <= new Date(phase.end))
+    ?? projectPhases[projectPhases.length - 1];
   activePhase.tasks.push(task);
   return task;
+}
+
+export function removeTaskFromProject(projectId, taskId) {
+  const phases = getPhasesForProject(projectId);
+  for (const phase of phases) {
+    const index = phase.tasks.findIndex((task) => task.id === taskId);
+    if (index !== -1) {
+      const [removed] = phase.tasks.splice(index, 1);
+      return { task: removed, phaseId: phase.id, index };
+    }
+  }
+  return null;
 }
