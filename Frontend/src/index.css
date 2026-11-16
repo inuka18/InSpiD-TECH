@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Poppins:wght@400;500;600;700&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -234,6 +234,17 @@
 }
 
 /* Shared surface treatment for the Schedule workspace. */
+.schedule-theme {
+  font-family: "Poppins", "Inter", sans-serif;
+}
+.schedule-theme h1,
+.schedule-theme h2,
+.schedule-theme h3,
+.schedule-theme button,
+.schedule-theme input,
+.schedule-theme select {
+  font-family: inherit;
+}
 .schedule-theme > div:first-child {
   border-color: hsl(var(--border) / 0.8);
 }

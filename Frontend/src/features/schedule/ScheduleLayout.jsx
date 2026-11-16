@@ -46,7 +46,7 @@ function ScheduleLayoutInner() {
 
   return (
     <div className="schedule-theme flex h-full flex-col gap-5">
-      <div className="mb-0 rounded-2xl border border-border/70 bg-gradient-to-br from-card via-card to-muted/20 px-4 py-4 shadow-sm sm:px-5 sm:py-5">
+      <div className="mb-0 rounded-xl border border-border bg-card px-4 py-4 shadow-sm sm:px-5 sm:py-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-2xl font-bold tracking-tight text-foreground">Schedule</h2>

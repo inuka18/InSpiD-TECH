@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { fetchSchedulePhases } from "../services/schedulePhasesService";
+import { applyCriticalPath } from "../features/schedule/lib/criticalPath";
 
 export function useSchedulePhases(projectId) {
   const [data, setData] = useState([]);
@@ -11,7 +12,7 @@ export function useSchedulePhases(projectId) {
     setLoading(true);
     fetchSchedulePhases(projectId)
       .then((res) => {
-        if (!cancelled) setData(res);
+        if (!cancelled) setData(applyCriticalPath(res));
       })
       .catch((err) => {
         if (!cancelled) setError(err);
