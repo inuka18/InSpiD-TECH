@@ -3,11 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "../../../components/ui
 import { cn } from "../../../lib/utils";
 
 const CAUSE_CATEGORIES = [
-  { key: "technical", label: "Technical", icon: Code2, color: "text-blue-700", dot: "bg-blue-600", track: "bg-blue-100" },
-  { key: "human", label: "Human", icon: UsersRound, color: "text-violet-700", dot: "bg-violet-600", track: "bg-violet-100" },
-  { key: "hardware", label: "Hardware", icon: Cpu, color: "text-amber-700", dot: "bg-amber-500", track: "bg-amber-100" },
-  { key: "server", label: "Server", icon: Server, color: "text-cyan-700", dot: "bg-cyan-600", track: "bg-cyan-100" },
-  { key: "other", label: "Other", icon: CircleHelp, color: "text-slate-600", dot: "bg-slate-500", track: "bg-slate-100" },
+  { key: "technical", label: "Technical", icon: Code2, color: "text-blue-700 dark:text-blue-300", dot: "bg-blue-600 dark:bg-blue-500", track: "bg-blue-100 dark:bg-blue-950/60" },
+  { key: "human", label: "Human", icon: UsersRound, color: "text-violet-700 dark:text-violet-300", dot: "bg-violet-600 dark:bg-violet-500", track: "bg-violet-100 dark:bg-violet-950/60" },
+  { key: "hardware", label: "Hardware", icon: Cpu, color: "text-amber-700 dark:text-amber-300", dot: "bg-amber-500 dark:bg-amber-400", track: "bg-amber-100 dark:bg-amber-950/60" },
+  { key: "server", label: "Server", icon: Server, color: "text-cyan-700 dark:text-cyan-300", dot: "bg-cyan-600 dark:bg-cyan-500", track: "bg-cyan-100 dark:bg-cyan-950/60" },
+  { key: "other", label: "Other", icon: CircleHelp, color: "text-slate-600 dark:text-slate-300", dot: "bg-slate-500 dark:bg-slate-400", track: "bg-slate-100 dark:bg-slate-800" },
 ];
 
 function classifyCause(task) {
@@ -27,15 +27,15 @@ export function RootCausePanel({ tasks = [], label, onSelectCause }) {
     ...category,
     tasks: causeTasks.filter((task) => classifyCause(task) === category.key),
   }));
-
   return (
-    <Card className="overflow-hidden border-border/80 shadow-sm">
-      <CardHeader className="border-b border-border/60 bg-gradient-to-br from-rose-50/70 via-background to-background pb-4">
+    <Card className="overflow-hidden border-border bg-card shadow-sm">
+      <CardHeader className="border-b border-border bg-muted/20 pb-4">
         <div className="flex items-start gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-rose-100 bg-white text-rose-600 shadow-sm">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 text-rose-600 dark:border-rose-900/70 dark:bg-rose-950/35 dark:text-rose-300">
             <AlertTriangle className="h-4 w-4" />
           </span>
           <div className="min-w-0">
+            <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Schedule diagnostics</p>
             <CardTitle className="text-base">Root Cause Analysis{label ? ` · ${label}` : ""}</CardTitle>
           </div>
         </div>
@@ -67,12 +67,12 @@ export function RootCausePanel({ tasks = [], label, onSelectCause }) {
               key={category.key}
               type="button"
               onClick={() => onSelectCause(category.label, category.tasks)}
-              className="w-full rounded-xl border border-border/70 bg-background p-3 text-left transition-all hover:-translate-y-px hover:border-primary/30 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="w-full rounded-lg border border-border bg-background p-3 text-left transition-colors hover:border-primary/40 hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               {content}
             </button>
           ) : (
-            <div key={category.key} className="rounded-xl border border-border/60 bg-background p-3">{content}</div>
+            <div key={category.key} className="rounded-lg border border-border bg-background p-3">{content}</div>
           );
         })}
         <p className="px-1 pt-1 text-[10px] leading-relaxed text-muted-foreground">Categories are inferred from the existing task cause and description.</p>

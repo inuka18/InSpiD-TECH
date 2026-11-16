@@ -125,6 +125,7 @@ export function TaskAssignmentList({ tasks = [], onSelectTask, isPM, projectId: 
   const [owner, setOwner] = useState("all");
   const [page, setPage] = useState(0);
   const [revision, setRevision] = useState(0);
+  const [durationDrafts, setDurationDrafts] = useState({});
   const [editingTask, setEditingTask] = useState(null);
   const [pendingNewTask, setPendingNewTask] = useState(null);
   const pageSize = 8;
@@ -252,8 +253,33 @@ export function TaskAssignmentList({ tasks = [], onSelectTask, isPM, projectId: 
   const manuallySetDuration = (task, hours, minutesPart) => {
     if (task.status === "done") return;
     const minutes = Math.max(1, (Math.max(0, Number(hours) || 0) * 60) + Math.min(59, Math.max(0, Number(minutesPart) || 0)));
-    const start = normalizeWorkingStart(task.start, workCalendar);
+    const taskStart = new Date(task.start);
+    if (Number.isNaN(taskStart.getTime())) return;
+    const start = normalizeWorkingStart(taskStart, workCalendar);
     updateTask(task, { start: start.toISOString(), durationMinutes: minutes, end: addWorkingMinutes(start, minutes, workCalendar).toISOString(), assignmentMode: "manual" }, `Manually changed duration for "${task.name}"`);
+  };
+  const durationDraftFor = (task) => durationDrafts[task.id] ?? {
+    hours: String(durationHours(task, workCalendar)),
+    minutes: String(durationMinutesPart(task, workCalendar)),
+  };
+  const updateDurationDraft = (task, field, value) => {
+    setDurationDrafts((current) => {
+      const existing = current[task.id] ?? {
+        hours: String(durationHours(task, workCalendar)),
+        minutes: String(durationMinutesPart(task, workCalendar)),
+      };
+      return { ...current, [task.id]: { ...existing, [field]: value } };
+    });
+  };
+  const commitDurationDraft = (task) => {
+    const draft = durationDrafts[task.id];
+    if (!draft) return;
+    manuallySetDuration(task, draft.hours, draft.minutes);
+    setDurationDrafts((current) => {
+      const next = { ...current };
+      delete next[task.id];
+      return next;
+    });
   };
   const autoPlan = () => {
     const editable = tasks.filter((task) => task.status !== "done");
@@ -336,7 +362,7 @@ export function TaskAssignmentList({ tasks = [], onSelectTask, isPM, projectId: 
                     {canEdit && !isCompleted && <select aria-label={`Change assignees for ${task.name}`} onClick={(event) => event.stopPropagation()} onChange={(event) => { manuallyAssign(task, event.target.value); event.target.value = ""; }} defaultValue="" className="mt-2 h-7 max-w-full rounded-md border border-input bg-background px-2 text-[10px] text-muted-foreground"><option value="" disabled>Manage team</option>{peopleForRole.map((person) => <option key={person.id} value={person.id} disabled={capacityByMember.get(person.id)?.offToday}>{taskAssigneeIds(task).includes(person.id) ? `Remove ${person.name}` : `Add ${person.name}`}{capacityByMember.get(person.id)?.offToday ? " · unavailable" : ""}</option>)}</select>}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3.5 align-top"><div className={cn("flex items-center gap-2 text-xs font-medium", late ? "text-red-600 dark:text-red-400" : "text-foreground")}><CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />{formatShortDate(task.start)}</div><p className={cn("mt-1.5 pl-[22px] text-[11px]", late ? "text-red-600/80 dark:text-red-400/80" : "text-muted-foreground")}>to {formatShortDate(task.end)}{late && <span className="ml-1 font-semibold">· Late</span>}</p></td>
-                  <td className="px-4 py-3.5 align-top"><div className="flex items-center gap-1.5"><Clock3 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /><Input aria-label={`Effort hours for ${task.name}`} type="number" min="0" step="1" value={durationHours(task, workCalendar)} onClick={(event) => event.stopPropagation()} onChange={(event) => manuallySetDuration(task, event.target.value, durationMinutesPart(task, workCalendar))} disabled={!editable} className="h-8 w-14 px-1.5 text-center text-xs" /><span className="text-[10px] text-muted-foreground">h</span><Input aria-label={`Effort minutes for ${task.name}`} type="number" min="0" max="59" step="1" value={durationMinutesPart(task, workCalendar)} onClick={(event) => event.stopPropagation()} onChange={(event) => manuallySetDuration(task, durationHours(task, workCalendar), event.target.value)} disabled={!editable} className="h-8 w-12 px-1 text-center text-xs" /><span className="text-[10px] text-muted-foreground">m</span></div><p className="mt-1.5 pl-5 text-[10px] text-muted-foreground">{durationLabel(getTaskEffortMinutes(task, workCalendar))} estimate · {durationLabel(getTaskRemainingEffortMinutes(task, workCalendar))} remaining</p></td>
+                  <td className="px-4 py-3.5 align-top"><div className="flex items-center gap-1.5"><Clock3 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /><Input aria-label={`Effort hours for ${task.name}`} type="number" min="0" step="1" value={durationDraftFor(task).hours} onClick={(event) => event.stopPropagation()} onChange={(event) => updateDurationDraft(task, "hours", event.target.value)} onBlur={() => commitDurationDraft(task)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); commitDurationDraft(task); event.currentTarget.blur(); } }} disabled={!editable} className="h-8 w-14 px-1.5 text-center text-xs" /><span className="text-[10px] text-muted-foreground">h</span><Input aria-label={`Effort minutes for ${task.name}`} type="number" min="0" max="59" step="1" value={durationDraftFor(task).minutes} onClick={(event) => event.stopPropagation()} onChange={(event) => updateDurationDraft(task, "minutes", event.target.value)} onBlur={() => commitDurationDraft(task)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); commitDurationDraft(task); event.currentTarget.blur(); } }} disabled={!editable} className="h-8 w-12 px-1 text-center text-xs" /><span className="text-[10px] text-muted-foreground">m</span></div><p className="mt-1.5 pl-5 text-[10px] text-muted-foreground">{durationLabel(getTaskEffortMinutes(task, workCalendar))} estimate · {durationLabel(getTaskRemainingEffortMinutes(task, workCalendar))} remaining</p></td>
                   <td className="px-4 py-3.5 align-top"><div className="flex items-center gap-1.5"><i className={cn("h-2 w-2 shrink-0 rounded-full", STATUS_DOT[task.status] ?? "bg-muted-foreground")} /><select aria-label={`Update status for ${task.name}`} value={task.status} disabled={!canEdit} onClick={(event) => event.stopPropagation()} onChange={(event) => manuallySetStatus(task, event.target.value)} className="h-8 min-w-28 rounded-md border border-input bg-background px-2 text-xs font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-60">{TASK_STATUSES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></div></td>
                   <td className="px-4 py-3.5 align-top"><div className="flex items-center justify-between gap-2"><span className={cn("text-xs font-semibold tabular-nums", late ? "text-red-600 dark:text-red-400" : "text-foreground")}>{progress}%</span>{progress === 100 ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> : <span className="text-[10px] text-muted-foreground">complete</span>}</div><div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted"><div className={cn("h-full rounded-full transition-[width]", progressColor)} style={{ width: `${progress}%` }} /></div></td>
                   <td className="px-4 py-3.5 align-top"><div className="flex items-center gap-1"><Button type="button" variant="ghost" size="icon" className="h-8 w-8" aria-label={`Edit ${task.name}`} onClick={(event) => { event.stopPropagation(); setEditingTask(task); }} disabled={!canEdit}><Pencil className="h-3.5 w-3.5" /></Button><Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" aria-label={`Remove ${task.name}`} onClick={(event) => { event.stopPropagation(); removeTask(task); }} disabled={!canEdit}><Trash2 className="h-3.5 w-3.5" /></Button></div></td>

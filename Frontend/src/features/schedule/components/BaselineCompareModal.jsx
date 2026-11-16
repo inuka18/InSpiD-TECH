@@ -16,10 +16,10 @@ function initialsFor(name) {
 function InitialPlanTable({ phases }) {
   let rowNum = 1;
   const statusStyle = {
-    "not-started": "bg-slate-100 text-slate-600",
-    "in-progress": "bg-blue-50 text-blue-700",
-    review: "bg-amber-50 text-amber-700",
-    done: "bg-emerald-50 text-emerald-700",
+    "not-started": "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+    "in-progress": "bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300",
+    review: "bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300",
+    done: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300",
   };
   const statusText = { "not-started": "Not started", "in-progress": "In progress", review: "In review", done: "Complete" };
 
@@ -29,7 +29,7 @@ function InitialPlanTable({ phases }) {
         <thead>
           <tr>
             {["#", "Task", "Owner", "Planned start", "Planned finish", "Duration", "Status", "Points"].map((heading) => (
-              <th key={heading} className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50/95 px-4 py-3.5 text-left text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500 backdrop-blur first:pl-5 whitespace-nowrap">
+              <th key={heading} className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50/95 px-4 py-3.5 text-left text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500 backdrop-blur first:pl-5 whitespace-nowrap dark:border-border dark:bg-slate-900/95 dark:text-slate-400">
                 {heading}
               </th>
             ))}
@@ -37,12 +37,12 @@ function InitialPlanTable({ phases }) {
         </thead>
         {phases.map((phase) => (
           <tbody key={phase.id}>
-            <tr className="bg-blue-50/55">
-              <td colSpan={8} className="border-b border-t border-blue-100/80 px-5 py-2.5">
+            <tr className="bg-blue-50/55 dark:bg-blue-950/25">
+              <td colSpan={8} className="border-b border-t border-blue-100/80 px-5 py-2.5 dark:border-blue-900/60">
                 <div className="flex items-center gap-2">
                   <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                  <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-700">{phase.name}</span>
-                  <span className="rounded-full border border-blue-100 bg-white/80 px-2 py-0.5 text-[9px] font-semibold text-slate-500">{phase.tasks.length} tasks</span>
+                  <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-700 dark:text-slate-200">{phase.name}</span>
+                  <span className="rounded-full border border-blue-100 bg-white/80 px-2 py-0.5 text-[9px] font-semibold text-slate-500 dark:border-blue-900/70 dark:bg-slate-900/70 dark:text-slate-400">{phase.tasks.length} tasks</span>
                 </div>
               </td>
             </tr>
@@ -51,33 +51,33 @@ function InitialPlanTable({ phases }) {
               const duration = daysBetween(task.baselineStart, task.baselineEnd) + 1;
               const number = rowNum++;
               return (
-                <tr key={task.id} className="group transition-colors hover:bg-blue-50/35 even:bg-slate-50/45">
-                  <td className="border-b border-slate-100 px-4 py-3.5 pl-5 text-center font-mono text-[10px] tabular-nums text-slate-400">{String(number).padStart(2, "0")}</td>
-                  <td className="max-w-[310px] border-b border-slate-100 px-4 py-3.5">
+                <tr key={task.id} className="group transition-colors hover:bg-blue-50/35 even:bg-slate-50/45 dark:hover:bg-blue-950/25 dark:even:bg-slate-900/25">
+                  <td className="border-b border-slate-100 px-4 py-3.5 pl-5 text-center font-mono text-[10px] tabular-nums text-slate-400 dark:border-border/70 dark:text-slate-500">{String(number).padStart(2, "0")}</td>
+                  <td className="max-w-[310px] border-b border-slate-100 px-4 py-3.5 dark:border-border/70">
                     <div className="flex items-center gap-2">
                       {task.critical && <span className="h-2 w-1 shrink-0 rounded-full bg-rose-500" title="Critical path" />}
                       {task.milestone && <Diamond className="h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-600" />}
-                      <span className="truncate font-semibold text-slate-800" title={task.name}>{task.name}</span>
+                      <span className="truncate font-semibold text-slate-800 dark:text-foreground" title={task.name}>{task.name}</span>
                     </div>
-                    <span className="ml-3.5 mt-1 block truncate font-mono text-[10px] text-slate-400">{task.id}</span>
+                    <span className="ml-3.5 mt-1 block truncate font-mono text-[10px] text-slate-400 dark:text-slate-500">{task.id}</span>
                   </td>
-                  <td className="border-b border-slate-100 px-4 py-3.5 whitespace-nowrap">
+                  <td className="border-b border-slate-100 px-4 py-3.5 whitespace-nowrap dark:border-border/70">
                     <div className="flex items-center gap-2" title={assignees.map((person) => person.name).join(", ") || "Unassigned"}>
                       <div className="flex -space-x-2">
                         {assignees.length ? assignees.slice(0, 3).map((person) => (
-                          <Avatar key={person.id} className="h-7 w-7 border-2 border-white text-[8px] shadow-sm"><AvatarFallback>{initialsFor(person.name)}</AvatarFallback></Avatar>
-                        )) : <Avatar className="h-7 w-7 border-2 border-white text-[8px]"><AvatarFallback>?</AvatarFallback></Avatar>}
+                          <Avatar key={person.id} className="h-7 w-7 border-2 border-white text-[8px] shadow-sm dark:border-card"><AvatarFallback>{initialsFor(person.name)}</AvatarFallback></Avatar>
+                        )) : <Avatar className="h-7 w-7 border-2 border-white text-[8px] dark:border-card"><AvatarFallback>?</AvatarFallback></Avatar>}
                       </div>
-                      <span className="text-[11px] font-medium text-slate-600">{assignees.length ? assignees[0].name : "Unassigned"}{assignees.length > 1 && <span className="ml-1 text-slate-400">+{assignees.length - 1}</span>}</span>
+                      <span className="text-[11px] font-medium text-slate-600 dark:text-muted-foreground">{assignees.length ? assignees[0].name : "Unassigned"}{assignees.length > 1 && <span className="ml-1 text-slate-400 dark:text-slate-500">+{assignees.length - 1}</span>}</span>
                     </div>
                   </td>
-                  <td className="border-b border-slate-100 px-4 py-3.5 whitespace-nowrap font-medium tabular-nums text-slate-700">{formatShortDate(task.baselineStart)}</td>
-                  <td className="border-b border-slate-100 px-4 py-3.5 whitespace-nowrap font-medium tabular-nums text-slate-700">{formatShortDate(task.baselineEnd)}</td>
-                  <td className="border-b border-slate-100 px-4 py-3.5 whitespace-nowrap text-slate-500">{duration}d</td>
-                  <td className="border-b border-slate-100 px-4 py-3.5 whitespace-nowrap">
+                  <td className="border-b border-slate-100 px-4 py-3.5 whitespace-nowrap font-medium tabular-nums text-slate-700 dark:border-border/70 dark:text-foreground">{formatShortDate(task.baselineStart)}</td>
+                  <td className="border-b border-slate-100 px-4 py-3.5 whitespace-nowrap font-medium tabular-nums text-slate-700 dark:border-border/70 dark:text-foreground">{formatShortDate(task.baselineEnd)}</td>
+                  <td className="border-b border-slate-100 px-4 py-3.5 whitespace-nowrap text-slate-500 dark:border-border/70 dark:text-muted-foreground">{duration}d</td>
+                  <td className="border-b border-slate-100 px-4 py-3.5 whitespace-nowrap dark:border-border/70">
                     <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold ${statusStyle[task.status] ?? statusStyle["not-started"]}`}><span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-current opacity-75" />{statusText[task.status] ?? "Not started"}</span>
                   </td>
-                  <td className="border-b border-slate-100 px-4 py-3.5 whitespace-nowrap"><span className="inline-flex min-w-8 justify-center rounded-md bg-indigo-50 px-2 py-1 font-semibold tabular-nums text-indigo-700">{task.storyPoints ?? "-"}</span></td>
+                  <td className="border-b border-slate-100 px-4 py-3.5 whitespace-nowrap dark:border-border/70"><span className="inline-flex min-w-8 justify-center rounded-md bg-indigo-50 px-2 py-1 font-semibold tabular-nums text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">{task.storyPoints ?? "-"}</span></td>
                 </tr>
               );
             })}
