@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Route, ZoomIn, ZoomOut, GitCompare } from "lucide-react";
 import { RootCausePanel } from "./components/RootCausePanel";
 import { BaselineCompareModal } from "./components/BaselineCompareModal";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../../components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Skeleton } from "../../components/ui/skeleton";
 import { EmptyState } from "../../components/common/EmptyState";
@@ -15,36 +15,77 @@ import { useSchedulePhases } from "../../hooks/useSchedulePhases";
 import { useResourceCapacity } from "../../hooks/useResourceCapacity";
 import { useActiveProject } from "../../hooks/useActiveProject";
 import { useRole, ROLES } from "../../context/RoleContext";
-import { flattenTasks, formatShortDate, causeStyle } from "./lib/scheduleUtils";
+import { addWorkingDays, endOfWorkingDays, useWorkCalendar } from "./context/WorkCalendarContext";
+import { flattenTasks, formatShortDate } from "./lib/scheduleUtils";
 
 const MIN_PX_PER_DAY = 2;
 const MAX_PX_PER_DAY = 60;
 const ZOOM_STEP = 2;
 
 export function ProjectTimelinePage() {
-  const { activeProjectId } = useActiveProject();
+  const { activeProject, activeProjectId } = useActiveProject();
   const { data: phases, loading } = useSchedulePhases(activeProjectId);
   const { data: capacity } = useResourceCapacity(activeProjectId);
   const { role } = useRole();
+  const { settings } = useWorkCalendar();
   const isPM = role === ROLES.PM;
   const [selectedTask, setSelectedTask] = useState(null);
   const [selectedCapacity, setSelectedCapacity] = useState(null);
-  const [pxPerDay, setPxPerDay] = useState(10);
+  const [pxPerDay, setPxPerDay] = useState(MAX_PX_PER_DAY);
   const [compareOpen, setCompareOpen] = useState(false);
   const allTasks = useMemo(() => flattenTasks(phases), [phases]);
+  const sprintPhases = useMemo(() => {
+    if (!allTasks.length) return [];
+    const activeStart = activeProject?.activeSprint?.startDate ? new Date(activeProject.activeSprint.startDate) : null;
+    const projectStart = activeStart ?? new Date(Math.min(...allTasks.map((task) => new Date(task.start).getTime())));
+    const projectEnd = new Date(Math.max(...allTasks.map((task) => new Date(task.end).getTime())));
+    projectStart.setHours(9, 0, 0, 0);
+    if (activeStart) activeStart.setHours(9, 0, 0, 0);
+    const sprintWorkdays = Number(settings.sprintDays ?? 10);
+    const firstSprintNumber = activeProject?.activeSprint?.number ?? 1;
+    const sprints = [];
+    let start = addWorkingDays(projectStart, 0, settings.workdays);
+    let number = 1;
+    while (start <= projectEnd) {
+      const end = endOfWorkingDays(start, sprintWorkdays, settings.workdays);
+      const nextStart = addWorkingDays(start, sprintWorkdays, settings.workdays);
+      nextStart.setHours(9, 0, 0, 0);
+      const isActive = activeStart && activeStart >= start && activeStart < nextStart;
+      const sprintNumber = firstSprintNumber + number - 1;
+      const sprintTasks = allTasks.filter((task) => {
+        const assignedSprint = Number.isInteger(task.plannedSprintNumber)
+          ? task.plannedSprintNumber
+          : task.status === "done" && Number.isInteger(task.sprintNumber) ? task.sprintNumber : null;
+        if (assignedSprint !== null) return assignedSprint === Math.max(1, sprintNumber);
+        const taskStart = new Date(task.start);
+        return taskStart >= start && taskStart < nextStart;
+      });
+      if (sprintTasks.length) sprints.push({
+        id: `project-sprint-${number}`,
+        name: `${isActive ? activeProject.activeSprint.name : `Sprint ${Math.max(1, sprintNumber)}`} · ${sprintWorkdays} working days`,
+        start: start.toISOString(),
+        end: end.toISOString(),
+        tasks: sprintTasks,
+      });
+      start = nextStart;
+      number += 1;
+    }
+    return sprints;
+  }, [allTasks, activeProject, phases, settings]);
 
   const { rangeStart, rangeEnd } = useMemo(() => {
     if (phases.length === 0) return { rangeStart: null, rangeEnd: null };
-    const starts = phases.map((p) => new Date(p.start));
-    const ends = phases.map((p) => new Date(p.end));
+    const phaseTasks = phases.flatMap((phase) => phase.tasks ?? []);
+    const starts = [...phases.map((p) => new Date(p.start)), ...phaseTasks.map((task) => new Date(task.start))];
+    const ends = [...phases.map((p) => new Date(p.end)), ...phaseTasks.map((task) => new Date(task.end))];
     return {
       rangeStart: new Date(Math.min(...starts)),
       rangeEnd: new Date(Math.max(...ends)),
     };
-  }, [phases]);
+  }, [phases, settings]);
 
   if (!loading && phases.length === 0) {
-    return <EmptyState icon={Route} title="No project timeline yet" description="No phases have been scheduled for this project." />;
+    return <EmptyState icon={Route} title="No project timeline yet" />;
   }
 
   return (
@@ -53,11 +94,7 @@ export function ProjectTimelinePage() {
         <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
           <div>
             <CardTitle className="text-base">Full Project Timeline</CardTitle>
-            <CardDescription>
-              {rangeStart && rangeEnd
-                ? `${formatShortDate(rangeStart)} – ${formatShortDate(rangeEnd)} across all four phases.`
-                : "Every phase and task from kickoff to launch."}
-            </CardDescription>
+            
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
             <Button
@@ -65,6 +102,8 @@ export function ProjectTimelinePage() {
               size="sm"
               onClick={() => setPxPerDay((v) => Math.max(MIN_PX_PER_DAY, v - ZOOM_STEP))}
               disabled={pxPerDay <= MIN_PX_PER_DAY}
+              aria-label="Zoom out"
+              title="Zoom out"
             >
               <ZoomOut className="h-4 w-4" />
             </Button>
@@ -73,6 +112,8 @@ export function ProjectTimelinePage() {
               size="sm"
               onClick={() => setPxPerDay((v) => Math.min(MAX_PX_PER_DAY, v + ZOOM_STEP))}
               disabled={pxPerDay >= MAX_PX_PER_DAY}
+              aria-label="Zoom in"
+              title="Zoom in"
             >
               <ZoomIn className="h-4 w-4" />
             </Button>
@@ -87,7 +128,7 @@ export function ProjectTimelinePage() {
             <Skeleton className="h-[28rem] w-full" />
           ) : (
             <GanttChart
-              phases={phases}
+              phases={sprintPhases}
               rangeStart={rangeStart}
               rangeEnd={rangeEnd}
               onSelectTask={setSelectedTask}
@@ -95,6 +136,8 @@ export function ProjectTimelinePage() {
               capacity={capacity}
               pxPerDay={pxPerDay}
               isPM={isPM}
+              groupByPhaseRequirement
+              projectId={activeProjectId}
             />
           )}
         </CardContent>
@@ -105,23 +148,20 @@ export function ProjectTimelinePage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Project Burndown</CardTitle>
-              <CardDescription>Planned versus actual effort across the full project timeline.</CardDescription>
             </CardHeader>
             <CardContent><BurndownChart tasks={allTasks} rangeStart={rangeStart} rangeEnd={rangeEnd} height={240} /></CardContent>
         </Card>
         <RootCausePanel
           tasks={allTasks}
           label="Project"
-          onSelectCause={(type) => {
-            const style = causeStyle(type);
-            const affected = allTasks.filter((task) => task.cause?.type === type);
-            setSelectedTask({ _causeList: true, tasks: affected, title: style.label, subtitle: `${affected.length} task${affected.length !== 1 ? "s" : ""} affected in this project` });
+          onSelectCause={(category, affected) => {
+            setSelectedTask({ _causeList: true, tasks: affected, title: category, subtitle: `${affected.length} task${affected.length !== 1 ? "s" : ""} affected in this project` });
           }}
         />
         </div>
       )}
 
-      {allTasks.length > 0 && <TaskAssignmentList tasks={allTasks} onSelectTask={setSelectedTask} />}
+      {allTasks.length > 0 && <TaskAssignmentList tasks={allTasks} onSelectTask={setSelectedTask} projectId={activeProjectId} />}
 
       <VarianceDrillDownModal
         task={selectedTask?._causeList ? null : selectedTask}

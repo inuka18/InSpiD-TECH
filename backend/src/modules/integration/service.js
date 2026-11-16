@@ -16,7 +16,7 @@ async function liveState(projectId) {
       liveStatus: r.liveStatus,
       resourceRole: r.resourceRole,
       granularity: r.granularity,
-      cluster: r.groupId,
+      cluster: r.clusterId ?? null,
       type: r.type,
     })),
   };

@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { TrendingUp, TrendingDown, Minus, CheckCircle2, AlertTriangle, Clock, Users } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../../../components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "../../../components/ui/card";
 import { Badge } from "../../../components/ui/badge";
 import { Avatar, AvatarFallback } from "../../../components/ui/avatar";
 import { getTeamMemberById } from "../../../data/mockTeam";
@@ -170,9 +170,6 @@ export function ViewComparisonTable({ tasks = [], label = "", onSelectTask }) {
           <CheckCircle2 className="h-4 w-4 text-primary" />
           <CardTitle className="text-base">Planned vs Actual — {label} View</CardTitle>
         </div>
-        <CardDescription>
-          {tasks.length} task{tasks.length !== 1 ? "s" : ""} · Click any row to see full task detail
-        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <KpiStrip tasks={tasks} />

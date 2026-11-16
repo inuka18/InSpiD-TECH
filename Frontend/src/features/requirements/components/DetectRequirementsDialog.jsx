@@ -17,7 +17,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { detectRequirementsFromSRS } from "../../../data/mockRequirementDetection";
 import { createRequirementsFromSRS } from "../../../services/requirementsService";
 import { RESOURCE_ROLES } from "../../../data/mockRequirements";
-import { useRole } from "../../../context/RoleContext";
 import { cn } from "../../../lib/utils";
 
 const ANALYZE_DELAY_MS = 1600;
@@ -36,13 +35,13 @@ const DETECTION_ROLES = ["Unassigned", ...RESOURCE_ROLES];
 // empty state (see RequirementsTable), and only for a PM, never a forced
 // step in project creation.
 export function DetectRequirementsDialog({ projectId, onCreated }) {
-  const { currentUser } = useRole();
   const [open, setOpen] = useState(false);
   const [stage, setStage] = useState("idle"); // idle | analyzing | results
   const [file, setFile] = useState(null);
   const [detected, setDetected] = useState([]);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
   const reset = () => {
     setStage("idle");
@@ -50,6 +49,7 @@ export function DetectRequirementsDialog({ projectId, onCreated }) {
     setDetected([]);
     setSelectedIds(new Set());
     setSubmitting(false);
+    setError("");
   };
 
   const handleOpenChange = (next) => {
@@ -92,23 +92,26 @@ export function DetectRequirementsDialog({ projectId, onCreated }) {
     const chosen = detected.filter((item) => selectedIds.has(item.id));
     if (chosen.length === 0) return;
     setSubmitting(true);
+    setError("");
     const fileName = file.name;
-    const created = await createRequirementsFromSRS({
-      projectId,
-      items: chosen.map((item) => ({
-        title: item.title,
-        description: item.description,
-        category: item.category,
-        resourceRole: item.resourceRole,
-        cluster: item.cluster,
-      })),
-      sourceDocument: fileName,
-      actor: currentUser?.name ?? "Unknown",
-    });
-    setSubmitting(false);
-    setOpen(false);
-    reset();
-    onCreated({ requirements: created, fileName });
+    try {
+      const created = await createRequirementsFromSRS({
+        projectId,
+        items: chosen.map((item) => ({
+          title: item.title,
+          description: item.description,
+          category: item.category,
+          resourceRole: item.resourceRole,
+        })),
+      });
+      setOpen(false);
+      reset();
+      onCreated({ requirements: created, fileName });
+    } catch (err) {
+      // Items before the failing one were already created on the server; the list reload shows them.
+      setError(err.message || "Could not create the requirements.");
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -126,12 +129,15 @@ export function DetectRequirementsDialog({ projectId, onCreated }) {
               <DialogTitle>Upload an SRS document</DialogTitle>
               <DialogDescription>Select a file to detect this project's requirements.</DialogDescription>
             </DialogHeader>
+            <p className="rounded-md border border-dashed border-primary/40 bg-primary/5 px-2.5 py-1.5 text-xs font-medium text-primary">
+  Sample extraction (demo, model not connected yet)
+</p>
 
             <div className="space-y-1.5">
               <Label htmlFor="srs-file">File</Label>
               <Input id="srs-file" type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
               <p className="text-xs text-muted-foreground">
-                Prototype only, no file is actually uploaded or stored.
+                Prototype only: no file is uploaded or stored, and the requirements shown next are sample data.
               </p>
             </div>
 
@@ -168,6 +174,9 @@ export function DetectRequirementsDialog({ projectId, onCreated }) {
               </DialogTitle>
               <DialogDescription>From "{file?.name}", review and confirm which requirements to add.</DialogDescription>
             </DialogHeader>
+            <p className="rounded-md border border-dashed border-primary/40 bg-primary/5 px-2.5 py-1.5 text-xs font-medium text-primary">
+  Sample extraction (demo, model not connected yet)
+</p>
 
             <div className="flex items-center justify-between">
               <button
@@ -242,6 +251,12 @@ export function DetectRequirementsDialog({ projectId, onCreated }) {
                 );
               })}
             </div>
+
+            {error && (
+              <p role="alert" className="rounded-lg border border-status-dropped-fg/30 bg-status-dropped-bg px-3 py-2 text-sm text-status-dropped-fg">
+                {error}
+              </p>
+            )}
 
             <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
               <DialogClose asChild>

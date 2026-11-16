@@ -13,6 +13,7 @@ import { mockRequirements, getRequirementById } from "../data/mockRequirements";
 import { mockTasks } from "../data/mockSchedule";
 import { mockPropagationRuns, getPropagationRunsForProject } from "../data/mockPropagationRuns";
 import { delay } from "./simulatedLatency";
+import { rentEaseCapacity, RENT_EASE_PROJECT_ID } from "../data/mockRentEase";
 
 const SEVERITY_RANK = { High: 3, Medium: 2, Low: 1 };
 const RISK_LEVELS = ["Low", "Medium", "High"];
@@ -48,6 +49,7 @@ export async function fetchExecutionEvidenceForGap(gap) {
 
 export async function fetchResourceCapacity(projectId) {
   await delay(450);
+  if (projectId === RENT_EASE_PROJECT_ID) return rentEaseCapacity;
   return projectId ? mockResourceCapacity.filter((c) => c.projectId === projectId) : mockResourceCapacity;
 }
 

@@ -14,8 +14,8 @@ export function RequirementsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { activeProjectId } = useActiveProject();
   const { role } = useRole();
-  const { data: requirements, setData: setRequirements, loading: reqLoading } = useRequirements(activeProjectId);
-  const { data: signals, setData: setSignals, loading: sigLoading } = useSignals(activeProjectId);
+  const { data: requirements, loading: reqLoading, error: reqError, reload: reloadRequirements } = useRequirements(activeProjectId);
+  const { data: signals, loading: sigLoading, error: sigError, reload: reloadSignals } = useSignals(activeProjectId);
   const [toast, setToast] = useState(null);
 
   useEffect(() => {
@@ -24,12 +24,21 @@ export function RequirementsPage() {
     return () => clearTimeout(timer);
   }, [toast]);
 
+  // New requirements change the computed clusters of the others, so reload the whole list from the API.
   const handleRequirementsCreated = useCallback(({ requirements: created, fileName }) => {
-    setRequirements((prev) => [...created, ...prev]);
+    reloadRequirements();
     setToast(`${created.length} requirement${created.length === 1 ? "" : "s"} added from ${fileName}.`);
-  }, [setRequirements]);
+  }, [reloadRequirements]);
+
+  // A submitted or reviewed signal can change requirement statuses (and the ledger, which reloads when opened).
+  const refreshAfterSignalChange = useCallback(() => {
+    reloadSignals();
+    reloadRequirements();
+  }, [reloadSignals, reloadRequirements]);
 
   const activeTab = searchParams.get("tab") === "signals" ? "signals" : "list";
+  const reviewParam = searchParams.get("review");
+  const presetReview = ["pending", "accepted", "rejected"].includes(reviewParam) ? reviewParam : undefined;
   const activeReqId = searchParams.get("req");
   const highlightSignalId = searchParams.get("signal");
 
@@ -102,6 +111,8 @@ export function RequirementsPage() {
           <RequirementsTable
             requirements={requirements}
             loading={reqLoading}
+            error={reqError}
+            onRetry={reloadRequirements}
             onSelectRequirement={selectRequirement}
             projectId={activeProjectId}
             isPM={role === ROLES.PM}
@@ -112,8 +123,13 @@ export function RequirementsPage() {
         <TabsContent value="signals">
           <SignalFeed
             signals={signals}
-            setSignals={setSignals}
             loading={sigLoading}
+            error={sigError}
+            onRetry={reloadSignals}
+            requirements={requirements}
+            projectId={activeProjectId}
+            onChanged={refreshAfterSignalChange}
+            presetReview={presetReview}
             onSelectRequirement={selectRequirement}
             isPM={role === ROLES.PM}
             highlightSignalId={highlightSignalId}
@@ -125,6 +141,8 @@ export function RequirementsPage() {
 
       <RequirementDetailPanel
         requirementId={activeReqId}
+        projectId={activeProjectId}
+        requirements={requirements}
         open={Boolean(activeReqId)}
         onOpenChange={closeDetail}
         onSelectRequirement={selectRequirement}

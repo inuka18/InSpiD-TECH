@@ -1,17 +1,37 @@
-import { mockLedger, getLedgerEntriesForRequirement } from "../data/mockLedger";
+import { getLedgerEntriesForRequirement } from "../data/mockLedger";
 import { mockCrossValidation, getCrossValidationById } from "../data/mockCrossValidation";
 import { getActionById } from "../data/mockActions";
 import { delay } from "./simulatedLatency";
+import { api } from "../lib/apiClient";
 
+// Ledger entries come from the API (/projects/:projectId/ledger). It is a LOCAL hash chain in the database
+// (onChain: false), not a blockchain. Entry shape: { txHash, eventType (display string), eventCode, requirementId,
+// requirementTitle, relatedRequirementId, previousStatus, newStatus, triggeringSignal, triggeringSignalId, actor, timestamp,
+// blockNumber, previousBlockHash, onChain, details (NETWORK_UPDATE only: { added: [...], removed: [...] }) }
 export async function fetchLedgerEntries(projectId) {
-  await delay(500);
-  if (!projectId) return mockLedger;
-  return mockLedger.filter((entry) => entry.projectId === projectId);
+  let entries;
+  if (projectId) {
+    entries = await api(`/projects/${encodeURIComponent(projectId)}/ledger`);
+  } else {
+    const projects = await api("/projects");
+    entries = (await Promise.all(projects.map((p) => api(`/projects/${encodeURIComponent(p.id)}/ledger`)))).flat();
+  }
+  // Newest block first.
+  return [...entries].sort((x, y) => (x.projectId === y.projectId ? y.blockNumber - x.blockNumber : new Date(y.timestamp) - new Date(x.timestamp)));
 }
 
-export async function fetchLedgerEntriesForRequirement(requirementId) {
+// With a projectId this uses the API; without one (the Retrospectives evidence lookup) it still uses the mock data.
+export async function fetchLedgerEntriesForRequirement(requirementId, projectId) {
+  if (projectId) {
+    return api(`/projects/${encodeURIComponent(projectId)}/ledger/requirements/${encodeURIComponent(requirementId)}`);
+  }
   await delay(250);
   return getLedgerEntriesForRequirement(requirementId);
+}
+
+// Recomputes the hash chain on the server: { valid, entries, brokenAt, reason }.
+export async function verifyLedger(projectId) {
+  return api(`/projects/${encodeURIComponent(projectId)}/ledger/verify`);
 }
 
 // The Evidence Ledger's lookup panel takes a requirement ID, an action ID,

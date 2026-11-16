@@ -12,16 +12,21 @@ import { Separator } from "../../../components/ui/separator";
 import { StatusBadge } from "./StatusBadge";
 import { StatusTimeline } from "./StatusTimeline";
 import { useRequirement } from "../../../hooks/useRequirements";
-import { getClusterMeta, getRequirementById } from "../../../data/mockRequirements";
+import { clusterMeta as clusterMetaOf } from "../../../lib/clusters";
 
-export function RequirementDetailPanel({ requirementId, open, onOpenChange, onSelectRequirement }) {
-  const { data: requirement, loading } = useRequirement(requirementId);
-  const clusterMeta = requirement ? getClusterMeta(requirement.cluster) : null;
+// `requirements` (the loaded list) is only used to show titles for the related requirements.
+// Optional: `onBack` + `backLabel` add a "back" button (used when the panel was opened from a link on the network map);
+// `onCloseAutoFocus` lets the opener decide where focus goes when the panel closes.
+export function RequirementDetailPanel({ requirementId, projectId, requirements = [], open, onOpenChange, onSelectRequirement, onBack, backLabel, onCloseAutoFocus }) {
+  const { data: requirement, loading, error } = useRequirement(requirementId, projectId);
+  const clusterMeta = requirement ? clusterMetaOf(requirement) : null;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="flex flex-col p-0">
-        {loading || !requirement ? (
+      <SheetContent className="flex flex-col p-0" onCloseAutoFocus={onCloseAutoFocus}>
+        {error && !loading ? (
+          <div className="p-6 text-sm text-status-dropped-fg">Could not load this requirement: {error.message}</div>
+        ) : loading || !requirement ? (
           <div className="space-y-4 p-6">
             <Skeleton className="h-6 w-32" />
             <Skeleton className="h-8 w-full" />
@@ -31,6 +36,11 @@ export function RequirementDetailPanel({ requirementId, open, onOpenChange, onSe
         ) : (
           <>
             <SheetHeader>
+              {onBack && (
+                <button type="button" onClick={onBack} className="mb-1 w-fit text-xs font-medium text-primary hover:underline">
+                  ← {backLabel ?? "Back"}
+                </button>
+              )}
               <span className="font-mono text-xs font-medium text-primary">{requirement.id}</span>
               <SheetTitle>{requirement.title}</SheetTitle>
               <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -73,7 +83,13 @@ export function RequirementDetailPanel({ requirementId, open, onOpenChange, onSe
 
               <section>
                 <h4 className="mb-4 text-sm font-semibold text-foreground">Status History</h4>
-                <StatusTimeline history={requirement.statusHistory} />
+                {requirement.statusHistory?.length ? (
+                  <StatusTimeline history={requirement.statusHistory} />
+                ) : (
+                  <p className="rounded-lg border border-dashed border-border px-4 py-5 text-center text-sm text-muted-foreground">
+                    No status changes yet. The requirement is still {requirement.liveStatus}.
+                  </p>
+                )}
               </section>
 
               {requirement.relatedIds?.length > 0 && (
@@ -83,7 +99,7 @@ export function RequirementDetailPanel({ requirementId, open, onOpenChange, onSe
                     <h4 className="mb-3 text-sm font-semibold text-foreground">Related Requirements</h4>
                     <div className="flex flex-wrap gap-2">
                       {requirement.relatedIds.map((relId) => {
-                        const related = getRequirementById(relId);
+                        const related = requirements.find((r) => r.id === relId);
                         return (
                           <button
                             key={relId}

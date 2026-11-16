@@ -25,7 +25,6 @@ import { DayViewPage } from "./features/schedule/DayViewPage";
 import { WeekViewPage } from "./features/schedule/WeekViewPage";
 import { SprintViewPage } from "./features/schedule/SprintViewPage";
 import { ProjectTimelinePage } from "./features/schedule/ProjectTimelinePage";
-import { ResourceManagementPage } from "./features/schedule/ResourceManagementPage";
 import { KanbanBoardPage } from "./features/board/KanbanBoardPage";
 import { TeamPage } from "./features/team/TeamPage";
 import { MeetingsPage } from "./features/meetings/MeetingsPage";
@@ -79,7 +78,7 @@ export default function App() {
               <Route path="week" element={<WeekViewPage />} />
               <Route path="sprint" element={<SprintViewPage />} />
               <Route path="project-timeline" element={<ProjectTimelinePage />} />
-              <Route path="resources" element={<ResourceManagementPage />} />
+              <Route path="resources" element={<Navigate to="../../team" replace />} />
             </Route>
             <Route path="board" element={<KanbanBoardPage />} />
             <Route path="team" element={<TeamPage />} />

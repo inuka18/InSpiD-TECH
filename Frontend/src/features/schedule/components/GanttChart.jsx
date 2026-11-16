@@ -1,10 +1,11 @@
 import { useMemo, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, Maximize2, Minimize2, GanttChartSquare } from "lucide-react";
+import { ChevronDown, ChevronRight, Maximize2, Minimize2, GanttChartSquare, Diamond, Circle } from "lucide-react";
 import { createPortal } from "react-dom";
 import { TaskBar } from "./TaskBar";
 import { Avatar, AvatarFallback } from "../../../components/ui/avatar";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel } from "../../../components/ui/dropdown-menu";
 import { getTeamMemberById } from "../../../data/mockTeam";
+import { getRequirementsForProject } from "../../../data/mockRequirements";
 import { TASK_STATUSES } from "../../../data/mockSchedulePhases";
 import {
   TODAY, statusBarClass, statusLabel, formatShortDate, addDays,
@@ -13,6 +14,7 @@ import {
 import { useScheduleHistory } from "../context/ScheduleHistoryContext";
 import { cn } from "../../../lib/utils";
 import { useWorkCalendar, workingDaysBetween } from "../context/WorkCalendarContext";
+import { getTaskEffortMinutes } from "../lib/requirementPlanner";
 
 const HEADER_H = 48;
 const PHASE_H  = 32;
@@ -42,6 +44,13 @@ const STATUS_TEXT = {
 
 function initialsFor(name) {
   return name.split(" ").map((p) => p[0]).join("").toUpperCase();
+}
+
+function getTaskDateRange(tasks) {
+  return {
+    start: new Date(Math.min(...tasks.map((task) => new Date(task.start).getTime()))),
+    end: new Date(Math.max(...tasks.map((task) => new Date(task.end).getTime()))),
+  };
 }
 
 // Smart ticks: day labels when pxPerDay >= 20, week otherwise for percentage mode
@@ -121,10 +130,10 @@ function StatusDot({ task, isPM, onChangeStatus }) {
 
 // ── Core chart body (shared between inline + fullscreen) ──────────────────────
 function GanttBody({
-  flatRows, collapsed, toggleCollapsed,
+  flatRows, collapsed, toggleCollapsed, groupByRequirement, groupByPhaseRequirement,
   rangeStart, rangeEnd, ticks, todayPos, usesPx, coordWidth, timelineHeight,
   dependencyLines, onSelectTask, onSelectResource, capacity, isPM,
-  handleReschedule, handleChangeStatus, totalDays, pxPerDay,
+  handleReschedule, handleChangeStatus, handleToggleMilestone, totalDays, pxPerDay,
   workCalendar,
   fullscreen = false,
 }) {
@@ -133,30 +142,31 @@ function GanttBody({
   const [hoveredRowId, setHoveredRowId] = useState(null);
 
   return (
-    <div className={cn("flex overflow-hidden rounded-xl border border-border bg-card text-xs shadow-md shadow-black/[0.035]", fullscreen && "h-full")}>
+    <div className={cn("w-full min-w-0 overflow-hidden rounded-xl", fullscreen && "h-full")}>
+    <div className={cn("flex w-full min-w-0 overflow-hidden rounded-xl border border-border bg-card text-xs shadow-sm", fullscreen && "h-full")}>
 
       {/* ── Left label column — responsive width so Name/Resource get real room
            but the timeline pane never gets squeezed down to nothing ── */}
-      <div className="relative z-20 flex shrink-0 basis-[46%] min-w-[560px] max-w-[700px] flex-col bg-card shadow-[5px_0_12px_-8px_rgba(15,23,42,0.32)]">
+      <div className="relative z-20 flex shrink-0 basis-[46%] min-w-[260px] max-w-[700px] flex-col bg-card shadow-[5px_0_12px_-8px_rgba(15,23,42,0.32)] xl:min-w-[560px]">
 
         {/* Column headers */}
         <div className="flex h-12 items-stretch border-b border-border bg-gradient-to-b from-muted/60 to-muted/25">
           <div className="flex shrink-0 items-center justify-center border-r border-border/50 px-1.5 text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground" style={{ width: FIXED_COLS.num.w }}>
             {FIXED_COLS.num.label}
           </div>
-          <div className="flex min-w-[180px] flex-[2] items-center border-r border-border/50 px-3 text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
-            Task / Requirement
+          <div className="flex min-w-[90px] flex-[2] items-center border-r border-border/50 px-3 text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground xl:min-w-[180px]">
+            {groupByPhaseRequirement ? "Sprint / Requirement / Task" : groupByRequirement ? "Requirement / Task" : "Task / Requirement"}
           </div>
-          <div className="flex shrink-0 items-center justify-center border-r border-border/50 px-1.5 text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground" style={{ width: FIXED_COLS.duration.w }}>
+          <div className="hidden shrink-0 items-center justify-center border-r border-border/50 px-1.5 text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground xl:flex" style={{ width: FIXED_COLS.duration.w }}>
             {FIXED_COLS.duration.label}
           </div>
-          <div className="flex shrink-0 items-center border-r border-border/50 px-1.5 text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground" style={{ width: FIXED_COLS.start.w }}>
+          <div className="hidden shrink-0 items-center border-r border-border/50 px-1.5 text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground xl:flex" style={{ width: FIXED_COLS.start.w }}>
             {FIXED_COLS.start.label}
           </div>
-          <div className="flex shrink-0 items-center border-r border-border/50 px-1.5 text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground" style={{ width: FIXED_COLS.finish.w }}>
+          <div className="hidden shrink-0 items-center border-r border-border/50 px-1.5 text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground xl:flex" style={{ width: FIXED_COLS.finish.w }}>
             {FIXED_COLS.finish.label}
           </div>
-          <div className="flex min-w-[125px] flex-[1.3] items-center px-3 text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
+          <div className="flex min-w-[85px] flex-1 items-center px-2 text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground xl:min-w-[125px] xl:flex-[1.3] xl:px-3">
             Resource
           </div>
         </div>
@@ -169,7 +179,7 @@ function GanttBody({
                 key={row.phase.id}
                 type="button"
                 onClick={() => toggleCollapsed(row.phase.id)}
-                className="flex h-8 w-full items-center gap-2 border-t border-border/80 bg-primary/[0.045] px-3 text-left text-[10px] font-bold uppercase tracking-[0.1em] text-foreground outline-none transition-colors hover:bg-primary/[0.075] focus-visible:bg-primary/[0.075]"
+                className="flex h-8 w-full items-center gap-2 border-t border-border/70 bg-blue-50/80 px-3 text-left text-[10px] font-bold uppercase tracking-[0.1em] text-foreground outline-none transition-colors hover:bg-blue-100/80 focus-visible:bg-blue-100/80 dark:bg-blue-950/20 dark:hover:bg-blue-950/35 dark:focus-visible:bg-blue-950/35"
               >
                 {isCollapsed ? <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />}
                 <span className="truncate">{row.phase.name}</span>
@@ -178,6 +188,17 @@ function GanttBody({
                 </span>
               </button>
             );
+          }
+
+          if (row.type === "requirement") {
+            const isCollapsed = collapsed.has(row.id);
+            const requirementHours = row.tasks.reduce((sum, task) => sum + getTaskEffortMinutes(task, workCalendar), 0) / 60;
+            return <button key={row.id} type="button" onClick={() => toggleCollapsed(row.id)} className="flex h-8 w-full items-center gap-2 border-t border-border/60 bg-slate-50/80 px-3 pl-8 text-left text-[10px] font-semibold text-foreground outline-none hover:bg-slate-100/80 dark:bg-slate-900/30 dark:hover:bg-slate-900/50">
+              {isCollapsed ? <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />}
+              <span className="truncate font-mono text-[9px] text-primary">{row.requirementId}</span><span className="truncate">{row.title}</span>
+              <span className="shrink-0 rounded bg-sky-100 px-1.5 py-0.5 text-[9px] font-semibold tabular-nums text-sky-800 dark:bg-sky-900/40 dark:text-sky-200">{requirementHours.toFixed(1)}h</span>
+              <span className="ml-auto shrink-0 rounded-full border border-border/70 bg-background px-2 py-0.5 text-[9px] font-medium text-muted-foreground">{row.tasks.length}</span>
+            </button>;
           }
 
           const { task, num } = row;
@@ -197,7 +218,7 @@ function GanttBody({
               onMouseLeave={() => setHoveredRowId((cur) => (cur === task.id ? null : cur))}
               className={cn(
                 "flex items-stretch border-t border-border/50 transition-colors",
-                isHovered ? "bg-primary/[0.045]" : isEven ? "bg-card" : "bg-muted/[0.16]",
+                isHovered ? "bg-blue-50/70 dark:bg-blue-950/25" : isEven ? "bg-card" : "bg-slate-50/80 dark:bg-slate-900/20",
                 task.critical && "border-l-2 border-l-red-500"
               )}
               style={{ height: ROW_H }}
@@ -207,28 +228,31 @@ function GanttBody({
                 {String(num).padStart(2, "0")}
               </div>
               {/* Task Name — flexible, gets whatever room the panel has */}
-              <div className="flex min-w-[180px] flex-[2] items-center gap-2 border-r border-border/30 px-3">
+              <div className="flex min-w-[90px] flex-[2] items-center gap-1.5 border-r border-border/30 px-2 xl:min-w-[180px] xl:gap-2 xl:px-3">
                 <StatusDot task={task} isPM={isPM} onChangeStatus={handleChangeStatus} />
+                {(isPM || task.milestone) && <button type="button" aria-label={task.milestone ? `Remove milestone from ${task.name}` : `Mark ${task.name} as milestone`} aria-pressed={Boolean(task.milestone)} title={task.milestone ? "Milestone — click to remove" : "Mark as milestone"} onClick={(event) => { event.stopPropagation(); if (isPM) handleToggleMilestone(task); }} className={cn("flex h-5 w-5 shrink-0 items-center justify-center rounded outline-none focus-visible:ring-2 focus-visible:ring-primary", isPM && "hover:bg-muted")}>
+                  {task.milestone ? <Diamond className="h-3.5 w-3.5 fill-amber-500 text-amber-600" /> : <Circle className="h-2.5 w-2.5 text-muted-foreground/55" />}
+                </button>}
                 {task.critical && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" title="Critical" />}
                 <div className="min-w-0 flex-1">
-                  <span className={cn("block truncate text-[11px] font-semibold leading-tight", isTaskLate ? "text-red-600 dark:text-red-400" : "text-foreground")} title={task.name}>{task.name}</span>
-                  <span className="mt-1 block truncate text-[9px] leading-tight text-muted-foreground" title={task.requirementId}>{task.requirementId ?? task.id}</span>
+                <span className={cn("block truncate text-[11px] font-semibold leading-tight", isTaskLate ? "text-red-600 dark:text-red-400" : "text-foreground")} title={task.name}>{task.name}</span>
+                  <span className="mt-1 block truncate font-mono text-[9px] leading-tight text-muted-foreground" title={task.id}>{task.id}</span>
                 </div>
               </div>
               {/* Duration */}
-              <div className="flex shrink-0 items-center justify-center border-r border-border/30 text-[10px] font-medium tabular-nums text-muted-foreground" style={{ width: FIXED_COLS.duration.w }}>
+              <div className="hidden shrink-0 items-center justify-center border-r border-border/30 text-[10px] font-medium tabular-nums text-muted-foreground xl:flex" style={{ width: FIXED_COLS.duration.w }}>
                 {dur}d
               </div>
               {/* Start */}
-              <div className={cn("flex shrink-0 items-center border-r border-border/30 px-2 text-[10px] tabular-nums", isTaskLate ? "text-red-600 dark:text-red-400" : "text-foreground")} style={{ width: FIXED_COLS.start.w }}>
+              <div className={cn("hidden shrink-0 items-center border-r border-border/30 px-2 text-[10px] tabular-nums xl:flex", isTaskLate ? "text-red-600 dark:text-red-400" : "text-foreground")} style={{ width: FIXED_COLS.start.w }}>
                 {formatShortDate(task.start)}
               </div>
               {/* Finish */}
-              <div className={cn("flex shrink-0 items-center border-r border-border/30 px-2 text-[10px] tabular-nums", isTaskLate ? "text-red-600 dark:text-red-400" : "text-foreground")} style={{ width: FIXED_COLS.finish.w }}>
+              <div className={cn("hidden shrink-0 items-center border-r border-border/30 px-2 text-[10px] tabular-nums xl:flex", isTaskLate ? "text-red-600 dark:text-red-400" : "text-foreground")} style={{ width: FIXED_COLS.finish.w }}>
                 {formatShortDate(task.end)}
               </div>
               {/* Resource — flexible */}
-              <div className="flex min-w-[125px] flex-[1.3] items-center gap-2 px-3">
+              <div className="flex min-w-[85px] flex-1 items-center gap-1 px-1.5 xl:min-w-[125px] xl:flex-[1.3] xl:gap-2 xl:px-3">
                 {resourceRecord && onSelectResource ? (
                   <button
                     type="button"
@@ -236,13 +260,13 @@ function GanttBody({
                     className="flex min-w-0 items-center gap-2 truncate rounded px-0.5 outline-none transition-colors hover:text-primary focus-visible:ring-2 focus-visible:ring-primary"
                     title={`View ${assignee?.name ?? "assignee"}`}
                   >
-                    <div className="flex shrink-0 -space-x-1.5">{assignees.slice(0, 2).map((person) => <Avatar key={person.id} className="h-6 w-6 border-2 border-card text-[8px]"><AvatarFallback>{initialsFor(person.name)}</AvatarFallback></Avatar>)}{assignees.length === 0 && <Avatar className="h-6 w-6 text-[8px]"><AvatarFallback>?</AvatarFallback></Avatar>}</div>
-                    <span className="truncate text-[10px] text-muted-foreground">{assignees.map((person) => person.name).join(", ") || "Unassigned"}</span>
+                    <div className="flex shrink-0 items-center -space-x-2">{assignees.slice(0, 2).map((person) => <Avatar key={person.id} title={person.name} className="h-6 w-6 border-2 border-card text-[8px] shadow-sm ring-1 ring-border/50 xl:h-7 xl:w-7"><AvatarFallback className="bg-primary/10 text-primary">{person.initials ?? initialsFor(person.name)}</AvatarFallback></Avatar>)}{assignees.length > 2 && <span className="z-10 flex h-5 w-5 items-center justify-center rounded-full border-2 border-card bg-muted text-[8px] font-semibold text-muted-foreground xl:h-6 xl:w-6" title={assignees.slice(2).map((person) => person.name).join(", ")}>+{assignees.length - 2}</span>}{assignees.length === 0 && <Avatar className="h-6 w-6 border-2 border-card text-[8px] shadow-sm xl:h-7 xl:w-7"><AvatarFallback className="bg-muted text-muted-foreground">?</AvatarFallback></Avatar>}</div>
+                    <span className="hidden truncate text-[10px] text-muted-foreground lg:inline">{assignees.map((person) => person.name).join(", ") || "Unassigned"}</span>
                   </button>
                 ) : (
                   <>
-                    <div className="flex shrink-0 -space-x-1.5">{assignees.slice(0, 2).map((person) => <Avatar key={person.id} className="h-6 w-6 border-2 border-card text-[8px]"><AvatarFallback>{initialsFor(person.name)}</AvatarFallback></Avatar>)}{assignees.length === 0 && <Avatar className="h-6 w-6 text-[8px]"><AvatarFallback>?</AvatarFallback></Avatar>}</div>
-                    <span className="truncate text-[10px] text-muted-foreground">{assignees.map((person) => person.name).join(", ") || "Unassigned"}</span>
+                    <div className="flex shrink-0 items-center -space-x-2">{assignees.slice(0, 2).map((person) => <Avatar key={person.id} title={person.name} className="h-6 w-6 border-2 border-card text-[8px] shadow-sm ring-1 ring-border/50 xl:h-7 xl:w-7"><AvatarFallback className="bg-primary/10 text-primary">{person.initials ?? initialsFor(person.name)}</AvatarFallback></Avatar>)}{assignees.length > 2 && <span className="z-10 flex h-5 w-5 items-center justify-center rounded-full border-2 border-card bg-muted text-[8px] font-semibold text-muted-foreground xl:h-6 xl:w-6" title={assignees.slice(2).map((person) => person.name).join(", ")}>+{assignees.length - 2}</span>}{assignees.length === 0 && <Avatar className="h-6 w-6 border-2 border-card text-[8px] shadow-sm xl:h-7 xl:w-7"><AvatarFallback className="bg-muted text-muted-foreground">?</AvatarFallback></Avatar>}</div>
+                  <span className="hidden truncate text-[10px] text-muted-foreground lg:inline">{assignees.map((person) => person.name).join(", ") || "Unassigned"}</span>
                   </>
                 )}
               </div>
@@ -253,7 +277,7 @@ function GanttBody({
 
       {/* ── Right timeline ── */}
       <div className={cn("relative min-w-0 flex-1 overflow-x-auto bg-card scrollbar-thin", fullscreen && "overflow-y-auto")}>
-        <div className="relative" ref={containerRef} style={usesPx ? { width: coordWidth } : undefined}>
+        <div className="relative" ref={containerRef} style={{ width: usesPx ? `${coordWidth}px` : "100%" }}>
 
               <div className="relative h-12 border-b border-border bg-gradient-to-b from-muted/60 to-muted/25">
             {ticks.map((tick) => (
@@ -270,13 +294,18 @@ function GanttBody({
             ))}
           </div>
 
-          {ticks.filter((t) => t.isWeekend).map((tick) => {
-            if (!usesPx || pxPerDay < 20) return null;
+          {Array.from({ length: totalDays + 1 }, (_, dayOffset) => {
+            const date = addDays(rangeStart, dayOffset);
+            if (date.getDay() !== 0 && date.getDay() !== 6) return null;
+            const dayWidth = 100 / Math.max(totalDays, 1);
             return (
               <div
-                key={`we-${tick.key}`}
-                className="pointer-events-none absolute bottom-0 top-12 bg-slate-500/[0.055]"
-                style={{ left: `${tick.pos}px`, width: pxPerDay }}
+                key={`weekend-${date.toISOString()}`}
+                className="pointer-events-none absolute bottom-0 top-12 bg-slate-500/[0.045]"
+                style={{
+                  left: usesPx ? `${dayOffset * pxPerDay}px` : `${dayOffset * dayWidth}%`,
+                  width: usesPx ? pxPerDay : `${dayWidth}%`,
+                }}
               />
             );
           })}
@@ -291,10 +320,10 @@ function GanttBody({
 
           {todayPos != null && (
             <div
-              className="pointer-events-none absolute bottom-0 top-0 z-10 w-0.5 bg-red-500/80"
+              className="pointer-events-none absolute bottom-0 top-0 z-20 w-[2px] bg-red-500/90 shadow-[0_0_2px_rgb(239_68_68_/_25%)]"
               style={{ left: `${todayPos}${unit}` }}
             >
-              <span className="absolute top-0 -translate-x-1/2 whitespace-nowrap rounded-b-md bg-red-500 px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-white shadow-sm">
+              <span className="absolute left-1/2 top-0 -translate-x-1/2 whitespace-nowrap rounded-b-md bg-red-500 px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-white shadow-sm">
                 Today
               </span>
             </div>
@@ -326,8 +355,28 @@ function GanttBody({
           )}
 
           {flatRows.map((row, idx) => {
-            if (row.type === "phase") {
-              return <div key={row.phase.id} className="h-8 border-t border-border/80 bg-primary/[0.045]" />;
+            if (row.type === "phase" || row.type === "requirement") {
+              const start = row.type === "phase" ? row.phase.start : row.start;
+              const end = row.type === "phase" ? row.phase.end : row.end;
+              const total = Math.max(totalDays, 1);
+              const leftDays = Math.max(0, Math.min(total, daysBetween(rangeStart, start)));
+              const rightDays = Math.max(leftDays, Math.min(total, daysBetween(rangeStart, end)));
+              const left = usesPx ? leftDays * pxPerDay : (leftDays / total) * 100;
+              const width = usesPx
+                ? Math.max((rightDays - leftDays) * pxPerDay, 6)
+                : Math.max(((rightDays - leftDays) / total) * 100, 0.5);
+              const unit = usesPx ? "px" : "%";
+              const isSprintRow = row.type === "phase";
+              return <div key={row.id ?? row.phase.id} className={cn("relative h-8 border-t border-border/70", isSprintRow ? "bg-blue-50/80 dark:bg-blue-950/20" : "bg-slate-50/80 dark:bg-slate-900/30")}>
+                <div
+                  className={cn("absolute top-1.5 h-5 rounded-md border px-2 text-[9px] font-semibold leading-[18px] text-white shadow-sm", isSprintRow ? "border-indigo-700/30 bg-indigo-600 dark:bg-indigo-500" : "border-sky-700/30 bg-sky-600 dark:bg-sky-500")}
+                  style={{ left: `${left}${unit}`, width: `${width}${unit}` }}
+                  title={`${isSprintRow ? row.phase.name : row.title}: ${formatShortDate(start)} – ${formatShortDate(end)}`}
+                  aria-label={`${isSprintRow ? "Sprint" : "Requirement"} timeline bar`}
+                >
+                  <span className="block truncate">{isSprintRow ? row.phase.name : `${row.requirementId} · ${row.title}`}</span>
+                </div>
+              </div>;
             }
             const { task } = row;
             const isEven = idx % 2 === 0;
@@ -338,8 +387,8 @@ function GanttBody({
                 onMouseEnter={() => setHoveredRowId(task.id)}
                 onMouseLeave={() => setHoveredRowId((cur) => (cur === task.id ? null : cur))}
                 className={cn(
-                  "border-t border-border/40 transition-colors",
-                  isHovered ? "bg-primary/[0.045]" : isEven ? "bg-card" : "bg-muted/[0.16]"
+                  "border-t border-border/40 transition-colors duration-150",
+                  isHovered ? "bg-blue-50/70 dark:bg-blue-950/25" : isEven ? "bg-card" : "bg-slate-50/80 dark:bg-slate-900/20"
                 )}
               >
                 <TaskBar
@@ -359,6 +408,7 @@ function GanttBody({
           })}
         </div>
       </div>
+    </div>
     </div>
   );
 }
@@ -390,13 +440,21 @@ function FullscreenGantt({ onClose, children }) {
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
-export function GanttChart({ phases, rangeStart, rangeEnd, onSelectTask, onSelectResource, capacity, pxPerDay, isPM = true }) {
+export function GanttChart({ phases, rangeStart, rangeEnd, onSelectTask, onSelectResource, capacity, pxPerDay, isPM = true, groupByRequirement = false, groupByPhaseRequirement = false, projectId }) {
   const { settings: workCalendar } = useWorkCalendar();
   const [collapsed, setCollapsed] = useState(() => new Set());
   const [renderTick, bump]        = useState(0);
   const [fullscreen, setFullscreen] = useState(false);
   const forceRender = () => bump((n) => n + 1);
   const { pushHistory } = useScheduleHistory();
+  const requirementTitles = useMemo(() => new Map(getRequirementsForProject(projectId ?? phases[0]?.projectId).map((item) => [item.id, item.title])), [phases, projectId]);
+  const requirementTitleFor = (requirementId, tasks) => {
+    if (!requirementId || requirementId === "unlinked") return "Tasks not linked to a requirement yet";
+    return requirementTitles.get(requirementId)
+      ?? tasks.find((task) => task.requirementTitle || task.requirement)?.requirementTitle
+      ?? tasks.find((task) => task.requirement)?.requirement
+      ?? "Requirement details unavailable";
+  };
 
   const totalDays  = daysBetween(rangeStart, rangeEnd);
   const usesPx     = Boolean(pxPerDay);
@@ -426,18 +484,45 @@ export function GanttChart({ phases, rangeStart, rangeEnd, onSelectTask, onSelec
   const { rowMeta, timelineHeight } = useMemo(() => {
     let y = HEADER_H;
     const meta = new Map();
-    visiblePhases.forEach((phase) => {
-      y += PHASE_H;
-      if (!collapsed.has(phase.id)) {
-        phase.tasks.forEach((task) => {
+    if (groupByPhaseRequirement) {
+      visiblePhases.forEach((phase) => {
+        y += PHASE_H;
+        if (!collapsed.has(phase.id)) {
+          const groups = new Map();
+          phase.tasks.forEach((task) => { const id = task.requirementId || "unlinked"; if (!groups.has(id)) groups.set(id, []); groups.get(id).push(task); });
+          groups.forEach((tasks, requirementId) => {
+            y += PHASE_H;
+            if (!collapsed.has(`requirement:${phase.id}:${requirementId}`)) tasks.forEach((task) => {
+              meta.set(task.id, { y: y + ROW_H / 2, x1: scale(task.start), x2: scale(task.end) });
+              y += ROW_H;
+            });
+          });
+        }
+      });
+    } else if (groupByRequirement) {
+      const groups = new Map();
+      visiblePhases.flatMap((phase) => phase.tasks).forEach((task) => {
+        const id = task.requirementId || "unlinked";
+        if (!groups.has(id)) groups.set(id, []);
+        groups.get(id).push(task);
+      });
+      groups.forEach((tasks, requirementId) => {
+        y += PHASE_H;
+        if (!collapsed.has(`requirement:${requirementId}`)) tasks.forEach((task) => {
           meta.set(task.id, { y: y + ROW_H / 2, x1: scale(task.start), x2: scale(task.end) });
           y += ROW_H;
         });
-      }
+      });
+    } else visiblePhases.forEach((phase) => {
+      y += PHASE_H;
+      if (!collapsed.has(phase.id)) phase.tasks.forEach((task) => {
+        meta.set(task.id, { y: y + ROW_H / 2, x1: scale(task.start), x2: scale(task.end) });
+        y += ROW_H;
+      });
     });
     return { rowMeta: meta, timelineHeight: y };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phases, rangeStart, rangeEnd, collapsed, pxPerDay, renderTick]);
+  }, [phases, rangeStart, rangeEnd, collapsed, pxPerDay, renderTick, groupByRequirement, groupByPhaseRequirement, workCalendar]);
 
   const dependencyLines = [];
   rowMeta.forEach((toPos, taskId) => {
@@ -466,6 +551,12 @@ export function GanttChart({ phases, rangeStart, rangeEnd, onSelectTask, onSelec
   };
 
   const handleChangeStatus = (task, status) => { setTaskStatus(task, status); forceRender(); };
+  const handleToggleMilestone = (task) => {
+    const previous = task.milestone;
+    task.milestone = !task.milestone;
+    pushHistory(`${task.milestone ? "Marked" : "Removed"} milestone: "${task.name}"`, () => { task.milestone = previous; });
+    forceRender();
+  };
 
   if (visiblePhases.length === 0) {
     return (
@@ -477,28 +568,58 @@ export function GanttChart({ phases, rangeStart, rangeEnd, onSelectTask, onSelec
 
   const flatRows = [];
   let taskNum = 1;
-  visiblePhases.forEach((phase) => {
+  if (groupByPhaseRequirement) {
+    visiblePhases.forEach((phase) => {
+      flatRows.push({ type: "phase", phase });
+      if (!collapsed.has(phase.id)) {
+        const groups = new Map();
+        phase.tasks.forEach((task) => { const id = task.requirementId || "unlinked"; if (!groups.has(id)) groups.set(id, []); groups.get(id).push(task); });
+        groups.forEach((tasks, requirementId) => {
+          const id = `requirement:${phase.id}:${requirementId}`;
+          flatRows.push({ type: "requirement", id, requirementId: requirementId === "unlinked" ? "No requirement" : requirementId, title: requirementTitleFor(requirementId, tasks), ...getTaskDateRange(tasks), tasks });
+          if (!collapsed.has(id)) tasks.forEach((task) => flatRows.push({ type: "task", task, phase, num: taskNum++ }));
+        });
+      }
+    });
+  } else if (groupByRequirement) {
+    const groups = new Map();
+    visiblePhases.flatMap((phase) => phase.tasks).forEach((task) => {
+      const id = task.requirementId || "unlinked";
+      if (!groups.has(id)) groups.set(id, []);
+      groups.get(id).push(task);
+    });
+    groups.forEach((tasks, requirementId) => {
+      const id = `requirement:${requirementId}`;
+      flatRows.push({ type: "requirement", id, requirementId: requirementId === "unlinked" ? "No requirement" : requirementId, title: requirementTitleFor(requirementId, tasks), ...getTaskDateRange(tasks), tasks });
+      if (!collapsed.has(id)) tasks.forEach((task) => flatRows.push({ type: "task", task, num: taskNum++ }));
+    });
+  } else visiblePhases.forEach((phase) => {
     flatRows.push({ type: "phase", phase });
-    if (!collapsed.has(phase.id)) {
-      phase.tasks.forEach((task) => flatRows.push({ type: "task", task, phase, num: taskNum++ }));
-    }
+    if (!collapsed.has(phase.id)) phase.tasks.forEach((task) => flatRows.push({ type: "task", task, phase, num: taskNum++ }));
   });
-
   const bodyProps = {
-    flatRows, collapsed, toggleCollapsed,
+    flatRows, collapsed, toggleCollapsed, groupByRequirement, groupByPhaseRequirement,
     rangeStart, rangeEnd, ticks, todayPos, usesPx, coordWidth, timelineHeight,
     dependencyLines, onSelectTask, onSelectResource, capacity, isPM,
-    handleReschedule, handleChangeStatus, totalDays, pxPerDay,
+    handleReschedule, handleChangeStatus, handleToggleMilestone, totalDays, pxPerDay,
     workCalendar,
   };
 
   return (
     <>
-      <div className="mb-2 flex items-center justify-between">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
           <GanttChartSquare className="h-3.5 w-3.5" />
           Gantt Chart
         </span>
+        <div className="hidden flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground md:flex" aria-label="Gantt legend">
+          {groupByPhaseRequirement && <><span className="flex items-center gap-1"><i className="h-2 w-2 rounded-sm bg-indigo-600" />Sprint</span><span className="flex items-center gap-1"><i className="h-2 w-2 rounded-sm bg-sky-600" />Requirement</span></>}
+          <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-[#7b8798]" />Not started</span>
+          <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-[#426fba]" />In progress</span>
+          <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-[#b7791f]" />Review</span>
+          <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-[#2e8067]" />Done</span>
+          <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-[#c74848]" />Late</span>
+        </div>
         <button
           type="button"
           onClick={() => setFullscreen(true)}

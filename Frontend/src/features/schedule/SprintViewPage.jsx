@@ -16,13 +16,11 @@ import { useSchedulePhases } from "../../hooks/useSchedulePhases";
 import { useResourceCapacity } from "../../hooks/useResourceCapacity";
 import { useScheduleView } from "../../hooks/useScheduleView";
 import { useRole, ROLES } from "../../context/RoleContext";
+import { addWorkingDays, endOfWorkingDays, useWorkCalendar } from "./context/WorkCalendarContext";
 import {
   flattenTasks,
   isAtRisk,
-  causeStyle,
   overlapsRange,
-  daysBetween,
-  addDays,
   formatShortDate,
   taskAssigneeIds,
 } from "./lib/scheduleUtils";
@@ -32,6 +30,7 @@ export function SprintViewPage() {
   const { data: phases, loading } = useSchedulePhases(activeProjectId);
   const { data: capacity } = useResourceCapacity(activeProjectId);
   const { role } = useRole();
+  const { settings } = useWorkCalendar();
   const isPM = role === ROLES.PM;
   const [sprintOffset, setSprintOffset] = useState(0);
   const [selectedTask, setSelectedTask] = useState(null);
@@ -40,21 +39,26 @@ export function SprintViewPage() {
   const [compareOpen, setCompareOpen] = useState(false);
 
   const sprint = activeProject?.activeSprint;
-  const sprintLengthDays = sprint ? daysBetween(sprint.startDate, sprint.endDate) : 0;
-  const sprintStart = sprint ? addDays(new Date(sprint.startDate), sprintOffset * sprintLengthDays) : null;
-  const sprintEnd = sprint ? addDays(new Date(sprint.endDate), sprintOffset * sprintLengthDays) : null;
+  const sprintLengthDays = Number(settings.sprintDays ?? 10);
+  const sprintStart = sprint ? addWorkingDays(new Date(sprint.startDate), sprintOffset * sprintLengthDays, settings.workdays) : null;
+  const sprintEnd = sprint ? endOfWorkingDays(sprintStart, sprintLengthDays, settings.workdays) : null;
   const sprintNumber = sprint ? sprint.number + sprintOffset : null;
   const sprintLabel = sprint ? (sprintOffset === 0 ? sprint.name : `Sprint ${sprintNumber}`) : "";
 
   const sprintTasks = useMemo(() => {
     if (!sprintStart || !sprintEnd) return [];
-    return flattenTasks(phases).filter((t) => overlapsRange(t, sprintStart, sprintEnd));
-  }, [phases, sprintStart, sprintEnd]);
+    return flattenTasks(phases).filter((task) => {
+      const assignedSprint = Number.isInteger(task.plannedSprintNumber)
+        ? task.plannedSprintNumber
+        : task.status === "done" && Number.isInteger(task.sprintNumber) ? task.sprintNumber : null;
+      return assignedSprint === null ? overlapsRange(task, sprintStart, sprintEnd) : assignedSprint === sprintNumber;
+    });
+  }, [phases, sprintStart, sprintEnd, sprintNumber, settings]);
   const delayedTasks = sprintTasks.filter(isAtRisk);
   const peopleCount = new Set(sprintTasks.flatMap(taskAssigneeIds)).size;
 
   if (!sprint) {
-    return <EmptyState icon={Target} title="No active sprint" description="This project doesn't have an active sprint configured." />;
+    return <EmptyState icon={Target} title="No active sprint" />;
   }
 
   return (
@@ -69,7 +73,7 @@ export function SprintViewPage() {
             <div>
               <CardTitle className="text-base">{sprintLabel}</CardTitle>
               <CardDescription>
-                {formatShortDate(sprintStart)} – {formatShortDate(sprintEnd)}
+                {formatShortDate(sprintStart)} – {formatShortDate(sprintEnd)} · {sprintLengthDays} working days
               </CardDescription>
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
@@ -103,6 +107,8 @@ export function SprintViewPage() {
               onSelectResource={setSelectedCapacity}
               capacity={capacity}
               isPM={isPM}
+              groupByRequirement
+              projectId={activeProjectId}
             />
           )}
         </div>
@@ -112,23 +118,20 @@ export function SprintViewPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Sprint Burndown</CardTitle>
-                <CardDescription>Planned versus actual effort within this sprint only.</CardDescription>
               </CardHeader>
               <CardContent><BurndownChart tasks={sprintTasks} rangeStart={sprintStart} rangeEnd={sprintEnd} height={220} /></CardContent>
             </Card>
             <RootCausePanel
             tasks={sprintTasks}
             label="Sprint"
-            onSelectCause={(type) => {
-              const style = causeStyle(type);
-              const affected = sprintTasks.filter((task) => task.cause?.type === type);
-              setListDrill({ title: style.label, subtitle: `${affected.length} task${affected.length !== 1 ? "s" : ""} affected in this sprint`, tasks: affected });
+            onSelectCause={(category, affected) => {
+              setListDrill({ title: category, subtitle: `${affected.length} task${affected.length !== 1 ? "s" : ""} affected in this sprint`, tasks: affected });
             }}
             />
           </div>
         )}
 
-        {!loading && <TaskAssignmentList tasks={sprintTasks} onSelectTask={setSelectedTask} />}
+        {!loading && <TaskAssignmentList tasks={sprintTasks} onSelectTask={setSelectedTask} projectId={activeProjectId} />}
 
       </div>
 

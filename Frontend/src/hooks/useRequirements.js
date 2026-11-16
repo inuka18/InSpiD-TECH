@@ -9,6 +9,7 @@ export function useRequirements(projectId) {
   const reload = useCallback(() => {
     let cancelled = false;
     setLoading(true);
+    setError(null);
     fetchRequirements(projectId)
       .then((res) => {
         if (!cancelled) setData(res);
@@ -30,7 +31,7 @@ export function useRequirements(projectId) {
   return { data, setData, loading, error, reload };
 }
 
-export function useRequirement(id) {
+export function useRequirement(id, projectId) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(Boolean(id));
   const [error, setError] = useState(null);
@@ -43,7 +44,7 @@ export function useRequirement(id) {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    fetchRequirementById(id)
+    fetchRequirementById(id, projectId)
       .then((res) => {
         if (!cancelled) setData(res);
       })
@@ -56,7 +57,7 @@ export function useRequirement(id) {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, projectId]);
 
   return { data, loading, error };
 }

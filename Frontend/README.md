@@ -65,3 +65,29 @@ src/
 To connect a real backend later: rewrite the bodies of the files in `src/services/`
 (e.g. replace the mock array + simulated delay with a `fetch` call) — every hook,
 page, and component keeps working unchanged.
+
+## Running against the real API (Component 1)
+
+The Requirements screens (list, signal feed, ledger, network map, signal analytics), Projects, Team and login use the backend.
+
+```
+cd Frontend
+npm install
+npm run dev          # http://localhost:5173 ; talks to http://localhost:5000/api/v1 by default
+```
+
+To use another API address, copy `.env.example` to `.env` and change `VITE_API_URL` (no secrets belong there). Log in with a seeded
+account (`pm.ret@inspid.test`, `developer.ret@inspid.test`, ... see the backend README); the login page has buttons that fill only the
+email. The session token is kept in `localStorage` under `inspid-token`.
+
+Still on mock data (not connected to the backend yet): Gap Detection, Schedule, Board, Meetings, Retrospectives, notifications,
+the Alignment Score page (shows an empty state), SRS requirement detection (sample extraction) and document upload for signals.
+
+## Documents and the network map
+
+- **Upload Document** (Signal Feed): pick a `.txt`, `.md`, `.docx` or `.pdf` file (or paste text), click "Find signals", review the table (change a match
+  if needed, untick what you do not want) and submit. Nothing is saved until you submit; signals are suggestions, so review them. A PM can
+  correct labels afterwards in the Signal Feed.
+- **Network map toolbar** (bottom-right): zoom in/out, the zoom % (click = 100%), fit to screen and fullscreen. With the map focused: `+` `-` zoom,
+  `0` fits, `F` toggles fullscreen. In fullscreen Esc closes an open panel or dialog first and only then leaves fullscreen. Chrome and Edge keep Esc
+  for the page (Keyboard Lock); Firefox and Safari leave fullscreen on Esc even with a panel open, so use the "Exit fullscreen" button or `F`.

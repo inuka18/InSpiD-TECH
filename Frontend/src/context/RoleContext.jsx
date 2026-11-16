@@ -1,75 +1,88 @@
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
-
-const STORAGE_KEY = "inspid-tech-role";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { api, clearToken, getToken, setToken, setUnauthorizedHandler } from "../lib/apiClient";
+import { initialsFor } from "../lib/utils";
 
 export const ROLES = {
   PM: "pm",
   MEMBER: "member",
 };
 
-// The two demo personas. Reused verbatim from the mock team roster
-// (see src/data/mockTeam.js) so "logged in as" always matches a real row
-// in the Team page for whichever project is active.
-const PERSONAS = {
-  [ROLES.PM]: {
-    name: "Tharindu Bandara",
-    initials: "TB",
-    email: "tharindu.bandara@inspid-tech.dev",
-    title: "Project Manager",
-    role: ROLES.PM,
-  },
-  [ROLES.MEMBER]: {
-    name: "Kavindu Silva",
-    initials: "KS",
-    email: "kavindu.silva@inspid-tech.dev",
-    title: "Frontend Developer",
-    role: ROLES.MEMBER,
-  },
-};
-
 const RoleContext = createContext(null);
 
-function getInitialRole() {
-  if (typeof window === "undefined") return null;
-  try {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (stored === ROLES.PM || stored === ROLES.MEMBER) return stored;
-  } catch {
-    // localStorage unavailable, start logged out.
-  }
-  return null;
+// Backend user { id, email, name, role: "PM" | "TeamMember", jobTitle, projectIds } -> the shape the UI already uses.
+function toCurrentUser(u) {
+  const role = u.role === "PM" ? ROLES.PM : ROLES.MEMBER;
+  return {
+    id: u.id,
+    name: u.name,
+    initials: initialsFor(u.name),
+    email: u.email,
+    title: u.jobTitle || (role === ROLES.PM ? "Project Manager" : "Team Member"),
+    role,
+    projectIds: u.projectIds || [],
+  };
 }
 
 export function RoleProvider({ children }) {
-  const [role, setRoleState] = useState(getInitialRole);
+  const [currentUser, setCurrentUser] = useState(null);
+  // true while a stored token is being checked with GET /auth/me (so the app does not flash the login page)
+  const [loading, setLoading] = useState(() => Boolean(getToken()));
 
   useEffect(() => {
-    try {
-      if (role) window.localStorage.setItem(STORAGE_KEY, role);
-      else window.localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      // Ignore write failures; role still applies for this session.
-    }
-  }, [role]);
-
-  const login = useCallback((nextRole) => {
-    if (nextRole === ROLES.PM || nextRole === ROLES.MEMBER) setRoleState(nextRole);
+    // A 401 from any call (expired session) signs the user out; RequireAuth then redirects to /login.
+    setUnauthorizedHandler(() => setCurrentUser(null));
+    return () => setUnauthorizedHandler(null);
   }, []);
 
-  const switchRole = login; // Same operation: top bar switcher just re-logs-in as the other persona.
+  useEffect(() => {
+    if (!getToken()) {
+      setLoading(false);
+      return undefined;
+    }
+    let cancelled = false;
+    api("/auth/me")
+      .then((u) => {
+        if (!cancelled) setCurrentUser(toCurrentUser(u));
+      })
+      .catch(() => {
+        // Invalid or expired token (or the backend is unreachable): start logged out.
+        clearToken();
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-  const logout = useCallback(() => setRoleState(null), []);
+  const login = useCallback(async (email, password) => {
+    const data = await api("/auth/login", { method: "POST", body: { email, password }, auth: false });
+    setToken(data.token);
+    const user = toCurrentUser(data.user);
+    setCurrentUser(user);
+    return user;
+  }, []);
 
-  const isAuthenticated = role !== null;
-  const currentUser = role ? PERSONAS[role] : null;
+  const logout = useCallback(() => {
+    clearToken();
+    setCurrentUser(null);
+  }, []);
 
-  return (
-    <RoleContext.Provider
-      value={{ role, currentUser, isAuthenticated, login, switchRole, logout, PERSONAS, ROLES }}
-    >
-      {children}
-    </RoleContext.Provider>
+  const value = useMemo(
+    () => ({
+      role: currentUser?.role ?? null,
+      currentUser,
+      isAuthenticated: currentUser !== null,
+      loading,
+      login,
+      logout,
+      ROLES,
+    }),
+    [currentUser, loading, login, logout]
   );
+
+  return <RoleContext.Provider value={value}>{children}</RoleContext.Provider>;
 }
 
 export function useRole() {

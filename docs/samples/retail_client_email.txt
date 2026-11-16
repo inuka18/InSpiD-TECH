@@ -1,0 +1,20 @@
+From: client.liaison@example.test
+To: retail-team@example.test
+Subject: Follow-up from yesterday's call
+
+Hi team,
+
+Thanks for the walkthrough yesterday. A few points from our side.
+
+The wishlist is popular in the pilot and our customers would like to share it with friends by link before launch.
+
+On the seller side, uploads are capped at five thousand rows per file by the import service, so large sellers need to split their files.
+
+The stock reservation at checkout is still overwriting seller stock updates, so we are stuck on that until the two systems agree on one source of truth.
+
+Good news: address validation is done and has been verified in the pilot.
+
+Please confirm the delivery slot feature stays on schedule for the festive campaign.
+
+Kind regards,
+Client liaison

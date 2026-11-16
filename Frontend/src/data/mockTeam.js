@@ -1,3 +1,5 @@
+import { rentEaseTeam } from "./mockRentEase";
+
 // Team rosters, one row per person per project (matches how a small org
 // actually assigns roles: per-project, not globally). The two login
 // personas (Tharindu Bandara / Kavindu Silva, see RoleContext) appear here
@@ -5,6 +7,7 @@
 // what the Team page shows.
 
 export const mockTeam = [
+  ...rentEaseTeam,
   // ---- NovaCart ----
   {
     id: "tm-01",

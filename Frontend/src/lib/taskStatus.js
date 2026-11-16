@@ -14,7 +14,14 @@
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 export function flattenTasks(phases) {
-  return phases.flatMap((phase) => phase.tasks.map((task) => ({ ...task, phaseId: phase.id, phaseName: phase.name })));
+  // Keep the source task object. Schedule edits mutate task records in place,
+  // and cloned rows would make updates disappear as soon as another view
+  // reloads the project's phases.
+  return phases.flatMap((phase) => phase.tasks.map((task) => {
+    task.phaseId = phase.id;
+    task.phaseName = phase.name;
+    return task;
+  }));
 }
 
 export function daysBetween(a, b) {

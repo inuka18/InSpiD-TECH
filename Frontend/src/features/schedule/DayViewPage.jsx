@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { CalendarClock, ChevronLeft, ChevronRight, PlaneTakeoff, GitCompare } from "lucide-react";
 import { RootCausePanel } from "./components/RootCausePanel";
 import { BaselineCompareModal } from "./components/BaselineCompareModal";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../../components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Avatar, AvatarFallback } from "../../components/ui/avatar";
@@ -18,11 +18,11 @@ import { useSchedulePhases } from "../../hooks/useSchedulePhases";
 import { useResourceCapacity } from "../../hooks/useResourceCapacity";
 import { useScheduleView } from "../../hooks/useScheduleView";
 import { getTeamMemberById } from "../../data/mockTeam";
+import { useWorkCalendar } from "./context/WorkCalendarContext";
 import {
   flattenTasks,
   isTaskActiveOn,
   isAtRisk,
-  causeStyle,
   statusBadgeVariant,
   statusLabel,
   TODAY,
@@ -30,6 +30,7 @@ import {
   formatShortDate,
   addDays,
   isSameDay,
+  isOnLeaveOnDate,
   taskAssigneeIds,
 } from "./lib/scheduleUtils";
 
@@ -38,13 +39,19 @@ function initialsFor(name) {
 }
 
 export function DayViewPage() {
-  const { activeProjectId } = useScheduleView();
+  const { activeProject, activeProjectId } = useScheduleView();
   const { data: phases, loading } = useSchedulePhases(activeProjectId);
+  const { settings: workCalendar } = useWorkCalendar();
   const { data: capacity } = useResourceCapacity(activeProjectId);
-  const [viewDate, setViewDate] = useState(TODAY);
+  const [viewDate, setViewDate] = useState(() => new Date(activeProject?.activeSprint?.startDate ?? TODAY));
   const [selectedTask, setSelectedTask] = useState(null);
   const [compareOpen, setCompareOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    const sprintStart = activeProject?.activeSprint?.startDate;
+    if (sprintStart) setViewDate(new Date(sprintStart));
+  }, [activeProjectId]);
 
   // Deep link support: the Variance Drill-Down modal's task cards (and
   // Activity Feed / Notifications) land here with ?date=<iso> to jump
@@ -66,12 +73,12 @@ export function DayViewPage() {
 
   const dayTasks = useMemo(
     () => flattenTasks(phases).filter((t) => isTaskActiveOn(t, viewDate)),
-    [phases, viewDate]
+    [phases, viewDate, workCalendar]
   );
   const delayedTasks = dayTasks.filter(isAtRisk);
   const peopleCount = new Set(dayTasks.flatMap(taskAssigneeIds)).size;
   const offToday = capacity.filter(
-    (c) => c.offToday && (c.leaveDate ? isSameDay(viewDate, c.leaveDate) : isSameDay(viewDate, TODAY))
+    (c) => isOnLeaveOnDate(c, viewDate)
   );
 
   if (loading) {
@@ -90,10 +97,6 @@ export function DayViewPage() {
         <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
           <div>
             <CardTitle className="text-base">{formatDayOfWeek(viewDate)}</CardTitle>
-            <CardDescription>
-              {dayTasks.length} task{dayTasks.length === 1 ? "" : "s"} touching this day, {delayedTasks.length} needing
-              action.
-            </CardDescription>
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
             <Button variant="outline" size="sm" onClick={() => setViewDate((d) => addDays(d, -1))}>
@@ -123,9 +126,6 @@ export function DayViewPage() {
       <Card>
           <CardHeader>
             <CardTitle className="text-base">Day Burndown</CardTitle>
-            <CardDescription>
-              Planned versus actual effort for {isSameDay(viewDate, TODAY) ? "today" : formatShortDate(viewDate)} only.
-            </CardDescription>
           </CardHeader>
           <CardContent>
             <BurndownChart tasks={dayTasks} rangeStart={viewDate} rangeEnd={viewDate} highlightDate={viewDate} height={180} />
@@ -135,24 +135,21 @@ export function DayViewPage() {
       <RootCausePanel
         tasks={dayTasks}
         label="Day"
-        onSelectCause={(type) => {
-          const style = causeStyle(type);
-          const affected = dayTasks.filter((task) => task.cause?.type === type);
-          setSelectedTask({ _causeList: true, tasks: affected, title: style.label, subtitle: `${affected.length} task${affected.length !== 1 ? "s" : ""} affected today` });
+        onSelectCause={(category, affected) => {
+          setSelectedTask({ _causeList: true, tasks: affected, title: category, subtitle: `${affected.length} task${affected.length !== 1 ? "s" : ""} affected today` });
         }}
       />
       </div>
 
-      <TaskAssignmentList tasks={dayTasks} onSelectTask={setSelectedTask} />
+      <TaskAssignmentList tasks={dayTasks} onSelectTask={setSelectedTask} projectId={activeProjectId} />
 
       <Card className="hidden">
         <CardHeader>
           <CardTitle className="text-base">Daily assignment details</CardTitle>
-          <CardDescription>Tasks scheduled for {isSameDay(viewDate, TODAY) ? "today" : formatShortDate(viewDate)} and their assigned team members.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
           {dayTasks.length === 0 ? (
-            <EmptyState icon={CalendarClock} title="Nothing scheduled" description="No task's active window covers this day." />
+            <EmptyState icon={CalendarClock} title="Nothing scheduled" />
           ) : (
             <>
               <div className="hidden grid-cols-[minmax(0,1fr)_minmax(15rem,.85fr)] gap-3 px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground sm:grid">
@@ -203,29 +200,39 @@ export function DayViewPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Off {isSameDay(viewDate, TODAY) ? "Today" : "That Day"}</CardTitle>
-          <CardDescription>Team members on PTO, from sprint capacity records.</CardDescription>
         </CardHeader>
         <CardContent>
           {offToday.length === 0 ? (
             <p className="py-4 text-center text-sm text-muted-foreground">Everyone's available.</p>
           ) : (
             <ul className="space-y-2">
-              {offToday.map((c) => (
-                <li key={c.id} className="flex items-center gap-3 rounded-lg border border-dashed border-border p-3">
+              {offToday.map((c) => {
+                const leaveTasks = flattenTasks(phases).filter((task) =>
+                  ((taskAssigneeIds(task).includes(c.memberId)
+                    || task.originalAssigneeId === c.memberId
+                    || task.prevAssigneeId === c.memberId) && isTaskActiveOn(task, viewDate))
+                  || (task.reallocatedFrom === c.name && task.leaveDate && isSameDay(task.leaveDate, viewDate))
+                );
+                return <li key={c.id} className="flex items-center gap-3 rounded-lg border border-dashed border-border p-3">
                   <Avatar className="h-8 w-8 shrink-0 text-[10px]">
                     <AvatarFallback>{initialsFor(c.name)}</AvatarFallback>
                   </Avatar>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-foreground">{c.name}</p>
                     <p className="text-xs text-muted-foreground">{c.role}</p>
-                    {c.offToday && <p className="mt-0.5 text-[11px] font-medium text-status-atrisk-fg">{getLeaveLabel(c.leaveType ?? "full-day", c.leaveHours)} leave</p>}
+                    <p className="mt-0.5 text-[11px] font-medium text-status-atrisk-fg">{getLeaveLabel(c.leaveType ?? "full-day", c.leaveHours)} leave</p>
+                    <div className="mt-2 space-y-1">
+                      {leaveTasks.length ? leaveTasks.map((task) => (
+                        <button key={task.id} type="button" onClick={() => setSelectedTask(task)} className="block max-w-full truncate text-left text-xs font-medium text-primary hover:underline">{task.name}</button>
+                      )) : <span className="text-xs text-muted-foreground">No tasks assigned</span>}
+                    </div>
                   </div>
                   <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
                     <PlaneTakeoff className="h-3.5 w-3.5" />
                     {c.returnDate ? `Back ${formatShortDate(c.returnDate)}` : "On PTO"}
                   </span>
-                </li>
-              ))}
+                </li>;
+              })}
             </ul>
           )}
         </CardContent>
@@ -245,6 +252,7 @@ export function DayViewPage() {
         onOpenChange={setCompareOpen}
         tasks={dayTasks}
         label="Day"
+        showGantt={false}
       />
     </div>
   );

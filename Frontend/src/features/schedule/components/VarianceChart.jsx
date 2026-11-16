@@ -96,7 +96,6 @@ export function VarianceChart({ levels, onSelectLevel }) {
           Planned target
         </span>
       </div>
-      <p className="mt-1 text-center text-[10px] text-muted-foreground">🖱️ Click any row to see the task-level breakdown</p>
     </div>
   );
 }

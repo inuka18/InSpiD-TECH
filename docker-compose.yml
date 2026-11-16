@@ -1,6 +1,7 @@
 # Start everything:            docker compose up --build
 # With a local MongoDB too:    docker compose --profile localdb up --build
 # (MongoDB Atlas is the default; see README.md.)
+# Classifier training (separate profile, never part of `up`): see ai-service/training/README.md
 name: inspid
 
 services:
@@ -38,8 +39,13 @@ services:
   ai-service:
     build: ./ai-service
     env_file: .env
+    environment:
+      MODELS_DIR: /app/models
     ports:
       - "8000:8000"
+    volumes:
+      - ./ai-service/models:/app/models:ro # trained classifier; /classify reloads when current.json changes
+      - ml_cache:/cache
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=3).status == 200 else 1)"]
       interval: 10s
@@ -76,7 +82,7 @@ services:
   # Optional local database for teammates without Atlas.
   mongo:
     image: mongo:7
-    profiles: ["localdb"]
+    profiles: ["localdb", "test"]
     ports:
       - "27017:27017"
     volumes:
@@ -87,6 +93,70 @@ services:
       timeout: 5s
       retries: 6
 
+  # ---- Backend tests and the test API (profile "test"; always use the LOCAL mongo, database inspid_test).
+  # Never started by `docker compose up`. `npm test` refuses to run if the database name is "inspid".
+  #   tests:      docker compose --profile localdb --profile test run --rm backend-test
+  #   seed:       docker compose --profile localdb --profile test run --rm backend-test npm run seed
+  #   test API:   docker compose --profile localdb --profile test up -d backend-test-api   (http://localhost:5001)
+  backend-test:
+    build: ./backend
+    profiles: ["test"]
+    env_file: .env
+    working_dir: /app
+    command: ["npm", "test"]
+    environment:
+      NODE_ENV: test
+      MONGODB_URI: mongodb://mongo:27017/
+      MONGODB_DB_NAME: inspid_test
+      SCENARIO_DIR: /data/scenario
+      DOCS_DIR: /docs
+    volumes:
+      - ./data/scenario:/data/scenario:ro
+      - ./docs:/docs # network:evaluate writes docs/network_evaluation.*
+      - ./backend/src:/app/src:ro
+      - ./backend/tests:/app/tests:ro
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  backend-test-api:
+    extends: backend-test
+    command: ["node", "src/server.js"]
+    ports:
+      - "5001:5000"
+    depends_on:
+      mongo:
+        condition: service_healthy
+      ai-service:
+        condition: service_healthy
+
+  # ---- Classifier training jobs: NOT started by a normal `docker compose up` (profile "train").
+  # Run them with `docker compose run --rm trainer python -m training.<script>`; see ai-service/training/README.md.
+  trainer:
+    build: ./ai-service
+    profiles: ["train"]
+    working_dir: /app
+    command: ["python", "-m", "training.train"]
+    environment:
+      DATA_DIR: /data
+      DOCS_DIR: /docs
+      MODELS_DIR: /app/models
+      EMBED_CACHE_DIR: /cache/embeddings
+    volumes:
+      - ./data:/data:ro
+      - ./docs:/docs
+      - ./ai-service/models:/app/models
+      - ./ai-service/training:/app/training
+      - ml_cache:/cache # Hugging Face weights + cached embeddings (fast reruns)
+
+  # Same as trainer, plus a writable data/processed so it can create jira_review_sample.csv.
+  review-sample:
+    extends: trainer
+    command: ["python", "-m", "training.make_review_sample"]
+    volumes:
+      - ./data/processed:/data/processed:rw
+
 volumes:
+  ml_cache:
   neo4j_data:
   mongo_data:

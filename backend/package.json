@@ -4,11 +4,18 @@
   "private": true,
   "description": "Shared backend for InSPiD-TECH",
   "main": "src/server.js",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "seed": "node src/seed/seed.js"
+    "seed": "node src/seed/seed.js",
+    "rechain": "node src/seed/rechain.js",
+    "test": "node tests/guard.js && node --test tests/unit tests/integration",
+    "test:unit": "node --test tests/unit",
+    "network:build": "node src/scripts/networkBuild.js",
+    "network:evaluate": "node src/scripts/networkEvaluate.js"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",
@@ -17,8 +24,11 @@
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
     "jsonwebtoken": "^9.0.2",
+    "mammoth": "1.13.0",
     "mongoose": "^8.8.0",
+    "multer": "2.4.0",
     "swagger-ui-express": "^5.0.1",
+    "unpdf": "1.8.1",
     "zod": "^3.23.8"
   }
 }

@@ -1,0 +1,101 @@
+robust_id,source,author_role,text,label,split,batch
+RB-001,Standup,Product Manager,Our hosting contract caps us at four containers per environment.,Constraint,dev,R
+RB-002,Slack,UX Designer,Heads up: All forty test cases for the transfer flow are green.,Completion,dev,R
+RB-003,Email,Product Manager,Hi team. The timetable feed and the room booking list tell different stories about the same lecture. Thanks.,Conflict,test,R
+RB-004,Slack,DevOps Engineer,fyi: The client is keen on getting delivery slots they can pick themselves.,Expectation,dev,R
+RB-005,Teams,QA Engineer,"From today's call: The grant covers the work until the end of June, after that there is no funding.",Constraint,test,R
+RB-006,Email,QA Engineer,"Hello all. Our pilot ward has been on the new bed board since Monday, no complaints so far. Regards.",Completion,test,R
+RB-007,Standup,Business Analyst,Update from me: Anything touching the pharmacy module goes through the safety officer first.,Constraint,dev,R
+RB-008,Email,QA Engineer,Hi team. The accessibility fixes passed the audit this afternoon. Thanks.,Completion,test,R
+RB-009,Standup,Product Manager,"The sandbox has been down for days, so none of the wallet tests run.",Conflict,dev,R
+RB-010,Slack,Project Manager,"I am worried we will miss the audit date, half the logs are still missing.",Conflict,dev,R
+RB-011,Slack,Product Manager,fyi: The security team gave the encryption setup a clean bill of health.,Completion,dev,R
+RB-012,Standup,Security Engineer,Update from me: Two teams edit the same stock figures and keep overwriting each other.,Conflict,test,R
+RB-013,Email,DevOps Engineer,Hi team. What time is the call with the client again? Thanks.,None,dev,R
+RB-014,Teams,QA Engineer,From today's call: Our patients keep asking if they can see their lab results on their phone.,Expectation,test,R
+RB-015,Jira Comment,Security Engineer,Updating the ticket: Our hosting plan runs out of memory every time the import kicks off.,Conflict,test,R
+RB-016,Slack,UX Designer,fyi: The login library does not support the older phones in our target list.,Conflict,test,R
+RB-017,Slack,QA Engineer,Heads up: Marketing is hoping customers can pay with their local wallets at checkout.,Expectation,dev,R
+RB-018,Jira Comment,QA Engineer,The university board ruled out exams on public holidays.,Constraint,dev,R
+RB-019,Standup,Security Engineer,Update from me: Support is looking for a button that sends the customer a copy of the chat.,Expectation,dev,R
+RB-020,Standup,Developer,Update from me: It would help a lot if the dashboard showed last month's numbers next to this month's.,Expectation,dev,R
+RB-021,Slack,Business Analyst,Heads up: Stock sync between the shop and the warehouse is up and running.,Completion,dev,R
+RB-022,Jira Comment,Developer,Has anyone looked at the wallet integration notes yet?,None,dev,R
+RB-023,Slack,Security Engineer,Heads up: Password reset emails are arriving within seconds now.,Completion,test,R
+RB-024,Teams,Product Manager,Security insisted on twelve characters minimum for passwords.,Constraint,test,R
+RB-025,Slack,Developer,fyi: Could we get a dark mode before the demo? Several testers brought it up.,Expectation,dev,R
+RB-026,Slack,Security Engineer,Heads up: Just sharing the link to the checkout notes in case anyone needs them.,None,test,R
+RB-027,Teams,DevOps Engineer,"From today's call: Customers abroad never get the code, so they are locked out of transfers.",Conflict,dev,R
+RB-028,Slack,Product Manager,fyi: The API docs are up to date and published on the wiki.,Completion,dev,R
+RB-029,Teams,UX Designer,"Support hours for the pilot are weekdays nine to five, nothing outside that.",Constraint,test,R
+RB-030,Teams,Developer,From today's call: The design calls for animations but the app is already over the size budget.,Conflict,dev,R
+RB-031,Email,Product Manager,Hi team. We get access to the vendor's test environment for just two weeks. Thanks.,Constraint,test,R
+RB-032,Standup,Security Engineer,For standup: Staff accounts expire automatically when the contract end date passes.,Constraint,test,R
+RB-033,Slack,QA Engineer,Heads up: QA ran through the full checkout flow today and everything passed.,Completion,test,R
+RB-034,Jira Comment,Team Lead,Updating the ticket: The new rule means the old reports stop making sense.,Conflict,test,R
+RB-035,Email,Developer,Hi team. I will share the slides after lunch. Thanks.,None,test,R
+RB-036,Jira Comment,Team Lead,We handed the final build to the client and they accepted it.,Completion,dev,R
+RB-037,Standup,Security Engineer,Update from me: It'd be great if students got a reminder before an assignment closes.,Expectation,test,R
+RB-038,Standup,Business Analyst,Update from me: The refund screen went live this morning and the first customers are already using it.,Completion,dev,R
+RB-039,Email,Team Lead,"Hello all. We are ordering lunch, send me your choices by noon. Regards.",None,dev,R
+RB-040,Slack,Developer,Heads up: Any new screen is signed off by accessibility testers before it ships.,Constraint,test,R
+RB-041,Teams,QA Engineer,Finance is hoping invoices can be exported straight into their accounting tool.,Expectation,test,R
+RB-042,Teams,Security Engineer,Reminder that the office is closed on Poya day.,None,dev,R
+RB-043,Teams,UX Designer,"From today's call: Marketing wants the banner live this week, but legal has not cleared the wording.",Conflict,test,R
+RB-044,Standup,DevOps Engineer,Update from me: The SMS reminders have been running for a week with no failures.,Completion,test,R
+RB-045,Slack,UX Designer,"Heads up: Thanks for the quick turnaround, appreciate it.",None,test,R
+RB-046,Standup,Business Analyst,Is the staging link the same as last week's?,None,test,R
+RB-047,Email,Project Manager,Hi team. Can someone add me to the shared calendar? Thanks.,None,dev,R
+RB-048,Standup,Security Engineer,For standup: Looks like the deadline and the scope are pulling in opposite directions.,Conflict,test,R
+RB-049,Jira Comment,Team Lead,"Updating the ticket: Customer data stays encrypted at rest, that is the bank's standing rule.",Constraint,dev,R
+RB-050,Jira Comment,Project Manager,Updating the ticket: Operations is hoping the system pings them when stock drops below the reorder level.,Expectation,test,R
+RB-051,Standup,Security Engineer,Update from me: Sales promised same-day delivery but the couriers only guarantee next day.,Conflict,dev,R
+RB-052,Teams,Product Manager,"From today's call: The two currencies round differently, so the totals never match at checkout.",Conflict,test,R
+RB-053,Jira Comment,Team Lead,"Good morning team, hope everyone had a good weekend.",None,test,R
+RB-054,Email,QA Engineer,Hello all. Our branch managers are counting on a weekly summary email landing in their inbox every Monday. Regards.,Expectation,test,R
+RB-055,Teams,QA Engineer,From today's call: Our users are asking for fingerprint login instead of typing the PIN each time.,Expectation,test,R
+RB-056,Email,QA Engineer,Hello all. Lecturers are pushing to upload one rubric and reuse it across modules. Regards.,Expectation,dev,R
+RB-057,Slack,UX Designer,Heads up: New third-party libraries get approved by the architecture team beforehand.,Constraint,dev,R
+RB-058,Standup,Team Lead,Update from me: Posting the agenda for Monday's design review now.,None,test,R
+RB-059,Standup,Business Analyst,For standup: Who has the spreadsheet with last sprint's burndown?,None,dev,R
+RB-060,Slack,Security Engineer,The owner is hoping the app can split a bill between friends before the next release.,Expectation,test,R
+RB-061,Standup,Developer,Update from me: Lecturers are already entering marks in the new gradebook.,Completion,dev,R
+RB-062,Jira Comment,DevOps Engineer,Updating the ticket: Does anyone know who is running the retro tomorrow?,None,dev,R
+RB-063,Email,Product Manager,Hi team. Nurses are asking for a way to flag urgent patients on the ward board. Thanks.,Expectation,dev,R
+RB-064,Slack,DevOps Engineer,The registrar is pushing for online enrolment to open before term starts.,Expectation,test,R
+RB-065,Teams,UX Designer,"Under the data policy, patient files stay on servers inside the country.",Constraint,dev,R
+RB-066,Email,Security Engineer,Hi team. Retention of chat logs is capped at ninety days under the privacy notice. Thanks.,Constraint,dev,R
+RB-067,Standup,Team Lead,People calling the helpline keep asking whether they can reschedule from the app.,Expectation,dev,R
+RB-068,Teams,DevOps Engineer,"No one agrees on who owns the approval step, so tickets sit untouched.",Conflict,test,R
+RB-069,Email,QA Engineer,Hi team. Students are submitting through the new portal as of this week. Thanks.,Completion,test,R
+RB-070,Slack,Business Analyst,Heads up: The vendor changed their file format without telling us and our export is now rejected.,Conflict,test,R
+RB-071,Standup,Team Lead,Update from me: Calendar sync is switched on for everyone as of today.,Completion,dev,R
+RB-072,Email,UX Designer,Hi team. A lot of our members hope to see their points balance on the home screen. Thanks.,Expectation,test,R
+RB-073,Slack,UX Designer,fyi: The regulator asks for transaction records to be kept for ten years.,Constraint,test,R
+RB-074,Slack,Developer,Heads up: Legal told us card details get deleted as soon as the payment clears.,Constraint,dev,R
+RB-075,Slack,DevOps Engineer,"fyi: Release windows are Tuesday and Thursday nights, nothing outside those slots.",Constraint,test,R
+RB-076,Slack,Developer,"fyi: Running a few minutes late, start without me.",None,test,R
+RB-077,Teams,Product Manager,"I am on leave Thursday, ping me if anything urgent comes up.",None,test,R
+RB-078,Standup,Developer,Update from me: Uploads to the portal top out at five megabytes per file.,Constraint,dev,R
+RB-079,Standup,Project Manager,"That ticket is off my plate, the patch is in production.",Completion,dev,R
+RB-080,Teams,Developer,"From today's call: The lab system sends results straight away, which goes against the rule that doctors look first.",Conflict,dev,R
+RB-081,Jira Comment,Project Manager,Ideally the shop would remember what is in my cart when I switch from my laptop to my phone.,Expectation,test,R
+RB-082,Email,UX Designer,Hi team. The migration to the new database wrapped up overnight without a hitch. Thanks.,Completion,test,R
+RB-083,Slack,Team Lead,"The payment portal is rejecting every card we try, so we are stuck on testing.",Conflict,dev,R
+RB-084,Jira Comment,Product Manager,Updating the ticket: Refunds go through a second approver once they pass a certain amount.,Constraint,test,R
+RB-085,Standup,QA Engineer,"Update from me: Finance wants approval before any refund, product wants refunds instant, and we are going in circles.",Conflict,dev,R
+RB-086,Teams,Business Analyst,From today's call: We shipped the biometric login to the beta group on Friday.,Completion,dev,R
+RB-087,Slack,Security Engineer,fyi: The client signed off on the invoice layout after yesterday's demo.,Completion,test,R
+RB-088,Jira Comment,QA Engineer,Updating the ticket: Doctors and billing describe the discharge step in totally different ways.,Conflict,dev,R
+RB-089,Jira Comment,UX Designer,Updating the ticket: Anyone up for coffee before the planning session?,None,dev,R
+RB-090,Jira Comment,Project Manager,Updating the ticket: The ward sister is hoping bed availability shows up live on the tablet.,Expectation,dev,R
+RB-091,Standup,QA Engineer,"Update from me: We are stuck waiting on the vendor's API keys, nothing moves until they arrive.",Conflict,dev,R
+RB-092,Email,Project Manager,"Hello all. My laptop update is taking forever, will be back soon. Regards.",None,dev,R
+RB-093,Jira Comment,Security Engineer,Updating the ticket: The budget for this quarter stops at two sprints of vendor time.,Constraint,dev,R
+RB-094,Jira Comment,Product Manager,"Updating the ticket: Go-live is fixed for the first of March, the bank has already told its customers.",Constraint,test,R
+RB-095,Email,QA Engineer,Hi team. The new search index is live and returning results. Thanks.,Completion,test,R
+RB-096,Slack,Business Analyst,fyi: Load test came back at six thousand users with room to spare.,Completion,test,R
+RB-097,Slack,Product Manager,Parents have been emailing to ask if they can track the school bus in real time.,Expectation,dev,R
+RB-098,Teams,Business Analyst,"I sent the invite for the sprint review, please check your inbox.",None,test,R
+RB-099,Email,Team Lead,"Hello all. Quick question, which branch are we using for the demo? Regards.",None,test,R
+RB-100,Standup,Project Manager,Update from me: Meeting room two is booked until three.,None,dev,R

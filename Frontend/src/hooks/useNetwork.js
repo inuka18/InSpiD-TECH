@@ -1,15 +1,16 @@
-import { useEffect, useState } from "react";
-import { fetchAlignmentHistory } from "../services/alignmentService";
+import { useCallback, useEffect, useState } from "react";
+import { fetchNetwork } from "../services/networkService";
 
-export function useAlignmentHistory(projectId) {
-  const [data, setData] = useState([]);
+export function useNetwork(projectId) {
+  const [data, setData] = useState({ nodes: [], links: [], clusters: [], warning: null });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
+  const reload = useCallback(() => {
     let cancelled = false;
     setLoading(true);
-    fetchAlignmentHistory(projectId)
+    setError(null);
+    fetchNetwork(projectId)
       .then((res) => {
         if (!cancelled) setData(res);
       })
@@ -24,5 +25,7 @@ export function useAlignmentHistory(projectId) {
     };
   }, [projectId]);
 
-  return { data, loading, error };
+  useEffect(() => reload(), [reload]);
+
+  return { data, loading, error, reload };
 }

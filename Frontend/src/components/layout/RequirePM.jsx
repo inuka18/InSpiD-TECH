@@ -14,7 +14,7 @@ export function RequirePM({ children }) {
         </div>
         <p className="text-sm font-semibold text-foreground">Only Project Managers can access Project Settings.</p>
         <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
-          Switch roles from the top bar to preview this page as a Project Manager.
+          Log in with a Project Manager account to open this page.
         </p>
       </div>
     );

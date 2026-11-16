@@ -1,0 +1,15 @@
+Retail Platform - daily standup notes
+Date: Wednesday 21 October 2026
+
+Product Manager: Quick round, then we go through blockers.
+Developer: Card and wallet payments are finished and QA has signed it off in staging.
+QA Engineer: The order tracking page went live yesterday and the first customers are already using it.
+Business Analyst: The business hopes customers can pay in instalments through a local provider before the festive campaign.
+Security Engineer: Any change to the discount code rules goes through the finance team for approval first.
+DevOps Engineer: The load test at three times peak failed again because the database connection pool is exhausted.
+Developer: The tax calculation is stuck, the rates vendor still has not sent the sandbox keys.
+Project Manager: Can someone book the big meeting room for Thursday's demo?
+Product Manager: Marketing is asking whether sellers can download their current stock as a CSV.
+QA Engineer: Returns are limited to 14 days after delivery under the store policy, so the return form has to enforce it.
+Developer: Thanks everyone, I will share the staging link after lunch.
+Business Analyst: The team agreed to drop the automatic image moderation for this release and review images by hand.

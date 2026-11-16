@@ -1,66 +1,61 @@
-// Data-access layer for requirements. Every consumer (hooks, components)
-// talks to this module, never to mockRequirements.js directly. When a real
-// backend exists, only the bodies below need to change to `fetch(...)`
-// calls; callers are unaffected.
-import { mockRequirements, getRequirementById, createRequirement, CLUSTERS, RESOURCE_ROLES } from "../data/mockRequirements";
-import { appendRequirementCreatedLedgerEntry } from "../data/mockLedger";
-import { delay } from "./simulatedLatency";
+// Data-access layer for requirements, backed by the real API (/projects/:projectId/requirements).
+// Every consumer (hooks, components) talks to this module. API shape per requirement:
+// { id, projectId, title, description, liveStatus, resourceRole, granularity, cluster, clusterLabel, type,
+//   relatedIds, statusHistory: [{ status, timestamp, signal, signalId }] }
+import { api } from "../lib/apiClient";
+import { clusterColor } from "../lib/clusters";
+
+// reqId -> projectId, learned from lists, so fetchRequirementById(id) keeps its one-argument form.
+const projectOf = new Map();
+const remember = (list) => {
+  list.forEach((r) => projectOf.set(r.id, r.projectId));
+  return list;
+};
+
+async function allProjectIds() {
+  return (await api("/projects")).map((p) => p.id);
+}
 
 export async function fetchRequirements(projectId) {
-  await delay(500);
-  if (!projectId) return mockRequirements;
-  return mockRequirements.filter((r) => r.projectId === projectId);
+  if (projectId) return remember(await api(`/projects/${encodeURIComponent(projectId)}/requirements`));
+  const lists = await Promise.all((await allProjectIds()).map((id) => api(`/projects/${encodeURIComponent(id)}/requirements`)));
+  return remember(lists.flat());
 }
 
-export async function fetchRequirementById(id) {
-  await delay(300);
-  const req = getRequirementById(id);
-  if (!req) throw new Error(`Requirement ${id} not found`);
-  return req;
+export async function fetchRequirementById(id, projectId) {
+  const pid = projectId ?? projectOf.get(id);
+  if (!pid) throw new Error(`Requirement ${id}: open it from a project so its project is known.`);
+  return api(`/projects/${encodeURIComponent(pid)}/requirements/${encodeURIComponent(id)}`);
 }
 
-export async function fetchClusters() {
-  await delay(200);
-  return CLUSTERS;
+// The computed clusters of a project, with a colour for each.
+export async function fetchClusters(projectId) {
+  if (!projectId) return [];
+  const list = await api(`/projects/${encodeURIComponent(projectId)}/requirements/clusters`);
+  return list.map((c) => ({ ...c, color: clusterColor(c.id) }));
 }
 
-export async function fetchResourceRoles() {
-  await delay(150);
-  return RESOURCE_ROLES;
+// Resource roles that actually occur on this project's requirements.
+export async function fetchResourceRoles(projectId) {
+  const reqs = await fetchRequirements(projectId);
+  return [...new Set(reqs.map((r) => r.resourceRole).filter(Boolean))].sort();
 }
 
-// PM-only: DetectRequirementsDialog's confirm step, baselining a project
-// that has no requirements yet. Every checked item lands here with what
-// the review screen lets a PM edit (title, description, category,
-// resourceRole, defaulted to "Unassigned" but overridable per row) plus
-// the cluster the mock detection pass inferred. granularity is the one
-// field this flow always defaults (harder to judge upfront for a
-// brand-new requirement than role is), left for a PM to set later from
-// the requirement detail panel same as any other record. One
-// createRequirement() call plus one "Requirement Created" ledger entry
-// per item, the same two-writes-per-call shape createManualLink uses, so
-// a requirement's origin is exactly as auditable whether it came from an
-// SRS upload or a signal.
-export async function createRequirementsFromSRS({ projectId, items, sourceDocument, actor }) {
-  await delay(400);
-  return items.map((item) => {
-    const requirement = createRequirement({
-      projectId,
+// PM-only: DetectRequirementsDialog's confirm step. One POST /requirements per approved item (sequentially, so the
+// network recomputation on the server never overlaps). The backend writes the "Requirement Created" and
+// network-update ledger entries itself. The detected `cluster` is NOT sent: the backend would store it as the
+// CSV group_id, and clusters are computed from the texts instead.
+export async function createRequirementsFromSRS({ projectId, items }) {
+  const created = [];
+  for (const item of items) {
+    const body = {
       title: item.title,
       description: item.description,
-      resourceRole: item.resourceRole,
+      type: item.category === "Non-Functional" ? "NFR" : "FR",
       granularity: "Sprint Commitment",
-      cluster: item.cluster,
-      category: item.category,
-      sourceLabel: `Detected from the uploaded SRS document "${sourceDocument}".`,
-    });
-    appendRequirementCreatedLedgerEntry({
-      projectId,
-      requirementId: requirement.id,
-      requirementTitle: requirement.title,
-      sourceDocument,
-      actor,
-    });
-    return requirement;
-  });
+    };
+    if (item.resourceRole && item.resourceRole !== "Unassigned") body.resourceRole = item.resourceRole;
+    created.push(await api(`/projects/${encodeURIComponent(projectId)}/requirements`, { method: "POST", body }));
+  }
+  return created;
 }

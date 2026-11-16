@@ -1,0 +1,587 @@
+{
+  "version": "20261020T110553Z",
+  "trained_at": "2026-10-20T11:05:53.763914+00:00",
+  "model_type": "concat_lr",
+  "variant": "D",
+  "title": "Model D (TF-IDF + MiniLM concatenated, one LR)",
+  "hyperparameters": {
+    "C": 100,
+    "class_weight": "balanced",
+    "scale": 0.5
+  },
+  "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+  "spacy_model": "en_core_web_sm",
+  "extra_data_file": null,
+  "uses_weak_jira": false,
+  "training_rows": {
+    "scenario_train": 1526,
+    "extra_data": 0,
+    "weak_jira": 0
+  },
+  "selection": "Selection score = mean(val batch A macro F1, robustness dev macro F1). Best score 0.787. Within 0.02 of it: D, C. The simplest of those was kept: D (Model D (TF-IDF + MiniLM concatenated, one LR)). Simplicity order: keyword < A < B < D < C.",
+  "selection_score": 0.7868179541663523,
+  "metrics": {
+    "val_batch_A": {
+      "n": 82,
+      "macro_f1": 0.8833727504379677,
+      "accuracy": 0.8658536585365854,
+      "per_class": {
+        "Constraint": {
+          "precision": 0.8666666666666667,
+          "recall": 0.7647058823529411,
+          "f1": 0.8125,
+          "support": 17
+        },
+        "Expectation": {
+          "precision": 0.9090909090909091,
+          "recall": 0.8333333333333334,
+          "f1": 0.8695652173913043,
+          "support": 24
+        },
+        "Completion": {
+          "precision": 0.9411764705882353,
+          "recall": 0.8888888888888888,
+          "f1": 0.9142857142857143,
+          "support": 18
+        },
+        "Conflict": {
+          "precision": 0.7272727272727273,
+          "recall": 0.9411764705882353,
+          "f1": 0.8205128205128205,
+          "support": 17
+        },
+        "None": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "support": 6
+        }
+      },
+      "confusion_matrix": {
+        "labels": [
+          "Constraint",
+          "Expectation",
+          "Completion",
+          "Conflict",
+          "None"
+        ],
+        "rows_true_cols_pred": [
+          [
+            13,
+            1,
+            0,
+            3,
+            0
+          ],
+          [
+            2,
+            20,
+            1,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            16,
+            2,
+            0
+          ],
+          [
+            0,
+            1,
+            0,
+            16,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            6
+          ]
+        ]
+      }
+    },
+    "val_all": {
+      "n": 338,
+      "macro_f1": 0.9715766175322589,
+      "accuracy": 0.9674556213017751,
+      "per_class": {
+        "Constraint": {
+          "precision": 0.972972972972973,
+          "recall": 0.9473684210526315,
+          "f1": 0.96,
+          "support": 76
+        },
+        "Expectation": {
+          "precision": 0.9761904761904762,
+          "recall": 0.9534883720930233,
+          "f1": 0.9647058823529412,
+          "support": 86
+        },
+        "Completion": {
+          "precision": 0.9807692307692307,
+          "recall": 0.9622641509433962,
+          "f1": 0.9714285714285714,
+          "support": 53
+        },
+        "Conflict": {
+          "precision": 0.9361702127659575,
+          "recall": 0.9887640449438202,
+          "f1": 0.9617486338797814,
+          "support": 89
+        },
+        "None": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "support": 34
+        }
+      },
+      "confusion_matrix": {
+        "labels": [
+          "Constraint",
+          "Expectation",
+          "Completion",
+          "Conflict",
+          "None"
+        ],
+        "rows_true_cols_pred": [
+          [
+            72,
+            1,
+            0,
+            3,
+            0
+          ],
+          [
+            2,
+            82,
+            1,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            51,
+            2,
+            0
+          ],
+          [
+            0,
+            1,
+            0,
+            88,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            34
+          ]
+        ]
+      }
+    },
+    "robustness_dev": {
+      "n": 50,
+      "macro_f1": 0.6902631578947369,
+      "accuracy": 0.7,
+      "per_class": {
+        "Constraint": {
+          "precision": 0.8333333333333334,
+          "recall": 0.5,
+          "f1": 0.625,
+          "support": 10
+        },
+        "Expectation": {
+          "precision": 0.8,
+          "recall": 0.8,
+          "f1": 0.8,
+          "support": 10
+        },
+        "Completion": {
+          "precision": 0.5555555555555556,
+          "recall": 0.5,
+          "f1": 0.5263157894736842,
+          "support": 10
+        },
+        "Conflict": {
+          "precision": 0.6363636363636364,
+          "recall": 0.7,
+          "f1": 0.6666666666666666,
+          "support": 10
+        },
+        "None": {
+          "precision": 0.7142857142857143,
+          "recall": 1.0,
+          "f1": 0.8333333333333334,
+          "support": 10
+        }
+      },
+      "confusion_matrix": {
+        "labels": [
+          "Constraint",
+          "Expectation",
+          "Completion",
+          "Conflict",
+          "None"
+        ],
+        "rows_true_cols_pred": [
+          [
+            5,
+            0,
+            2,
+            3,
+            0
+          ],
+          [
+            0,
+            8,
+            1,
+            0,
+            1
+          ],
+          [
+            0,
+            1,
+            5,
+            1,
+            3
+          ],
+          [
+            1,
+            1,
+            1,
+            7,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            10
+          ]
+        ]
+      }
+    },
+    "test_batch_A": {
+      "n": 106,
+      "macro_f1": 0.8973613822019807,
+      "accuracy": 0.8773584905660378,
+      "per_class": {
+        "Constraint": {
+          "precision": 0.7333333333333333,
+          "recall": 0.9565217391304348,
+          "f1": 0.8301886792452831,
+          "support": 23
+        },
+        "Expectation": {
+          "precision": 0.96,
+          "recall": 0.8571428571428571,
+          "f1": 0.9056603773584906,
+          "support": 28
+        },
+        "Completion": {
+          "precision": 0.9411764705882353,
+          "recall": 0.8421052631578947,
+          "f1": 0.8888888888888888,
+          "support": 19
+        },
+        "Conflict": {
+          "precision": 0.8928571428571429,
+          "recall": 0.8333333333333334,
+          "f1": 0.8620689655172413,
+          "support": 30
+        },
+        "None": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "support": 6
+        }
+      },
+      "confusion_matrix": {
+        "labels": [
+          "Constraint",
+          "Expectation",
+          "Completion",
+          "Conflict",
+          "None"
+        ],
+        "rows_true_cols_pred": [
+          [
+            22,
+            0,
+            0,
+            1,
+            0
+          ],
+          [
+            3,
+            24,
+            0,
+            1,
+            0
+          ],
+          [
+            2,
+            0,
+            16,
+            1,
+            0
+          ],
+          [
+            3,
+            1,
+            1,
+            25,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            6
+          ]
+        ]
+      },
+      "macro_f1_ci95_bootstrap": [
+        0.8400633592532891,
+        0.9465952929423516
+      ]
+    },
+    "test_all": {
+      "n": 434,
+      "macro_f1": 0.9740438608937569,
+      "accuracy": 0.9700460829493087,
+      "per_class": {
+        "Constraint": {
+          "precision": 0.9191919191919192,
+          "recall": 0.9891304347826086,
+          "f1": 0.9528795811518325,
+          "support": 92
+        },
+        "Expectation": {
+          "precision": 0.9908256880733946,
+          "recall": 0.9642857142857143,
+          "f1": 0.9773755656108597,
+          "support": 112
+        },
+        "Completion": {
+          "precision": 0.9859154929577465,
+          "recall": 0.958904109589041,
+          "f1": 0.9722222222222222,
+          "support": 73
+        },
+        "Conflict": {
+          "precision": 0.975609756097561,
+          "recall": 0.96,
+          "f1": 0.967741935483871,
+          "support": 125
+        },
+        "None": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "support": 32
+        }
+      },
+      "confusion_matrix": {
+        "labels": [
+          "Constraint",
+          "Expectation",
+          "Completion",
+          "Conflict",
+          "None"
+        ],
+        "rows_true_cols_pred": [
+          [
+            91,
+            0,
+            0,
+            1,
+            0
+          ],
+          [
+            3,
+            108,
+            0,
+            1,
+            0
+          ],
+          [
+            2,
+            0,
+            70,
+            1,
+            0
+          ],
+          [
+            3,
+            1,
+            1,
+            120,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            32
+          ]
+        ]
+      }
+    },
+    "robustness_test": {
+      "n": 50,
+      "macro_f1": 0.7135449735449735,
+      "accuracy": 0.72,
+      "per_class": {
+        "Constraint": {
+          "precision": 0.7,
+          "recall": 0.7,
+          "f1": 0.7,
+          "support": 10
+        },
+        "Expectation": {
+          "precision": 1.0,
+          "recall": 0.8,
+          "f1": 0.8888888888888888,
+          "support": 10
+        },
+        "Completion": {
+          "precision": 1.0,
+          "recall": 0.4,
+          "f1": 0.5714285714285714,
+          "support": 10
+        },
+        "Conflict": {
+          "precision": 0.6363636363636364,
+          "recall": 0.7,
+          "f1": 0.6666666666666666,
+          "support": 10
+        },
+        "None": {
+          "precision": 0.5882352941176471,
+          "recall": 1.0,
+          "f1": 0.7407407407407407,
+          "support": 10
+        }
+      },
+      "confusion_matrix": {
+        "labels": [
+          "Constraint",
+          "Expectation",
+          "Completion",
+          "Conflict",
+          "None"
+        ],
+        "rows_true_cols_pred": [
+          [
+            7,
+            0,
+            0,
+            0,
+            3
+          ],
+          [
+            1,
+            8,
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            4,
+            3,
+            3
+          ],
+          [
+            2,
+            0,
+            0,
+            7,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            10
+          ]
+        ]
+      },
+      "macro_f1_ci95_bootstrap": [
+        0.5661213192937331,
+        0.8316920995670996
+      ]
+    }
+  },
+  "auto_accept": {
+    "recommended_threshold": null,
+    "target_precision": 0.95,
+    "dev": {
+      "50": {
+        "threshold": 50,
+        "total": 132,
+        "accepted": 118,
+        "accepted_pct": 89.39393939393939,
+        "correct": 102,
+        "precision": 0.864406779661017
+      },
+      "60": {
+        "threshold": 60,
+        "total": 132,
+        "accepted": 104,
+        "accepted_pct": 78.78787878787878,
+        "correct": 92,
+        "precision": 0.8846153846153846
+      },
+      "70": {
+        "threshold": 70,
+        "total": 132,
+        "accepted": 96,
+        "accepted_pct": 72.72727272727273,
+        "correct": 86,
+        "precision": 0.8958333333333334
+      },
+      "80": {
+        "threshold": 80,
+        "total": 132,
+        "accepted": 81,
+        "accepted_pct": 61.36363636363637,
+        "correct": 73,
+        "precision": 0.9012345679012346
+      },
+      "90": {
+        "threshold": 90,
+        "total": 132,
+        "accepted": 54,
+        "accepted_pct": 40.90909090909091,
+        "correct": 51,
+        "precision": 0.9444444444444444
+      }
+    },
+    "test_at_threshold": {
+      "threshold": 90,
+      "total": 156,
+      "accepted": 89,
+      "accepted_pct": 57.05128205128205,
+      "correct": 88,
+      "precision": 0.9887640449438202
+    },
+    "test_threshold_is_recommendation": false
+  },
+  "jira_review": null
+}

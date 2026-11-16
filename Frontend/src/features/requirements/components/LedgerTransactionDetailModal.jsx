@@ -5,23 +5,22 @@ import {
   Copy,
   Check,
   ShieldCheck,
-  Lock,
   ArrowRight,
   ArrowUpRight,
   Blocks,
-  Globe,
+  Database,
+  Network,
+  Flag,
 } from "lucide-react";
 import { Dialog, DialogContent } from "../../../components/ui/dialog";
 import { Badge } from "../../../components/ui/badge";
 import { Button } from "../../../components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../../components/ui/tooltip";
 import { StatusBadge } from "./StatusBadge";
-import { ClassificationBadge } from "./ClassificationBadge";
-import { ConfidenceMeter } from "./ConfidenceMeter";
-import { getTriggeringSignalForEntry } from "../../../data/mockLedger";
+import { NetworkUpdateSummary } from "./LedgerTable";
 import { formatDateTime, truncateHash, cn } from "../../../lib/utils";
 
-const EVENT_ICON = { "Manual Link Added": Link2, "Manual Link Removed": Unlink };
+const EVENT_ICON = { "Manual Link Added": Link2, "Manual Link Removed": Unlink, "Network Updated": Network, "Baseline Created": Flag };
 
 // A transaction's full drill-down: deliberately styled as a distinct
 // "verified record" rather than an ordinary detail sheet: a dark chrome
@@ -38,10 +37,11 @@ export function LedgerTransactionDetailModal({ entry, open, onOpenChange, onSele
 
   if (!entry) return null;
 
-  const isManual = entry.eventType === "Manual Link Added" || entry.eventType === "Manual Link Removed";
-  const isCreated = entry.eventType === "Requirement Created";
+  const isManual = entry.eventCode === "MANUAL_LINK";
+  const isBaseline = entry.eventCode === "BASELINE_CREATED";
+  const isNetwork = entry.eventCode === "NETWORK_UPDATE";
+  const isCreated = entry.eventCode === "REQUIREMENT_CREATED";
   const EventIcon = EVENT_ICON[entry.eventType];
-  const signal = getTriggeringSignalForEntry(entry);
 
   const handleCopy = async () => {
     try {
@@ -69,7 +69,7 @@ export function LedgerTransactionDetailModal({ entry, open, onOpenChange, onSele
           <Link2 className="pointer-events-none absolute -right-3 -top-3 h-24 w-24 rotate-12 text-sidebar-foreground/[0.06]" />
           <div className="relative flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-sidebar-foreground/60">
             <ShieldCheck className="h-3.5 w-3.5" />
-            Transaction · Block #{entry.blockNumber.toLocaleString()}
+            {entry.onChain ? "Blockchain transaction" : "Local hash chain entry"} · Block #{entry.blockNumber.toLocaleString()}
           </div>
           <div className="relative mt-2 flex flex-wrap items-center gap-2">
             <span className="break-all font-mono text-base font-semibold text-sidebar-foreground">{entry.txHash}</span>
@@ -82,8 +82,8 @@ export function LedgerTransactionDetailModal({ entry, open, onOpenChange, onSele
             </button>
           </div>
           <div className="relative mt-3">
-            {isManual ? (
-              <Badge variant="ripple" className="gap-1 text-[10px]">
+            {isManual || isNetwork || isBaseline ? (
+              <Badge variant={isNetwork || isBaseline ? "info" : "ripple"} className="gap-1 text-[10px]">
                 {EventIcon && <EventIcon className="h-3 w-3" />}
                 {entry.eventType}
               </Badge>
@@ -111,14 +111,17 @@ export function LedgerTransactionDetailModal({ entry, open, onOpenChange, onSele
             </div>
             <div>
               <dt className="flex items-center gap-1 text-muted-foreground">
-                <Globe className="h-3 w-3" />
-                Network
+                <Database className="h-3 w-3" />
+                Storage
               </dt>
-              <dd className="mt-1 font-medium text-foreground">Ethereum Sepolia Testnet</dd>
+              <dd className="mt-1 font-medium text-foreground">
+                {entry.onChain ? "On-chain" : "Local database, hash-chained (not a blockchain)"}
+              </dd>
             </div>
           </dl>
 
           {/* Requirement(s) */}
+          {!isNetwork && !isBaseline && (
           <div>
             <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               {isManual ? "Requirements Linked" : "Requirement"}
@@ -145,9 +148,52 @@ export function LedgerTransactionDetailModal({ entry, open, onOpenChange, onSele
               )}
             </div>
           </div>
+          )}
 
-          {/* Status transition, or the manual event + who/reason */}
-          {isManual ? (
+          {/* Status transition, or the manual / network event + who/reason */}
+          {isBaseline ? (
+            <div>
+              <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Baseline</p>
+              <div className="flex items-center gap-2">
+                <Badge variant="info" className="gap-1">
+                  <Flag className="h-3.5 w-3.5" />
+                  {entry.eventType}
+                </Badge>
+                {entry.actor && <span className="text-xs text-muted-foreground">by {entry.actor}</span>}
+              </div>
+              <div className="mt-3 rounded-lg border border-border bg-muted/20 p-3.5 text-sm">
+                <span className="font-semibold text-foreground">{entry.details?.name ?? "(unnamed)"}</span>
+                {entry.details?.baselineId && <span className="ml-2 font-mono text-xs text-muted-foreground">{entry.details.baselineId}</span>}
+                <p className="mt-1 text-xs text-muted-foreground">The requirement network and requirement statuses were frozen. Alignment is measured against the latest baseline.</p>
+              </div>
+            </div>
+          ) : isNetwork ? (
+            <div>
+              <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Requirement network changes</p>
+              <div className="flex items-center gap-2">
+                <Badge variant="info" className="gap-1">
+                  <Network className="h-3.5 w-3.5" />
+                  {entry.eventType}
+                </Badge>
+                {entry.actor && <span className="text-xs text-muted-foreground">by {entry.actor}</span>}
+              </div>
+              {entry.triggeringSignalId && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Triggered by signal <span className="font-mono text-primary">{entry.triggeringSignalId}</span>
+                  {entry.requirementId ? <> applied to <span className="font-mono text-primary">{entry.requirementId}</span></> : null}.
+                </p>
+              )}
+              {!entry.triggeringSignalId && entry.requirementId && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Triggered by a change to <span className="font-mono text-primary">{entry.requirementId}</span>
+                  {entry.requirementTitle ? ` (${entry.requirementTitle})` : ""}.
+                </p>
+              )}
+              <div className="mt-3 rounded-lg border border-border bg-muted/20 p-3.5 text-sm">
+                <NetworkUpdateSummary details={entry.details} />
+              </div>
+            </div>
+          ) : isManual ? (
             <div>
               <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Event</p>
               <div className="flex items-center gap-2">
@@ -176,43 +222,42 @@ export function LedgerTransactionDetailModal({ entry, open, onOpenChange, onSele
           )}
 
           {/* Triggering signal (Status Change) / reason (Manual Link) */}
+          {!isNetwork && !isBaseline && (
           <div>
             <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               {isManual ? "Reason" : isCreated ? "Source" : "Triggering Signal"}
             </p>
             <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-3.5">
-              {signal && (
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <ClassificationBadge classification={signal.classification} />
-                  <span className="text-[11px] text-muted-foreground">{signal.source}</span>
-                </div>
-              )}
               <p className="text-sm leading-relaxed text-foreground/90">{entry.triggeringSignal}</p>
-              {signal && (
-                <div className="flex items-center justify-between gap-2 border-t border-border pt-2.5">
-                  <ConfidenceMeter value={signal.confidence} />
-                  <span className="text-[11px] text-muted-foreground">{signal.author}</span>
-                </div>
+              {entry.triggeringSignalId && (
+                <p className="border-t border-border pt-2 text-[11px] text-muted-foreground">
+                  Signal <span className="font-mono">{entry.triggeringSignalId}</span>
+                  {entry.actor ? ` · applied by ${entry.actor}` : ""}
+                </p>
               )}
             </div>
           </div>
+          )}
 
-          {/* Verification */}
-          <div className="rounded-lg border border-status-confirmed-fg/25 bg-status-confirmed-bg/30 p-3.5">
+          {/* Verification: honest about what this is */}
+          <div className="rounded-lg border border-border bg-muted/20 p-3.5">
             <div className="flex items-center justify-between gap-2">
-              <span className="flex items-center gap-1.5 text-sm font-medium text-status-confirmed-fg">
-                <ShieldCheck className="h-4 w-4" />
-                Signature Verified
-                <Check className="h-3.5 w-3.5" />
+              <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                <ShieldCheck className="h-4 w-4 text-primary" />
+                {entry.onChain ? "On-chain transaction" : "Local hash chain"}
               </span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-status-confirmed-fg/15 px-2 py-0.5 text-[10px] font-medium text-status-confirmed-fg">
-                <Lock className="h-2.5 w-2.5" />
-                Immutable, cannot be altered retroactively
+              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                {entry.onChain ? "On a blockchain" : "Not on a blockchain"}
               </span>
             </div>
-            <div className="mt-2.5 flex items-center gap-1.5 border-t border-status-confirmed-fg/20 pt-2.5 text-xs">
-              <Link2 className="h-3.5 w-3.5 shrink-0 text-status-confirmed-fg/70" />
-              <span className="text-muted-foreground">Previous Block Hash:</span>
+            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+              {entry.onChain
+                ? "This entry was written to a blockchain."
+                : "The hash below covers this entry and the one before it, so changing an old entry breaks the chain. Use Verify chain on the ledger page to check it."}
+            </p>
+            <div className="mt-2.5 flex items-center gap-1.5 border-t border-border pt-2.5 text-xs">
+              <Link2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <span className="text-muted-foreground">Previous block hash:</span>
               <span className="font-mono text-foreground/80">{truncateHash(entry.previousBlockHash)}</span>
             </div>
           </div>
@@ -227,7 +272,7 @@ export function LedgerTransactionDetailModal({ entry, open, onOpenChange, onSele
                   </Button>
                 </span>
               </TooltipTrigger>
-              <TooltipContent>Testnet explorer link, prototype only</TooltipContent>
+              <TooltipContent>Not on a blockchain, so there is no explorer link</TooltipContent>
             </Tooltip>
           </div>
         </div>
